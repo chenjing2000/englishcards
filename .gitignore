@@ -1,0 +1,79 @@
+# EnglishCards — source repository ignore rules
+# Commit source, test fixtures, package-lock.json and documentation.
+
+# Node.js: installed dependencies, package-manager caches
+node_modules/
+.npm/
+.npm-cache/
+.pnpm-store/
+.yarn/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Web/TypeScript build output and generated files
+/dist/
+/artifacts/dist/
+/artifacts/desktop/
+/artifacts/coverage/
+/artifacts/test-results/
+/artifacts/playwright-report/
+/artifacts/blob-report/
+/artifacts/test-runtime/
+/artifacts/demo/preview-page-*.png
+coverage/
+.vite/
+*.tsbuildinfo
+
+# .NET / Visual Studio generated output
+**/bin/
+**/obj/
+.vs/
+.vscode/.ropeproject/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+TestResults/
+
+# Playwright / test execution output
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+.install-check/
+
+# Portable runtime user data, including instances under publish folders
+# Never commit user articles, settings, drafts, WebView2 profiles or export output.
+**/userdata/
+/config/settings.json
+/config/*.tmp
+
+# Developer-local configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+*.pfx
+*.p12
+*.pem
+*.key
+
+# Logs, transient and editor/OS files
+*.log
+*.log.*
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+~$*
+
+# Intentionally tracked: package-lock.json, assets/ test fixtures,
+# docs/, tools/, desktop/, src/, and tests/.

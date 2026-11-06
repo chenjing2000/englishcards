@@ -1,0 +1,334 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { commitEntryHead, defaults, editParagraph, emptySense, newId, removeEntrySense, splitSenseMeaning, toggleHighlight, type EntryCollection, projectDocument, styleSchema, type RenderProject, type Project, type Sense, type Styles } from '../models/project';
+import { paginate, type Layout } from '../services/pagination';
+import { cacheDraft, download, loadDesktopData, loadSettings, readSettingsFile, saveSettings, openProject, saveProject, requestExport, restoreDraft, sampleDraft, type DesktopPersistence, type DesktopSaveResult } from '../services/projectIO';
+import { desktopRequest, isDesktop } from '../services/desktopBridge';
+
+type ParagraphCollection = 'source' | 'translation';
+const stringify = (project: Project) => JSON.stringify(projectDocument(project), null, 2);
+
+export function useEditorViewModel() {
+  const desktop = isDesktop();
+  const [boot, setBoot] = useState(desktop ? sampleDraft : restoreDraft);
+  const [history, setHistory] = useState<{ past: RenderProject[]; present: RenderProject; future: RenderProject[] }>({ past: [], present: { ...boot.project, styles: { ...defaults } }, future: [] });
+  const project = history.present;
+  const [vocabularySelection, setVocabularySelection] = useState<string | null>(null);
+  const vocabularyIndex = project.vocabulary.findIndex(entry => entry.id === vocabularySelection);
+  const selectedVocabularyIndex = vocabularyIndex >= 0 ? vocabularyIndex : project.vocabulary.length ? 0 : -1;
+  const selectedVocabulary = project.vocabulary[selectedVocabularyIndex];
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const error = Object.values(errors)[0] ?? '';
+  const [warning, setWarning] = useState<{ text: string } | null>(null);
+  function reportError(source: string, text: string) {
+    setErrors(current => {
+      if ((current[source] ?? '') === text) return current;
+      const next = { ...current }; if (text) next[source] = text; else delete next[source]; return next;
+    });
+  }
+  function showWarning(text: string) { setWarning({ text }); }
+  useEffect(() => {
+    if (!warning) return;
+    const timer = setTimeout(() => setWarning(current => current === warning ? null : current), 10000);
+    return () => clearTimeout(timer);
+  }, [warning]);
+  useEffect(() => {
+    if (boot.rejected && !boot.cacheBlocked) showWarning(boot.notice);
+  }, []);
+  useEffect(() => { if (project.warnings.length) showWarning(project.warnings.join(' ')); }, [project.warnings]);
+  const [lastFile, setLastFile] = useState('');
+  const [rendered, setRendered] = useState<{ project: RenderProject; layout: Layout } | null>(null);
+  const [highlightRefresh, setHighlightRefresh] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const preparingClose = useRef(false);
+  const openRequest = useRef(0);
+  const openedFile = useRef(0);
+  const saving = useRef(false);
+  const importingSettings = useRef(false);
+  const desktopStore = useRef<DesktopPersistence | null>(null);
+  const desktopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const latest = useRef({ project, opening });
+  useLayoutEffect(() => { latest.current = { project, opening }; }, [project, opening]);
+  const [settingsReady, setSettingsReady] = useState(false);
+  const savedSettings = useRef('');
+  const settingsQueue = useRef(Promise.resolve());
+  const pendingSettingsSaves = useRef(0);
+  const settingsRevision = useRef(0);
+  const ready = settingsReady && !opening && rendered?.project === project;
+  const hasFileChanges = lastFile !== stringify(project);
+
+  function update(next: Project | ((current: RenderProject) => Project)) {
+    setHistory(current => {
+      const result = typeof next === 'function' ? next(current.present) : next;
+      if (result === current.present) return current;
+      return { past: [...current.past.slice(-9), current.present], present: { ...result, styles: 'styles' in result ? (result as RenderProject).styles : current.present.styles }, future: [] };
+    });
+  }
+  function undo() { setHistory(current => current.past.length ? { past: current.past.slice(0, -1), present: current.past.at(-1)!, future: [current.present, ...current.future] } : current); }
+  function redo() { setHistory(current => current.future.length ? { past: [...current.past, current.present], present: current.future[0], future: current.future.slice(1) } : current); }
+
+  useEffect(() => {
+    let cancelled = false;
+    if (desktop) {
+      loadDesktopData().then(result => {
+        if (cancelled) return;
+        desktopStore.current = result.persistence;
+        setBoot(result.draft);
+        setHistory({ past: [], present: { ...result.draft.project, styles: result.settings }, future: [] });
+        savedSettings.current = JSON.stringify(result.settings);
+        if (result.notice) showWarning(result.notice);
+        setSettingsReady(true);
+      }).catch(reason => { if (!cancelled) reportError('settings-load', `本机数据读取失败：${String(reason)}`); });
+      return () => { cancelled = true; };
+    }
+    loadSettings().then(result => {
+      if (cancelled) return;
+      const styles = styleSchema.parse(result.settings);
+      savedSettings.current = JSON.stringify(styles);
+      setHistory(current => ({ past: [], present: { ...current.present, styles }, future: [] }));
+      if (result.error) showWarning(result.error); setSettingsReady(true);
+    }).catch(reason => { if (!cancelled) { reportError('settings-load', `配置读取失败：${String(reason)}。请刷新重试。`); } });
+    return () => { cancelled = true; };
+  }, [desktop]);
+  useEffect(() => {
+    if (desktop || !settingsReady) return;
+    const revision = ++settingsRevision.current;
+    const parsed = styleSchema.safeParse(project.styles);
+    if (!parsed.success) { reportError('settings-validation', `配置无效，未保存：${parsed.error.issues.map(issue => issue.message).join(' ')}`); return; }
+    reportError('settings-validation', '');
+    const serialized = JSON.stringify(parsed.data);
+    if (serialized === savedSettings.current && pendingSettingsSaves.current === 0) {
+      reportError('settings-save', '');
+      return;
+    }
+    const timer = setTimeout(() => {
+      pendingSettingsSaves.current++;
+      settingsQueue.current = settingsQueue.current.then(async () => {
+        try {
+          if (revision !== settingsRevision.current) return;
+          await saveSettings(parsed.data); savedSettings.current = serialized;
+          if (revision === settingsRevision.current) reportError('settings-save', '');
+        } catch (reason) { if (revision === settingsRevision.current) reportError('settings-save', `配置未保存：${String(reason)}`); }
+        finally { pendingSettingsSaves.current--; }
+      });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [desktop, project.styles, settingsReady]);
+
+  useEffect(() => {
+    if (desktop) return;
+    if (boot.cacheBlocked) { reportError('draft', '自动缓存已停用，旧草稿未覆盖，请保存 JSON。'); return; }
+    try {
+      cacheDraft(project);
+      reportError('draft', '');
+    } catch { reportError('draft', '自动草稿保存失败！请立即下载 JSON 备份。'); }
+  }, [desktop, project]);
+
+  function reportDesktopSave(result: DesktopSaveResult) {
+    reportError('settings-save', result.settingsError);
+    reportError('draft', result.draftError);
+  }
+  useEffect(() => {
+    const store = desktopStore.current;
+    if (!settingsReady || !store || preparingClose.current) return;
+    let current = true;
+    desktopTimer.current = setTimeout(() => {
+      void store.save(project).then(result => { if (current) reportDesktopSave(result); });
+    }, 300);
+    return () => { current = false; clearTimeout(desktopTimer.current); };
+  }, [project, settingsReady]);
+  useLayoutEffect(() => {
+    if (!desktop) return;
+    const host = window as Window & { prepareClose?: () => Promise<{ pending: boolean; errors: string[]; busy?: boolean }> };
+    host.prepareClose = async () => {
+      if (preparingClose.current) return { pending: true, errors: [], busy: true };
+      // Commit an active inline editor and let React publish the latest undo/edit before taking the snapshot.
+      preparingClose.current = true;
+      try {
+        flushSync(() => {
+          (document.activeElement as HTMLElement | null)?.blur();
+          setClosing(true);
+        });
+        if (latest.current.opening || saving.current || importingSettings.current)
+          return { pending: true, errors: [], busy: true };
+        clearTimeout(desktopTimer.current);
+        const result = await desktopStore.current?.save(latest.current.project);
+        if (!result) return { pending: false, errors: [] };
+        reportDesktopSave(result);
+        return { pending: result.pending, errors: [result.settingsError, result.draftError].filter(Boolean) };
+      } finally {
+        preparingClose.current = false;
+        setClosing(false);
+      }
+    };
+    return () => { delete host.prepareClose; };
+  }, [desktop]);
+  useEffect(() => {
+    if (!settingsReady) return;
+    const valid = styleSchema.safeParse(project.styles);
+    if (!valid.success) { setRendered(null); return; }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      paginate(project).then(layout => {
+        if (cancelled) return;
+        setRendered({ project, layout });
+        window.editor = { project, signature: layout.signature, diagnostics: layout.diagnostics };
+        reportError('pagination', '');
+        if (layout.warnings.length) showWarning(layout.warnings.join(' '));
+      }).catch(reason => { if (!cancelled) reportError('pagination', `分页失败：${String(reason)}。请检查字号、边距或恢复模板默认。`); });
+    }, 120);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [project, highlightRefresh, settingsReady]);
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => { if (hasFileChanges || pendingSettingsSaves.current > 0 || (settingsReady && JSON.stringify(project.styles) !== savedSettings.current)) event.preventDefault(); };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [hasFileChanges, settingsReady, project.styles]);
+
+  async function open(file?: File) {
+    if (!file && !isDesktop()) return;
+    const request = ++openRequest.current;
+    setOpening(true);
+    try {
+      const next = await openProject(file);
+      if (request !== openRequest.current || next === null) return;
+      openedFile.current = request;
+      update(next); setLastFile(stringify(next)); reportError('import', '');
+    } catch (reason) { if (request === openRequest.current) reportError('import', `无法打开项目：${reason instanceof Error ? reason.message : String(reason)}`); }
+    finally { if (request === openRequest.current) setOpening(false); }
+  }
+  async function save() {
+    if (saving.current) return;
+    saving.current = true;
+    const previousOpen = openedFile.current;
+    try {
+      const pending = saveProject(project);
+      const contents = typeof pending === 'string' ? pending : await pending;
+      if (contents === null || previousOpen !== openedFile.current) return;
+      setLastFile(contents); reportError('save', '');
+    } catch (reason) {
+      if (previousOpen === openedFile.current) reportError('save', `项目保存失败：${String(reason)}`);
+    } finally { saving.current = false; }
+  }
+  async function exportImages() {
+    if (!ready || exporting) return;
+    setExporting(true);
+    try {
+      const outcome = await requestExport(project, rendered!.layout.signature, rendered!.layout.pages.length);
+      if (outcome === false) showWarning('导出已取消。');
+      reportError('export', '');
+    } catch (reason) { reportError('export', `导出失败：${reason instanceof Error ? reason.message : String(reason)}`); }
+    finally { setExporting(false); }
+  }
+  function setProjectText(key: 'title' | 'mainIdea' | 'personalizedHeader', value: string) {
+    update(current => ({ ...current, [key]: value }));
+  }
+  function setParagraphText(key: ParagraphCollection, id: string, text: string) {
+    update(current => editParagraph(current, id, text, key));
+  }
+  function addParagraph(key: ParagraphCollection) {
+    update(current => ({ ...current, [key]: { paragraphs: [...current[key].paragraphs, { id: newId(), text: '' }] } }));
+  }
+  function highlightRange(paragraphId: string, start: number, end: number) {
+    if (start === end) { showWarning('请先在英文段落中选择要标注的文字。'); return; }
+    const next = toggleHighlight(project, paragraphId, start, end);
+    if (next === project) { showWarning('请选择完整的单词或词组。'); return; }
+    update(next);
+  }
+  function refreshHighlights() {
+    setRendered(null);
+    setHighlightRefresh(current => current + 1);
+  }
+  function reorder(key: EntryCollection, index: number, direction: number) {
+    update(current => { const list = [...current[key]]; const destination = index + direction; if (destination < 0 || destination >= list.length) return current; [list[index], list[destination]] = [list[destination], list[index]]; return { ...current, [key]: list }; });
+  }
+  function setEntryField(key: EntryCollection, id: string, property: string, value: string) {
+    update(current => ({ ...current, [key]: current[key].map(item => item.id === id ? { ...item, [property]: value } : item) }));
+  }
+  function commitHead(key: EntryCollection, id: string, value: string) {
+    try {
+      const next = commitEntryHead(project, key, id, value);
+      if (next !== project) update(next);
+      reportError('entry', '');
+    } catch (reason) { reportError('entry', `词条保存失败：${String(reason)}`); }
+  }
+  function setSenseField(key: EntryCollection, id: string, index: number, field: keyof Sense, value: string) {
+    update(current => ({ ...current, [key]: current[key].map(entry => entry.id === id ? { ...entry, senses: entry.senses.map((sense, i) => i === index ? { ...sense, [field]: value } : sense) } : entry) }));
+  }
+  function setVocabularyMeaning(id: string, index: number, value: string) {
+    update(current => ({ ...current, vocabulary: current.vocabulary.map(entry => entry.id === id ? { ...entry, senses: entry.senses.map((sense, i) => i === index ? { ...sense, ...splitSenseMeaning(value, sense.pos) } : sense) } : entry) }));
+  }
+  function addSense(key: EntryCollection, id: string) {
+    update(current => ({ ...current, [key]: current[key].map(entry => entry.id === id ? { ...entry, senses: [...entry.senses, emptySense()] } : entry) }));
+  }
+  function removeSense(key: EntryCollection, id: string, index: number) {
+    update(current => removeEntrySense(current, key, id, index));
+  }
+  function addEntry(key: EntryCollection) {
+    update(current => ({ ...current, [key]: [...current[key], key === 'vocabulary' ? { id: newId(), word: '', ipa: '', highlight: [], senses: [emptySense()] } : { id: newId(), phrase: '', highlight: [], senses: [emptySense()] }] }));
+  }
+  function removeEntry(key: EntryCollection, id: string) {
+    update(current => ({ ...current, [key]: current[key].filter(item => item.id !== id) }));
+  }
+  function selectVocabulary(id: string) { setVocabularySelection(id); }
+  function moveSelectedVocabulary(direction: number) {
+    if (!selectedVocabulary) return;
+    setVocabularySelection(selectedVocabulary.id);
+    reorder('vocabulary', selectedVocabularyIndex, direction);
+  }
+  function deleteSelectedVocabulary() {
+    if (!selectedVocabulary) return;
+    const next = project.vocabulary[selectedVocabularyIndex + 1] ?? project.vocabulary[selectedVocabularyIndex - 1];
+    setVocabularySelection(next?.id ?? null);
+    removeEntry('vocabulary', selectedVocabulary.id);
+  }
+  function insertVocabularyBelow() {
+    const entry = { id: newId(), word: '', ipa: '', highlight: [], senses: [emptySense()] };
+    update(current => {
+      const vocabulary = [...current.vocabulary];
+      const index = vocabulary.findIndex(item => item.id === selectedVocabulary?.id);
+      vocabulary.splice(index + 1, 0, entry);
+      return { ...current, vocabulary };
+    });
+    setVocabularySelection(entry.id);
+    return entry.id;
+  }
+  function setStyle<K extends keyof Styles>(key: K, value: Styles[K]) {
+    update(current => ({ ...current, styles: { ...current.styles, [key]: value } }));
+  }
+  function replaceStyles(styles: Styles) {
+    desktopStore.current?.replaceSettings();
+    savedSettings.current = '';
+    update(current => ({ ...current, styles: { ...styles } }));
+  }
+  function resetStyles() { replaceStyles(defaults); }
+  async function importSettings(file?: File) {
+    if (!desktop || !file || importingSettings.current) return;
+    importingSettings.current = true;
+    try {
+      replaceStyles(await readSettingsFile(file));
+      reportError('settings-import', '');
+    } catch (reason) {
+      reportError('settings-import', `配置导入失败：${String(reason)}`);
+    } finally { importingSettings.current = false; }
+  }
+  function clearError() { const source = Object.keys(errors)[0]; if (source) reportError(source, ''); }
+  async function downloadRejectedDraft() {
+    if (boot.desktopRejected) {
+      try { await desktopRequest('saveRejectedDraft'); reportError('draft-recovery', ''); }
+      catch (reason) { reportError('draft-recovery', `原始草稿另存失败：${String(reason)}`); }
+    } else if (boot.rejected) download(new Blob([boot.rejected], { type: 'text/plain' }), 'rejected-draft.txt');
+  }
+
+  return {
+    project, warning, error, settingsReady, ready, exporting, desktop, closing,
+    canUndo: history.past.length > 0, canRedo: history.future.length > 0,
+    layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
+    undo, redo, open, save, exportImages, setProjectText, setParagraphText, addParagraph,
+    highlightRange, refreshHighlights, commitHead, setSenseField, setVocabularyMeaning, addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,
+    selectedVocabulary, selectedVocabularyIndex, selectVocabulary, moveSelectedVocabulary, deleteSelectedVocabulary, insertVocabularyBelow,
+    clearError, downloadRejectedDraft, importSettings,
+  };
+}

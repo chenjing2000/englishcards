@@ -1,0 +1,304 @@
+{
+  "schemaVersion": 1,
+  "id": "brainco-example",
+  "title": "Brain-Computer Interfaces: Beyond Neuralink",
+  "readingLevel": 6000,
+  "source": {
+    "paragraphs": [
+      {
+        "id": "en-1",
+        "text": "THE EXHIBITION hall at BrainCo, a “neuro-tech” startup based in the city of Hangzhou, showcases just how much its wearable devices are capable of. At one exhibit an amputee plays the piano before easily removing a bionic arm that can be attached without surgery. Elsewhere another amputee with an artificial leg paces back and forth, challenging onlookers to guess which limb is mechanical."
+      },
+      {
+        "id": "en-2",
+        "text": "BrainCo’s devices are not only for victims of serious accidents. At another station, your correspondent is asked to lie down and don a mask that pumps low-amplitude electrical micro-currents into his frontal lobe, supposedly to induce relaxation. For the past decade “brain-computer interfaces” (BCIs)—machines that can deliver signals to and receive them from the human brain—have been closely associated with Neuralink, an American startup founded by Elon Musk in 2016. Neuralink was the first company to conduct trials of wireless brain implants that allow severely disabled people to control computers for long periods of time with only their thoughts and no additional hardware."
+      }
+    ]
+  },
+  "highlights": [
+    {
+      "id": "h-1",
+      "text": "neuro-tech",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-2",
+      "text": "showcases",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-3",
+      "text": "wearable",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-4",
+      "text": "amputee",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-5",
+      "text": "bionic",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-6",
+      "text": "paces back and forth",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-7",
+      "text": "onlookers",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-8",
+      "text": "limb",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-9",
+      "text": "don",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-10",
+      "text": "low-amplitude",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-11",
+      "text": "micro-currents",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-12",
+      "text": "frontal lobe",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-13",
+      "text": "supposedly",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-14",
+      "text": "induce",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-15",
+      "text": "brain-computer interfaces",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-16",
+      "text": "deliver signals",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-17",
+      "text": "have been closely associated with",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-18",
+      "text": "conduct trials",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-19",
+      "text": "wireless",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-20",
+      "text": "brain implants",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-21",
+      "text": "severely",
+      "style": "emphasis"
+    },
+    {
+      "id": "h-22",
+      "text": "additional hardware",
+      "style": "emphasis"
+    }
+  ],
+  "vocabulary": [
+    {
+      "id": "v-1",
+      "word": "neuro-tech",
+      "pos": "adj.",
+      "meaning": "神经科技的"
+    },
+    {
+      "id": "v-2",
+      "word": "showcase",
+      "pos": "v.",
+      "meaning": "展示",
+      "ipa": "/ˈʃəʊkeɪs/"
+    },
+    {
+      "id": "v-3",
+      "word": "wearable",
+      "pos": "adj.",
+      "meaning": "可穿戴的",
+      "ipa": "/ˈweərəbl/"
+    },
+    {
+      "id": "v-4",
+      "word": "amputee",
+      "pos": "n.",
+      "meaning": "截肢者",
+      "ipa": "/ˌæmpjʊˈtiː/"
+    },
+    {
+      "id": "v-5",
+      "word": "bionic",
+      "pos": "adj.",
+      "meaning": "仿生的",
+      "ipa": "/baɪˈɒnɪk/"
+    },
+    {
+      "id": "v-6",
+      "word": "onlooker",
+      "pos": "n.",
+      "meaning": "旁观者",
+      "ipa": "/ˈɒnlʊkə/"
+    },
+    {
+      "id": "v-7",
+      "word": "limb",
+      "pos": "n.",
+      "meaning": "肢体",
+      "ipa": "/lɪm/"
+    },
+    {
+      "id": "v-8",
+      "word": "don",
+      "pos": "v.",
+      "meaning": "穿上；戴上",
+      "ipa": "/dɒn/"
+    },
+    {
+      "id": "v-9",
+      "word": "supposedly",
+      "pos": "adv.",
+      "meaning": "据称",
+      "ipa": "/səˈpəʊzɪdli/"
+    },
+    {
+      "id": "v-10",
+      "word": "induce",
+      "pos": "v.",
+      "meaning": "诱发；引起",
+      "ipa": "/ɪnˈdjuːs/"
+    },
+    {
+      "id": "v-11",
+      "word": "micro-current",
+      "pos": "n.",
+      "meaning": "微电流"
+    },
+    {
+      "id": "v-12",
+      "word": "wireless",
+      "pos": "adj.",
+      "meaning": "无线的",
+      "ipa": "/ˈwaɪələs/"
+    },
+    {
+      "id": "v-13",
+      "word": "severely",
+      "pos": "adv.",
+      "meaning": "严重地",
+      "ipa": "/sɪˈvɪəli/"
+    }
+  ],
+  "expressions": [
+    {
+      "id": "x-1",
+      "phrase": "pace back and forth",
+      "meaning": "来回踱步",
+      "example": "She paced back and forth before the interview.",
+      "exampleTranslation": "面试前，她来回踱步。"
+    },
+    {
+      "id": "x-2",
+      "phrase": "low-amplitude electrical micro-currents",
+      "meaning": "低振幅的微电流",
+      "example": "The device uses low-amplitude currents in a controlled test.",
+      "exampleTranslation": "该装置在受控测试中使用低振幅电流。"
+    },
+    {
+      "id": "x-3",
+      "phrase": "frontal lobe",
+      "meaning": "大脑额叶",
+      "example": "The frontal lobe plays a role in planning and decision-making.",
+      "exampleTranslation": "额叶参与计划和决策等功能。"
+    },
+    {
+      "id": "x-4",
+      "phrase": "brain-computer interface",
+      "meaning": "脑机接口（BCI）",
+      "example": "A brain-computer interface can translate neural signals into computer commands.",
+      "exampleTranslation": "脑机接口可以将神经信号转换为计算机指令。"
+    },
+    {
+      "id": "x-5",
+      "phrase": "be closely associated with",
+      "meaning": "与……紧密联系",
+      "example": "The research centre is closely associated with the university.",
+      "exampleTranslation": "这家研究中心与该大学联系紧密。"
+    },
+    {
+      "id": "x-6",
+      "phrase": "conduct trials",
+      "meaning": "开展试验",
+      "example": "Scientists conduct trials before introducing new devices.",
+      "exampleTranslation": "科学家在推出新设备前开展试验。"
+    },
+    {
+      "id": "x-7",
+      "phrase": "brain implants",
+      "meaning": "脑部植入装置",
+      "example": "Brain implants are being investigated for assistive technology.",
+      "exampleTranslation": "研究人员正在探索脑部植入装置的辅助技术用途。"
+    },
+    {
+      "id": "x-8",
+      "phrase": "deliver signals",
+      "meaning": "传递信号",
+      "example": "The sensor delivers signals to a connected computer.",
+      "exampleTranslation": "传感器向连接的计算机传递信号。"
+    },
+    {
+      "id": "x-9",
+      "phrase": "additional hardware",
+      "meaning": "额外硬件",
+      "example": "The program works without additional hardware.",
+      "exampleTranslation": "这款程序无需额外硬件即可运行。"
+    }
+  ],
+  "mainIdea": "文章通过 BrainCo 的仿生肢体和神经科技设备，介绍人脑与机器交互的不同路径。",
+  "translation": {
+    "paragraphs": [
+      {
+        "id": "zh-1",
+        "text": "位于杭州的“神经科技”初创企业 BrainCo 的展厅，展示了其可穿戴设备究竟有多大能耐。在一个展区，一名截肢者先弹奏钢琴，随后轻松取下一只无需手术即可装配的仿生手臂。在另一处，一名装着假腿的截肢者来回踱步，让围观者猜测他的哪一条腿是机械假肢。BrainCo 的设备并非只为严重事故的受害者设计。在另一个体验区，记者被要求躺下并戴上一副面罩；面罩向他大脑的额叶输送低振幅微电流，据称可以使人放松。"
+      },
+      {
+        "id": "zh-2",
+        "text": "过去十年，“脑机接口”（BCI）——能够向人脑传递信号、并接收人脑发出信号的机器——一直与 Neuralink 紧密联系在一起。Neuralink 是一家美国初创企业，由埃隆·马斯克于 2016 年创立。Neuralink 是第一家开展无线脑部植入装置试验的公司。这类装置使严重残障人士无需任何额外硬件、仅凭意念就能长时间控制计算机。"
+      }
+    ]
+  },
+  "theme": "classic",
+  "layoutOverrides": {
+    "manualPageBreaks": [],
+    "elementStyles": {}
+  }
+}

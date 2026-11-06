@@ -1,0 +1,91 @@
+[
+  {
+    "id": "v-1",
+    "word": "neuro-tech",
+    "pos": "adj.",
+    "meaning": "神经科技的"
+  },
+  {
+    "id": "v-2",
+    "word": "showcase",
+    "pos": "v.",
+    "meaning": "展示",
+    "ipa": "/ˈʃəʊkeɪs/"
+  },
+  {
+    "id": "v-3",
+    "word": "wearable",
+    "pos": "adj.",
+    "meaning": "可穿戴的",
+    "ipa": "/ˈweərəbl/"
+  },
+  {
+    "id": "v-4",
+    "word": "amputee",
+    "pos": "n.",
+    "meaning": "截肢者",
+    "ipa": "/ˌæmpjʊˈtiː/"
+  },
+  {
+    "id": "v-5",
+    "word": "bionic",
+    "pos": "adj.",
+    "meaning": "仿生的",
+    "ipa": "/baɪˈɒnɪk/"
+  },
+  {
+    "id": "v-6",
+    "word": "onlooker",
+    "pos": "n.",
+    "meaning": "旁观者",
+    "ipa": "/ˈɒnlʊkə/"
+  },
+  {
+    "id": "v-7",
+    "word": "limb",
+    "pos": "n.",
+    "meaning": "肢体",
+    "ipa": "/lɪm/"
+  },
+  {
+    "id": "v-8",
+    "word": "don",
+    "pos": "v.",
+    "meaning": "穿上；戴上",
+    "ipa": "/dɒn/"
+  },
+  {
+    "id": "v-9",
+    "word": "supposedly",
+    "pos": "adv.",
+    "meaning": "据称",
+    "ipa": "/səˈpəʊzɪdli/"
+  },
+  {
+    "id": "v-10",
+    "word": "induce",
+    "pos": "v.",
+    "meaning": "诱发；引起",
+    "ipa": "/ɪnˈdjuːs/"
+  },
+  {
+    "id": "v-11",
+    "word": "micro-current",
+    "pos": "n.",
+    "meaning": "微电流"
+  },
+  {
+    "id": "v-12",
+    "word": "wireless",
+    "pos": "adj.",
+    "meaning": "无线的",
+    "ipa": "/ˈwaɪələs/"
+  },
+  {
+    "id": "v-13",
+    "word": "severely",
+    "pos": "adv.",
+    "meaning": "严重地",
+    "ipa": "/sɪˈvɪəli/"
+  }
+]

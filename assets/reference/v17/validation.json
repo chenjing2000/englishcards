@@ -1,0 +1,52 @@
+{
+  "useful_expressions_can_cross_pages": true,
+  "split_strategy": "note components (phrase / definition / sample / translation) are paginated independently",
+  "page_count": 4,
+  "checks": [
+    {
+      "overflow": false,
+      "mainHeight": 1403.328125
+    },
+    {
+      "overflow": false,
+      "mainHeight": 1474
+    },
+    {
+      "overflow": false,
+      "mainHeight": 1474
+    },
+    {
+      "overflow": false,
+      "mainHeight": 1474
+    }
+  ],
+  "first_line_indent": {
+    "english_article": "true paragraph starts only",
+    "chinese_translation": "each paragraph first line",
+    "indent": "2em"
+  },
+  "font_updates": {
+    "english_article_px": 36,
+    "english_title_px": 40,
+    "chinese_translation_px": 32,
+    "article_highlight_px": 36
+  },
+  "v17_checks": [
+    {
+      "overflow": false,
+      "highlightFont": "36px"
+    },
+    {
+      "overflow": false,
+      "highlightFont": "36px"
+    },
+    {
+      "overflow": false,
+      "highlightFont": "16px"
+    },
+    {
+      "overflow": false,
+      "highlightFont": "16px"
+    }
+  ]
+}

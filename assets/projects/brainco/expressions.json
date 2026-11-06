@@ -1,0 +1,65 @@
+[
+  {
+    "id": "x-1",
+    "phrase": "pace back and forth",
+    "meaning": "来回踱步",
+    "example": "She paced back and forth before the interview.",
+    "exampleTranslation": "面试前，她来回踱步。"
+  },
+  {
+    "id": "x-2",
+    "phrase": "low-amplitude electrical micro-currents",
+    "meaning": "低振幅的微电流",
+    "example": "The device uses low-amplitude currents in a controlled test.",
+    "exampleTranslation": "该装置在受控测试中使用低振幅电流。"
+  },
+  {
+    "id": "x-3",
+    "phrase": "frontal lobe",
+    "meaning": "大脑额叶",
+    "example": "The frontal lobe plays a role in planning and decision-making.",
+    "exampleTranslation": "额叶参与计划和决策等功能。"
+  },
+  {
+    "id": "x-4",
+    "phrase": "brain-computer interface",
+    "meaning": "脑机接口（BCI）",
+    "example": "A brain-computer interface can translate neural signals into computer commands.",
+    "exampleTranslation": "脑机接口可以将神经信号转换为计算机指令。"
+  },
+  {
+    "id": "x-5",
+    "phrase": "be closely associated with",
+    "meaning": "与……紧密联系",
+    "example": "The research centre is closely associated with the university.",
+    "exampleTranslation": "这家研究中心与该大学联系紧密。"
+  },
+  {
+    "id": "x-6",
+    "phrase": "conduct trials",
+    "meaning": "开展试验",
+    "example": "Scientists conduct trials before introducing new devices.",
+    "exampleTranslation": "科学家在推出新设备前开展试验。"
+  },
+  {
+    "id": "x-7",
+    "phrase": "brain implants",
+    "meaning": "脑部植入装置",
+    "example": "Brain implants are being investigated for assistive technology.",
+    "exampleTranslation": "研究人员正在探索脑部植入装置的辅助技术用途。"
+  },
+  {
+    "id": "x-8",
+    "phrase": "deliver signals",
+    "meaning": "传递信号",
+    "example": "The sensor delivers signals to a connected computer.",
+    "exampleTranslation": "传感器向连接的计算机传递信号。"
+  },
+  {
+    "id": "x-9",
+    "phrase": "additional hardware",
+    "meaning": "额外硬件",
+    "example": "The program works without additional hardware.",
+    "exampleTranslation": "这款程序无需额外硬件即可运行。"
+  }
+]

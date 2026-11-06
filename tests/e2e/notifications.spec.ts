@@ -1,0 +1,56 @@
+import { test, expect } from './fixtures';
+
+test('settings use keyboard text entry while mouse wheels and arrow keys do not change values', async ({ page, request }) => {
+  await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  await expect(page.getByLabel('信息提示栏')).toHaveText('');
+  await page.getByRole('button', { name: '样式', exact: true }).click();
+  const input = page.getByLabel('英文正文字号', { exact: true });
+  await expect(input).toHaveAttribute('type', 'text');
+  await input.focus(); await input.press('ArrowUp'); await input.press('ArrowDown');
+  await input.hover(); await page.mouse.wheel(0, 400);
+  await expect(input).toHaveValue('34');
+  await page.getByLabel('英文行距', { exact: true }).fill('1.');
+  await page.getByLabel('英文行距', { exact: true }).pressSequentially('55');
+  await expect(page.getByLabel('英文行距', { exact: true })).toHaveValue('1.55');
+  await expect.poll(async () => (await (await request.get('/api/settings')).json()).settings.lineHeight).toBe(1.55);
+  await expect(page.getByLabel('信息提示栏')).toHaveText('');
+  const gap = page.getByLabel('段距', { exact: true });
+  await gap.fill('0');
+  await gap.fill('');
+  await expect(page.getByRole('alert')).toContainText('Error:');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(gap).toHaveValue('0');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(gap).toHaveValue('');
+  await expect(page.getByRole('alert')).toContainText('Error:');
+});
+
+test('warnings slide from the bottom for ten seconds and errors remain until closed', async ({ page }) => {
+  await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  const bar = page.getByLabel('信息提示栏');
+  await expect.poll(() => bar.evaluate(node => node.getBoundingClientRect().height)).toBe(0);
+  await page.clock.install();
+  await page.getByRole('button', { name: '高亮 / 取消高亮 1', exact: true }).click();
+  await expect(bar).toContainText('Warning:');
+  await expect(bar.locator('.notice')).toHaveCSS('font-size', '14px');
+  await expect.poll(() => bar.evaluate(node => node.getBoundingClientRect().height)).toBeGreaterThan(0);
+  expect(await bar.evaluate(node => node.getBoundingClientRect().height)).toBeLessThanOrEqual(120);
+  await expect(bar.locator('.notice')).toHaveCSS('line-height', '21px');
+  await page.clock.runFor(9000); await expect(bar).toContainText('Warning:');
+  await page.clock.runFor(1000); await expect(bar).toHaveText('');
+  await expect.poll(() => bar.evaluate(node => node.getBoundingClientRect().height)).toBe(0);
+  await page.getByRole('button', { name: '高亮 / 取消高亮 1', exact: true }).click();
+  await page.clock.runFor(9000);
+  await page.getByRole('button', { name: '高亮 / 取消高亮 1', exact: true }).click();
+  await page.clock.runFor(1000); await expect(bar).toContainText('Warning:');
+  await page.clock.runFor(9000); await expect(bar).toHaveText('');
+  await page.getByLabel('打开项目 JSON').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('{') });
+  await expect(bar.getByRole('alert')).toContainText('Error:');
+  await expect(bar.getByRole('button', { name: '关闭', exact: true })).toHaveCSS('font-size', '12px');
+  await page.getByRole('button', { name: '高亮 / 取消高亮 1', exact: true }).click();
+  await expect(bar.getByRole('alert')).toContainText('无法打开项目');
+  await page.clock.runFor(10001); await expect(bar.getByRole('alert')).toContainText('Error:');
+  await bar.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(bar).toHaveText('');
+});
