@@ -1,298 +1,76 @@
-# 项目代码审查与整理记录
+# EnglishCards Code Review — 2026-11-06
 
-日期：2026-10-19（Asia/Shanghai）。基线：`54fb9a9`，当前分支：`main`。
+## Scope and evidence
 
-> 前述代码审查对应提交 `7855073`；文中资源路径已随目录归类调整。后续目录整理的复验见文末。
+- Review basis: supplied `windows-app-review` Skill and its reference documents.
+- Source baseline: user-uploaded `EnglishCards.zip` (49,082,045 bytes).
+- Owner-reported Windows acceptance: prior test and manual results in this conversation.
+- The ZIP contains no `.git` metadata. Branch, commit, remotes and dirty working-tree state cannot be verified.
+- This pass changes documentation and review instructions only; no C# or TypeScript runtime code was changed.
+- No Windows/.NET build or runtime tests were executed in this environment.
 
-## 审查范围与结论
+## Summary
 
-检查了数据校验与迁移、React 编辑/历史/草稿、DOM 分页与字体测量、本机导出服务、构建配置、单元/E2E 测试、演示脚本及相关文档。现有模型、分页、界面、服务的职责划分可保留，无需新增架构层或依赖。独立只读代码复核未发现新的必改问题。
+No Critical defect is confirmed from the static review. Important documentation conflicts were corrected. Several reliability topics require a focused follow-up review against the exact current Windows working tree.
 
-## 必要修复
+## Findings and actions
 
-| 问题及原因 | 修改与行为 |
-|---|---|
-| 手动分页键误用业务 ID 的 200 字符限制；JSON 编码与表达字段后缀可能使合法 ID 的键超限，保存后无法重开。 | 分页键采用独立 2048 字符上限，覆盖 200 字符 ID 的转义；业务 ID 限制保持 200。旧分页键迁移后也可再次保存/加载。 |
-| schema 1 的高亮 ID 由两个业务 ID 和位置拼接，合法的长 ID 迁移时会超限。 | 为迁移出的每个高亮分配 UUID；高亮位置与引用文字不变，保存为 schema 2 后保留 UUID。重复打开同一份未保存的 v1 文件会重新分配内部 ID，不改写原文件。 |
-| 分页失败后导入坏 JSON，错误分支仅根据历史签名恢复“就绪”，导致当前项目尚未成功分页却可导出。 | 就绪状态绑定最后成功渲染的项目对象；导入错误不改写就绪状态，撤销/重做继续使用现有历史机制。 |
-| 导出在多处分支关闭浏览器、释放锁；渲染异常和关闭异常同时发生时会抛出清理异常，且可能永久保留 busy。 | 浏览器只在 finally 中关闭一次；保留原错误并补充清理错误，无论关闭是否成功都释放锁，清理成功后才返回导出文件。 |
+### Important — Project contract contained contradictory states
 
-以上问题均先由新增回归测试复现失败，再修改并确认通过。
+`docs/project-contract.md` simultaneously described ZIP export as not implemented/not verified and as implemented/accepted. It also referenced a non-existent `tools\publish-desktop.bat` while the tree contains `tools/publish.bat`. These contradictions could cause regressions and incorrect commands.
 
-## 可靠性与文档整理
+**Action:** Consolidated the contract and separated current behavior from historical owner-reported evidence.
 
-- E2E 禁止复用已存在的 4317 服务，避免误测旧代码；端口占用时应先停止手动服务。
-- 修正 README 的过期工作目录及样式面板的即时应用提示。
-- 区分初次实现的历史验收、原始设计建议与本次复验，避免将尚未实现的建议当成现有功能。
-- 更新 `artifacts/verification/` 的实际结果和 `artifacts/demo/` 的生产演示；四页 PNG 本身与基线无 Git 差异。
+### Important — No root AGENTS.md
 
-## 清理与保留
+The archive had no root `AGENTS.md`, so coding agents had no mandatory entry to the project contract, review Skill, verification commands and protected behavior.
 
-没有删除项目源文件、参考资料、配置或用户数据，也没有发现应删除的已跟踪废弃文件。仅清理本次测试生成的 `artifacts/test-results/` 临时截图与浏览器配置。已有 `.gitignore` 已覆盖依赖、构建输出和测试临时目录，无需增加规则。保留本地构建与依赖，便于直接运行。
+**Action:** Added root `AGENTS.md`.
 
-开始任务时已有未跟踪的 `docs/`（含用户指定 skill），保持原样且不纳入本次提交。`assets/projects/`、`assets/reference/`、依赖清单和锁文件均无 Git 差异。
+### Important — Historical documents could be mistaken for current requirements
 
-## 验证结果
+`docs/HANDOFF.md`, `docs/IMPLEMENTATION_PLAN.md` and `docs/specs/DESKTOP_WEBVIEW2.md` retain early single-page export, web prototype and LocalAppData descriptions.
 
-| 检查 | 结果与证据 |
-|---|---|
-| 依赖安装 | `npm.cmd ci --no-audit --no-fund --fetch-retries=0 --fetch-timeout=20000`，成功安装 185 包。 |
-| 单元测试 | `npm.cmd test -- --reporter=default --reporter=json --outputFile=artifacts/verification/unit.json`，2 文件、8/8 通过；涵盖长 ID 往返、迁移、关闭失败与锁恢复。 |
-| 浏览器回归 | `npm.cmd run test:e2e`，真实 Chromium 13/13 通过；涵盖编辑保存、草稿重启、极端分页、字体失败、误启用导出及图片一致性。 |
-| 静态检查与构建 | `npm.cmd run build -- --logLevel warn`，包含 `tsc --noEmit`，退出 0。 |
-| 生产导出 | `npm.cmd run demo`，4 页 1200×1600；全部预览与导出 PNG 逐字节相同，重复导出逐字节相同，无外部资源请求。见 `artifacts/demo/validation.json`。 |
-| 视觉抽查 | 实际打开编辑器截图及第 4 页 PNG，文字和页脚可见，无明显裁切。 |
-| 差异检查 | `git diff --check` 通过；原始项目与参考资源未改动。 |
+**Action:** Added historical banners and pointed readers to the current contract. Files were not deleted.
 
-## 验证边界与保留问题
+### Important — Bridge behavior was undocumented
 
-本次结果限于 Windows 与安装的 Chromium，未覆盖其他浏览器/系统的全部字体和像素差异。上级原始交接 ZIP 在本次环境中不存在，未重复验证历史报告中的 ZIP 逐字节对照；`artifacts/demo/validation.json` 对应字段明确为 null。
+`desktop/Web/EditorBridge.cs` and `src/services/desktopBridge.ts` define a cross-language command contract, but there was no focused reference describing envelope, allow-list, source origin, ordering and stale-navigation behavior.
 
-构建仍有上游 Zod PURE 注释警告，E2E 有环境颜色变量警告；安装时有 esbuild 安装脚本策略提示，但构建与测试均实际通过，未更改依赖或屏蔽警告。超大项目主线程分页性能、孤行优化、Markdown 导出、单元素样式和安装包仍为原有边界，本次未扩展功能。
+**Action:** Added `docs/specs/EDITOR_BRIDGE_CONTRACT.md` based on the inspected implementation.
 
-## Git 提交范围
+### Important — ZIP export behavior lacked one authoritative focused spec
 
-仅提交本次代码、回归测试、相关说明和更新后的验证/演示产物。验证通过后提交至现有 `main` 并正常推送 `origin/main`，不切换、合并或强制推送；确切提交号以本次交付消息及 `git log -1` 为准。
+`ZipExportService`, `CardCapture`, `ArticleJsonFormatter` and `ProgressDialog` collectively define the user-visible export contract. Older docs still described prototype behavior.
 
-## 后续目录归类与复验
+**Action:** Added `docs/specs/EXPORT_CONTRACT.md`.
 
-按用户要求将根目录从 25 项归并为 14 项（均含隐藏项），程序功能与 npm 命令保持不变：
+## Reliability follow-up targets (not confirmed defects)
 
-- 服务入口移至 `src/server/index.ts`；构建配置、浏览器测试配置与演示脚本集中到 `tools/`。
-- 交接、计划、报告及规范集中到 `docs/`，原有 `docs/skills/` 不改动。
-- 样例项目和参考资料集中到 `assets/`；15 个原始资料文件移动前后 SHA-256 全部一致。
-- 构建、演示、验证报告及测试临时文件集中到 `artifacts/`；同步调整导入、服务根路径、文档链接及忽略规则，没有删除资料。
+1. `EditorBridge.Receive` is an `async void` WebView event handler. Confirm all exceptions from `RunFileCommandAsync` are observed and valid requests receive one response unless navigation is stale/disposed.
+2. `UserDataStore.StageAndMoveAsync` determines `overwrite` before staging. Confirm the intended concurrent-writer policy and Windows replacement semantics.
+3. Review `ZipExportService` around cancellation during archive finalization, renderer disposal/close order, final `File.Move(..., overwrite: true)`, and preservation of existing targets on every failure path.
+4. `LocalWebContent` applies a prefix check to navigation/resource URLs. Confirm exact-origin behavior for unusual URL forms.
+5. `App.OnStartup` is an async WPF override. Confirm exceptions always result in deterministic shutdown and no orphaned window.
+6. WebView2 Evergreen missing-runtime/init-failure guidance is not demonstrated by this archive's visible startup path; verify actual Windows behavior.
+7. The uploaded source archive includes `desktop/bin/`, `desktop/obj/`, and `artifacts/dist/`. `.gitignore` excludes generated output from Git, but the uploaded ZIP itself is not source-clean.
+8. `tools/publish.bat` checks for `coreclr.dll` but does not prove that all stale self-contained files are absent. Validate clean staging without deleting `userdata`.
 
-本轮重新执行单元测试 8/8、真实 Chromium E2E 13/13、TypeScript + Vite 构建及生产演示，均通过。生产导出仍为 4 页 1200×1600，每页与预览和重复导出逐字节一致。原有 Zod 注释及环境颜色变量警告仍存在。
+## Dependency review
 
-用户进一步要求按 MVVM 整理后，将原 App 的状态和编辑命令提取到 `src/viewmodels/useEditorViewModel.ts`，原 JSX 和焦点/缩放交互保留在 `src/views/EditorView.tsx`；数据规则归入 `src/models/project.ts`，分页与浏览器 IO 归入 `src/services/`，Node 服务单列于 `src/server/`。前端以 React Hook 实现 ViewModel，未引入依赖注入、事件总线或额外状态框架。样式归入 Views，根目录条目数量保持 14 项。
+`express` and `@types/express` are already in `devDependencies`; no dependency move is required. React, React DOM, Zod, fflate and font packages are build/runtime front-end dependencies embedded as static assets. Vite, TypeScript, Vitest, Playwright and tsx are development tooling.
 
-MVVM 拆分后再次执行上述单元、E2E、构建与生产演示检查，结果仍为 8/8、13/13、构建成功及 4 页图片逐字节一致；独立只读复核未发现新的问题。Model 与样式内容不变，分页服务仅调整导入路径。
+## Verification performed
 
-## 词汇表交互调整
+- Read the supplied Skill and all supplied reference documents.
+- Inspected project contract, README, package manifest, WPF project, publish script, `.gitignore`, bridge, local WebView2 host, persistence, ZIP export, JSON formatter, progress dialog, project schema, Vite and Playwright configuration.
+- Confirmed the source archive contains no `.git` metadata.
+- No tests/builds were run in this environment.
 
-按用户要求将“词汇”标签页改为“词头 / 音标 / 含义”三列表格，一词一行。点击或编辑单元格选择该行，表格下方四个按钮 `↑ / ↓ / × / +` 分别交换上一行、交换下一行、删除当前行及在其下方插入空白行。首尾禁用越界移动，空表仍可用加号创建首行；插入后选中新行并聚焦词头，删除后优先选择下一行，否则选择上一行。
+## Historical owner-reported evidence (not rerun)
 
-新增 View `src/views/VocabularyTable.tsx`，稳定 ID 选择状态与行操作放在现有 ViewModel，表格与固定操作区样式放在 Views。原有词性与释义保留在“含义”列中，前换页设置移到表格下方；JSON 格式、草稿键和卡片预览/导出的双栏词汇格式不变。
+The owner previously reported 35/35 Vitest, 58/58 Playwright E2E, 9/9 .NET checks, successful Windows x64 publish, and manual acceptance of ZIP content, Pretty JSON, Win11 progress dialog, cancellation, temp cleanup and existing ZIP preservation. These are historical owner-reported results, not fresh verification of this review package.
 
-新增真实浏览器回归先确认旧界面缺少三列表格，再实现并通过。最新单元测试 8/8、完整 E2E 15/15、TypeScript + Vite 构建均通过。浏览器用例覆盖选择与编辑、上下交换、居中/末尾/空表插入、删除至空表、撤销重做、词性及草稿保留、手动分页与预览定位；同步更新原有编辑流程用例。实际检查表格截图，三列与选中行可见，四个按钮固定在表格下方。独立只读复核未发现必改问题。
+## Conclusion
 
-生产演示重新生成 4 页 1200×1600 PNG，全部预览/导出及重复导出仍逐字节一致；导出图片哈希与本轮修改前一致。
-
-## 四列词汇、可调两栏及表达标签
-
-按最新要求将词汇页改成“词头 / 音标 / 词性 / 含义”四列，保留现有选中行操作。表达页每条使用四行两列表格，题头为“短语 / 含义 / 例句 / 翻译”，原有增删、排序、手动分页及预览定位继续保留。
-
-新增 View `src/views/SplitPane.tsx`，通过指针捕获拖动调整左右栏，支持方向键和 Home / End。正常窗口下两栏各保留至少 320px，极窄窗口按可用空间调整边界；尺寸变化时按比例重排。分隔线只影响工作区，不改变项目数据或卡片分页签名。
-
-分页渲染在相应字段首行加入 `含义：`、`例句：`、`翻译：`，颜色均为 `#006d87`。标签使用真实文本节点并参与宽度、字形高度及字体预加载，续行不重复；正文独立放在 `.line-content` 中，原文区间和连续性断言保持原含义，JSON 不写入标签。
-
-新增四项需求的回归先在旧实现中失败，再逐项实现。完整回归曾发现原尺寸预览截图宽度为 1201px：两栏按比例计算带来小数像素位置。已将分隔位置和卡片居中位置对齐到整数像素，原逐字节比对保留，并增加明确的 1200×1600 断言；修复后重新运行完整回归。
-
-最终验证：单元测试 8/8、真实 Chromium E2E 18/18、TypeScript + Vite 构建通过；生产演示 4 页 1200×1600，全部预览与导出、重复导出逐字节一致。新增测试覆盖拖动/键盘/窗口变化、分页签名不变、四列表格、四行两列表格、字段修改与定位、标签颜色、长字段跨页、空字段与可见字形边界。已实际查看词汇页、表达页及导出第 2 页图片。独立只读代码复核未发现必改问题；本次未扩展到其他浏览器或操作系统验证。
-
-## 表格输入框高度与对齐
-
-词汇四列统一使用单行 input，取消可拖动的多行输入框；长内容在输入框内横向浏览。表达保留可纵向调整的 textarea，初始仅占实际文字需要的高度，并在编辑、撤销重做、字体加载与栏宽变化后重新适配。两种表格的题头与内容单元格统一垂直居中；数据模型、草稿格式和预览/导出逻辑不变。
-
-新增两项真实浏览器用例，先确认旧实现失败，再验证单行高度、居中位置、表达初始高度、增减文字、撤销重做及栏宽变化。最终单元测试 8/8、完整 Chromium E2E 20/20、TypeScript + Vite 构建均通过，已实际查看两种表格截图。本轮未重新生成生产演示；完整 E2E 中现有预览/导出一致性检查通过。
-
-因默认 4317 端口已有服务，本轮保留该服务，测试改用 4321；Playwright 配置与进程重启用例统一读取 PORT 对应的测试地址。当前修改仅本地保存和提交，尚未推送远程。
-
-独立只读复核未发现必改问题。仅清理本轮生成的测试临时截图与跟踪文件，保留项目资源和原有未跟踪的 skill 文件。
-
-## 个性化页眉
-
-在“原文”页新增单行“个性化页眉”，Project 字段 `personalizedHeader` 默认 `some birds on tree`，缺少该字段的旧项目自动使用默认值，自定义和空字符串均可往返保存。修改沿用现有 ViewModel 编辑、撤销重做、草稿及 JSON 保存流程。
-
-每页页眉使用同一行左右布局，右侧沿用左侧 `ENGLISH READING` 的字体、字号、字重和字距，右对齐，颜色为 `#b2bfc3`；过长时省略，避免覆盖左侧。个性化内容纳入字体预加载，预览与导出共用渲染路径。
-
-先验证缺省字段测试失败，再实现并通过。最终单元测试 9/9、完整 Chromium E2E 21/21、TypeScript + Vite 构建通过；新增浏览器测试覆盖默认值、每页重复、字体颜色及位置、修改、撤销重做、刷新恢复和清空。已查看实际界面截图，原有预览/导出及重复导出逐字节一致性检查通过。独立只读复核未发现必改问题。本轮未重新生成生产演示，未验证其他浏览器；修改仅本地提交，未推送远程。
-
-## 大写默认页眉与导出错误诊断
-
-将缺省页眉改为 `SOME BIRDS ON TREE`，已有自定义内容及空值继续保留。用户报告的错误来自预览/导出签名不一致，但前端原先对所有失败无条件追加安装 Chromium 的建议，服务端也在签名不匹配时笼统建议更换浏览器；这些提示不能说明实际原因。
-
-现在仅在后台浏览器启动明确报告可执行文件缺失时提供 Playwright Chromium 安装命令；其他错误保留实际原因，不再追加统一安装提示、额外 `Error:` 或重复标点。导出前再次检查排版就绪状态。新增运行期诊断（项目哈希、逐行记录、页数），签名不一致时区分项目数据差异、首条行记录差异及版本/旧页面问题，显示页码、内容标识、差异字段和值；原签名拒绝逻辑不放宽，诊断不写入项目文件。
-
-只读复核发现完整诊断中重复的长 ID 可能使小项目请求超过原有 5 MiB 限制，已整改：超预算时仅附带项目哈希与页数，保留原签名校验并说明逐行信息未附带。新增 4000 条转义长 ID 记录的回归，验证正常项目内容不变且请求仍在限制内。
-
-验证：单元测试 12/12，完整浏览器回归 23/23，TypeScript + Vite 构建通过；覆盖正常导出、项目差异、行高差异、旧预览、缺失浏览器提示、前端错误显示及本机安装的 Google Chrome 调用后台 Chromium 导出。生产演示生成 4 页 1200×1600，预览与导出、重复导出均逐字节一致，已查看大写页眉导出图片。上游 Zod 注释警告仍存在。
-
-本机当前项目未复现用户原来的签名不一致，尚不能断定其具体来自旧页面、版本或字体测量；新诊断用于进一步定位。使用更新后代码前应保存 JSON，重启服务并刷新 Chrome。既有运行中的服务未被终止，未安装或重装 Node.js/浏览器。本轮修改仅本地提交，未推送远程。
-
-## 设备缩放引起的行高不一致
-
-用户进一步提供标题行高 `54.66666793823242` 与 `54` 的诊断，以及构建/启动日志。使用安装的 Chrome、`--force-device-scale-factor=1.5` 和原生窗口视口，已在修改前精确复现相同错误。设备缩放 100% / 125% / 150% / 200% 下 DOM 字形边界分别约为 54 / 55.2 / 54.6667 / 54.5，而 Canvas 字体包围框度量始终为 54。原逻辑将 DOM Range 的高度直接作为分页行高，导致预览和后台默认设备缩放的签名不同。
-
-修复仅调整分页器的字形高度来源：使用基础文字及 span/strong 各自实际字体的 Canvas 字体/可见字形包围框最大值，向上取整并给两侧各留 1 CSS px 的取整空间，再与用户配置行高取较大者。DOM Range 继续负责识别换行与检查宽度；严格项目/分页签名校验、错误诊断、数据格式均保持。修复会适当调整实际行距及分页，避免依赖设备缩放偶然取整。
-
-新增缩放回归先确认 150% 的真实 Chrome 导出失败，再验证四种缩放下实际 devicePixelRatio、文字页边界、完整分页签名与后台 Chromium 导出成功。最终单元测试 12/12、完整浏览器 E2E 26/26、TypeScript + Vite 构建通过；生产演示仍为 4 页 1200×1600，预览/导出和重复导出逐字节一致。独立只读复核未发现必改问题。证据范围为本机 Windows、安装的 Chrome 与配套 Chromium、项目字体及上述缩放；未声称覆盖所有系统回退字体。
-
-粘贴日志显示构建成功并启动于 4317；funding 信息、esbuild 安装脚本策略警告和上游 Zod 注释警告与本次已复现的行高差异无关。未修改 npm 安全策略、依赖版本或屏蔽警告。仅删除本轮临时探测脚本及测试临时目录，不动用户运行中的服务和项目数据。本轮仅本地提交，未推送远程。
-
-## 2026-10-20 按 MVVM skill 全面复审与远程提交
-
-审查范围覆盖当前 Model、ViewModel、Views、Services、Server、测试、文档与两份项目 skill。现有轻量 MVVM 依赖方向合理：数据规则在 Model、编辑状态与命令在 ViewModel、界面和焦点在 View、IO/字体测量/校验在 Services、HTTP 和 Chromium 在 Server。没有发现需要整体重写或引入额外框架的架构问题。
-
-### 必要修复
-
-- **导出请求大小边界**：此前完整诊断超限后改传摘要，但本身恰好 5 MiB 的合法项目请求加摘要会变成 5,242,994 字节，仍超过 5,242,880 字节上限。新增边界用例先失败，再增加第二级降级：摘要仍超限时完全省略诊断，保留完整项目、签名及页码，不截断正文、不增加服务端大小限制。同步诊断提示和 README。
-- **冷启动字体竞态**：预载文本遗漏 `vocabulary.pos`。以仅出现在词性中的西里尔字符和延迟字体响应，确认首次分页与字体就绪后的第二次分页签名不同。新增真实浏览器失败用例后，将词性、可选音标、完整固定标签和页码字符纳入预载；固定标签与渲染共享常量。修复后冷启动首份签名、字体完全加载后的签名一致，首份签名可直接用于后台导出。中文词性探测未复现差异，没有把所有非英文词性笼统描述为必然失败。
-
-### 局部整理与保持项
-
-View 统一注册/释放输入框引用，修复原文及译文 textarea 卸载时仍留在 Map 中的引用，沿用既有焦点与预览定位行为。仅清理重复的引用登记逻辑及共享固定标签，没有搬迁已合理的模块或做全文件格式化。项目 schema 2、默认样式、稳定 ID、草稿、撤销重做、单行词汇与自适应表达输入契约保持。
-
-文章转 JSON skill 的完整示例再次通过实际 `parseProject` 校验；本轮不改变项目字段，不需要改写 JSON 生成规范。历史实施文档已标注为历史记录，最新结果集中于本报告。独立只读审查提出的请求预算和文档问题均已处理；最终复核未发现必改代码问题。
-
-### 验证、清理及提交范围
-
-单元测试 13/13，完整 Chromium/安装的 Chrome 浏览器回归 27/27，TypeScript + Vite 构建通过，覆盖冷字体、四种设备缩放、表格和分隔线交互、持久化、分页、预览/导出及重复导出。生产演示为 4 页 1200×1600，预览和导出、重复导出逐字节一致，四页 PNG 哈希与本轮整理前相同。
-
-仅删除本轮生成的测试临时目录。保留现有日志、正在使用的生产构建、依赖、原始资源、演示与验证报告；原始 assets 没有改动。未升级依赖或屏蔽现有 Zod 注释及环境颜色变量警告。未覆盖所有操作系统、非 Chromium 引擎或所有系统回退字体，超大项目主线程测量性能仍为原有边界。
-
-用户已明确授权本轮提交并推送。保持当前 `main`，先 fetch 核对远程，没有远程独有提交；正常提交和快进推送，不切换、合并或强制推送。推送包含此前六个已验证的本地功能/skill 提交及本轮整理提交；确切提交号和远程 HEAD 一致性在交付消息中报告。
-
-## 2026-10-21 条目变体列表与导入自动高亮
-
-词汇和表达条目新增 `highlight: string[]`，缺省为 `[]`，保持 schema 2 与旧文件兼容；新建条目也初始化空列表。它与顶层精确区间数组 `highlights` 分开：列表描述待匹配的原文表面形式，导入时生成具体位置，保存时两者均保留。
-
-Model 新增纯数据匹配函数，由文件 IO 的 `readProject` 在解析和校验成功后调用。仅扫描英文原文各段，使用大小写不敏感的字面量匹配，词边界排除相邻字母、数字、组合标记和下划线；不推断未列出的词形，不执行用户提供的正则。词组内连续空白或段内换行可互相匹配，但不跨段。忽略空白规则，合并重复/重叠命中，再扣除已有标注覆盖，只为未覆盖区间生成新标注，保留原手工标注及其 ID。原文、列表和原项目对象不改写。
-
-普通解析、草稿恢复、保存、分页和导出不调用自动扫描，因而不会重新加回手工取消的标注；再次显式导入文件仍按列表补齐。现有手工标注、撤销重做与高亮随原文修改迁移的行为保持。模型规则位于 Model，导入协调位于 IO Service，ViewModel 仅初始化新条目，无额外框架或 UI 列。
-
-先运行新增五项单元回归，确认旧实现丢失字段或不生成命中，再实现并通过。覆盖旧文件默认、列表类型校验、大小写与完整词边界、标点字面量、组合字符、UTF-16 索引、重复/重叠词组、连续空白、已有标注覆盖、不跨段、幂等性与导入/普通解析区别。浏览器新增端到端用例覆盖导入可见高亮、取消/撤销/重做、JSON 下载、草稿刷新、后台 ZIP/PNG 导出、新增词汇行及其空规则保存。同步补齐直接构造模型的测试数据字段。
-
-文章转 JSON skill 更新字段契约、变体生成规则、单复数字段区别、导入时机与完整示例；校验脚本复用同一匹配函数，示例导入产生 2 处高亮。最终单元 18/18、完整浏览器 28/28、TypeScript + Vite 构建通过，已查看自动高亮截图；生产演示 4 页 1200×1600，与预览、重复导出逐字节一致，原样例 PNG 哈希保持不变。独立只读复核未发现必改问题。保留原有上游构建警告和跨系统验证边界，仅清理本轮测试临时目录。
-
-## 2026-10-21 仅由条目管理高亮与词典形式整理
-
-依用户新要求，替换上一节的双份状态设计：项目只保留词汇、表达的 `highlight` 列表，移除持久化顶层 `highlights`。Model 按当前原文纯计算临时命中位置，分页测量与渲染共用同一批结果；普通编辑、草稿、JSON 保存、重新导入和后台导出均遵循同一规则，不再保存坐标或高亮 ID。保持原有轻量 MVVM 分层。
-
-手工标注将选中表面形式收集为词汇或表达，已有同名条目则复用，释义等未知信息留空。用户明确选择统一取消：从所有相关条目移除覆盖选择的规则，全部相同命中一起取消，条目保留且可撤销。独立复核发现部分单词选择可产生无法命中的规则，已补充完整匹配检查及界面提示；取消已有规则仍允许选择其局部。旧版 text 提示或已验证的 quote 区间先迁移为条目规则，损坏区间仍拒绝；旧子词区间保留原始字符串并提示完整词边界限制，原文件不覆盖。
-
-Skill 规定根据语境还原词典形式（如 ran → run、took off → take off），合并同一词条的有效变体，保留已有词典条目的 ID、未合并对象及无关内容，明确空列表不重新启用。完整示例和 CLI 同步移除顶层字段；CLI 拒绝新生成文件含 highlights/hightlights，而应用继续兼容旧文件。独立试用使用 went/go、ran 空列表和 took off 的输入，仅根据 skill 完成还原与合并；实际解析及断言验证通过，非词汇内容保持。
-
-默认 BrainCo JSON 转为新格式，旧变体归入相应词典条目，并补收 low-amplitude。原始 schema 1 JSON 原字节备份到 `assets/reference/v17/project.schema1.json`，与基线 Git 文件逐字节核对一致；原文及译文独立快照保持。
-
-验证：单元 24/24、完整浏览器回归 28/28（无跳过或重试）、TypeScript + Vite 构建通过。覆盖统一取消、完整词选择、旧格式迁移、手工收集、历史、草稿、JSON/ZIP 无顶层字段、后台 PNG 导出，以及原有 Chrome 缩放和字体回归。生产演示 4 页 1200×1600，预览与导出、重复导出逐字节一致，已查看实际导出图片。沙箱内本机 HTTP 连接报 EACCES，获准在沙箱外重跑浏览器与生产验证后通过，未修改程序来绕过环境限制。
-
-仅清理本轮临时脚本、试用 JSON 和测试输出目录；保留旧资源备份、生产构建、日志及验证产物。未升级依赖、未屏蔽上游 Zod 或颜色环境警告，未覆盖非 Chromium 引擎及其他操作系统。应用不自行还原词形，该语义整理由后续 LLM 按 skill 完成。
-
-## 2026-10-21 多义项、手工词形与统一刷新
-
-用户批准后升级为 schema 3：两类条目的 `senses` 列表将每个义项的 pos、meaning、example、exampleTranslation 成组保存，不使用并行列表。兼容 schema 1/2，导入时把原单个义项迁移为一个 sense，原本没有的内容留空，继续保留条目 ID、页眉、样式、规则及分页标记；schema 3 缺少有效 senses 列表会拒绝。BrainCo 示例同步升级；上一版本 JSON 原字节备份到 `assets/reference/project.schema2.json`，与 Git 基线核对一致，现有测试显式使用该旧格式验证兼容路径。
-
-手工词头/短语在失焦完成时同时保存到 word/phrase 和 highlight，词头也可用 Enter 完成；不保存逐键中间片段，保留原字符串及已有变体，完全相同字符串去重。View 只持有未完成输入，提交和历史由 ViewModel/Model 管理。选区添加继续复用已有规则。最终按用户批准的方案，↻ 只重新扫描两类条目的 highlight，不再采用此前草稿的“补词典词头”行为；不改变项目和历史，不重新启用空列表。匹配坐标仅在分页任务内存中计算，无需临时文件及文件清理。
-
-词汇表改为词头、音标、含义三列；含义内每义项一行，词性紧跟对应释义，保留单行输入和垂直居中。选中词条可展开义项例句，支持增删及成组编辑；表达短语只显示一次，各义项显示含义、例句和翻译。预览按义项分行/分组，例句和翻译前缀着色；预览点击可选中相应词条、展开例句并定位字段。删除义项同步重映射之后义项的分页标记，撤销重做可恢复。
-
-独立复核发现并修复：第二及后续义项使用直接拼接 ID 会与合法业务 ID 碰撞，现改为 JSON 元组编码；手工输入不应 trim 后存储，现仅 trim 判空、原值入列表；跨词条点击例句需先切换选中条目。回归发现新建条目字段顺序与服务端规范化不同导致导出签名错误，已按模型顺序构造；异步读入文件期间曾可能短暂显示旧项目就绪，现用 opening 状态阻止导出与就绪误判。没有放宽数据或分页签名校验。
-
-Skill、完整示例和 CLI 同步 schema 3。独立 LLM 试用仅根据 skill 合并 recorded/record、took off/take off，保留名词/动词和不同短语含义的对应例句，并保持 went → go 的空列表与非词汇数据；实际解析及语义断言通过。根据试用反馈，补充同一词头多读音时在 ipa 字符串注明词性的规则。官方 quick_validate 因缺少 PyYAML 未能运行；采用标准库检查元数据、命名、围栏和本地引用，并用项目实际解析器校验 JSON 示例及试用结果，不能将替代检查报告为官方校验通过。
-
-最终单元 28/28、完整 Chromium 浏览器 31/31、TypeScript + Vite 构建通过；覆盖新格式往返、旧格式迁移、原始词形、空列表、刷新无历史、导入等待、多义项及其例句、特殊 ID、分页标记删除与恢复、跨词条定位、草稿和 JSON/ZIP/PNG 一致性，原有长文、字体和设备缩放回归保留。生产演示 4 页 1200×1600，预览与导出及重复导出逐字节一致，原示例四页 PNG 哈希不变，已查看实际多义项预览。独立增量复核未发现剩余必改问题。未验证其他操作系统或非 Chromium 浏览器，不升级依赖或屏蔽既有上游警告；只清理本次临时试用文件和测试目录，保留日志、原始资源及生产构建。
-
-
-## 2026-10-21 MAIN IDEA 首行缩进
-
-主旨正文原未启用分页器现有的首行缩进参数，现仅为 mainIdea 内容块启用 indent，沿用正文的 2em 缩进；首行缩进两个汉字宽度，折行和跨页续行顶格，不向项目文本中插入空格。预览、测量和导出共用同一内容块设置。
-
-新增浏览器回归先复现首行 0px，修复后验证首行 72px、其余行 0px、跨页及文本完整性和后台导出。相关分页回归 9/9、TypeScript + Vite 构建通过，未重复执行完整回归或单元测试。生产演示 4 页，预览与 PNG、重复导出均逐字节一致，已查看第 3 页的 MAIN IDEA 实际效果。仅清理本轮临时测试目录，既有上游构建警告保持。
-
-
-## 2026-10-21 项目全面复查与整理
-
-基线 c7894ff，工作区起始干净，保持 main 分支。依据 project-code-review skill 检查 Model、ViewModel、View、Services、Server 的依赖与职责，以及全部测试、构建配置、JSON skill、示例、资源和 Git 状态。现有轻量 MVVM 架构可保留，不增加框架或依赖，不做无关重命名和批量格式化。独立只读审查覆盖模型迁移、规则高亮、文件 IO、分页和导出，没有发现需改变现有格式或正常行为的问题。
-
-必要修复：主任务构造两个受控 File.text 异步读取，确认先选文件晚完成会覆盖后选项目，先选读取失败会污染新项目错误提示。ViewModel 现用递增请求序号检查成功、异常及 finally，仅最后一次选择可更新项目、提示和 opening；保留现有草稿、保存、导出和历史契约。新增两项浏览器回归先复现失败再通过，验证迟到的旧结果和旧错误都被忽略。
-
-推荐的分层整理已完成：将删除义项及相应分页标记重映射移入 Model.removeEntrySense，ViewModel 只协调命令与历史；共享 EntryCollection 类型，去除不再需要的导入和嵌套三元表达式。补充源数据不变、最后义项保护和 JSON 往返的纯模型回归，现有 UI 删除/撤销/重做/导出回归保持。简单表单命令仍直接实现，没有为套用分层而拆出额外抽象。未实施仅属风格偏好的改动。
-
-验证：单元 29/29、完整浏览器 34/34（无跳过、重试或失败）、TypeScript + Vite 构建、额外 noUnusedLocals/noUnusedParameters 检查均通过。实际解析器验证 JSON skill 完整示例和当前 BrainCo 项目均通过，数据格式和 skill 规则无需更改。生产模式生成 4 页 1200×1600，预览与导出及重复导出逐字节一致；四页 PNG 和项目 JSON 的 SHA-256 与基线完全相同。独立增量复核确认请求序号与数据规则迁移无剩余必改问题。
-
-清理仅删除本轮生成的 artifacts/test-results 临时目录；根目录 debug.log、node_modules、现有生产构建、原始资源、旧格式备份、演示和验证报告均保留。审查时未发现其他可确认无用的源文件或配置，不为减少数量而删除有用文件。不升级依赖、不屏蔽既有 Zod 注释和颜色环境警告。验证边界仍为本机 Windows 的 Chromium/Chrome，未宣称覆盖其他操作系统或浏览器引擎。
-
-
-## 2026-10-21 文件清理与移除旧格式支持
-
-用户要求清理不必要文件，并明确“这些更新是破坏性升级，不必兼容旧格式文件”，本节取代前述兼容性结论。删除 demo 的 4 张 preview-page-*.png：删除前逐个核对与 page-*.png 完全相同，共 1020824 字节；另删除根目录 456 字节的过期 Chromium debug.log。工具改为在内存中截图并与 PNG 比较，保留完整的一致性验收；.gitignore 加入重复预览图片规则。保留实际导出 PNG、编辑器截图、ZIP、当前项目、验证报告、依赖和生产构建，以及原文、译文和历史参考资料，不以无引用为由删除原始资料。
-
-删除 schema1/2、旧文本/坐标高亮及裸分页 ID 的迁移实现。Model 只接受 schemaVersion: 3，并严格检查顶层、词汇/表达条目和义项字段；旧 highlights/hightlights 或旧条目顶层释义/例句会拒绝，不会默默丢弃。分页键必须是编码后的 [kind, sourceId]。旧格式草稿不转换，按现有隔离机制保存原始字符串；读取失败或旧文件导入失败不覆盖当前项目、草稿或原文件。浏览器草稿键沿用既有名称，以保留已经保存的 schema3 草稿，该键名不代表仍支持 schema2。
-
-所有运行测试改用当前 BrainCo schema3 样例，去掉旧格式迁移成功测试，增加旧版本、旧字段、裸分页键的拒绝以及旧草稿隔离和客户端/后台拒绝的回归。README 与文章转 JSON skill 同步只支持当前格式；历史报告保留实际发生过的旧行为记录，历史 schema1/2 JSON 仅作参考存档，不参与运行及测试。清理文档中的重复图片引用和过时 v2 演示链接。
-
-验证：31 项单元、35 项完整浏览器回归、TypeScript + Vite 构建及 noUnusedLocals/noUnusedParameters 检查均通过；实际解析器验证 skill 完整示例和当前项目通过。最终生产演示 4 页 1200×1600，预览与导出、重复导出逐字节一致，PNG/项目 JSON 的哈希与基线保持，重复预览图片和 debug.log 未重新生成。独立增量复核未发现旧迁移残留或阻断问题。只清理本轮临时转换脚本和测试目录；既有上游构建警告和跨系统/浏览器验证边界保持。
-
-
-## 2026-10-21 合并义项编辑框与内容自适应高度
-
-词汇表含义单元格改为每个 sense 一个单行编辑框，显示“词性＋一个空格＋含义”，不同义项的框纵向叠放。JSON 仍用各自的 pos/meaning 字段，不改 schema3；Model 分解组合内容，ViewModel 一次更新同一义项的两个字段，保留例句、翻译和高亮规则，pos/meaning 的预览定位都绑定同一个实际输入框。
-
-独立复核发现逐键拆分并重组会回填空格，导致 Backspace 删除卡住或产生双空格。先用真实 pressSequentially/Backspace 浏览器回归复现，再复用既有本地 draft 输入组件，编辑期间保留原始输入，失焦或非输入法 Enter 后原子提交，避免格式化干扰打字。覆盖常见词性、无词性释义及既有自定义词性前缀，撤销和草稿恢复继续有效。
-
-原文页英文标题和各英文段落、主旨与译文页主旨和各中文段落，统一复用 AutoSizeTextarea，去掉原固定 rows 预留高度；按内容、字体加载和栏宽调整，可在内容缩短后收回高度。表达页移除独立词性输入框、删除义项按钮及全部添加义项按钮；已导入的多义项及其词性数据仍保留，含义、例句和翻译继续逐项编辑。词汇页自身的义项管理保留。同步更新 README、JSON skill 的界面说明及原有交互回归，不修改数据格式或生成规则。
-
-验证：32 项单元测试、39 项完整浏览器回归（无失败、跳过或重试）、构建及 noUnusedLocals/noUnusedParameters 检查通过；skill 完整示例经实际解析器验证通过。新增回归先确认旧实现每义项有两个框、文本框固定多行空白及表达多余控件，再验证合并框、垂直叠放、真实逐键输入/删除、失焦保存、撤销、刷新恢复和文本框增高/缩短；既有多义项、预览定位与后台 ZIP/PNG 测试保持。已查看组合编辑框截图。生产演示 4 页，预览与导出和重复导出逐字节一致；四页 PNG 与项目 JSON 哈希与基线相同。独立增量复核未发现剩余必改问题。只清理本轮临时测试目录，保留原始资料、日志及生产构建；既有上游警告和跨系统验证边界保持。
-## 2026-10-22 MAIN IDEA 字号与导出按钮调整
-
-MAIN IDEA 正文从固定 36px 改为读取中文译文的 translationSize，默认均为 32px，随“中文译文字号”同步调整；保留原行距和首行 2em 缩进。预览与导出共用分页排版设置。删除预览底部各页 PNG 按钮及其无用样式，顶部“导出全部 PNG / ZIP”继续可用，项目格式不变。
-
-验证：新增回归确认默认及调整后的字号一致、首行缩进随字号变化、底部按钮不存在且全部导出可用；修正测试中误写的控件名称后，相关浏览器测试 15/15 通过。TypeScript + Vite 构建通过，生产演示 4 页 1200×1600，预览与导出、重复导出逐字节一致，已查看主旨与译文所在页面。同步更新 README、演示及验证产物，只清理本轮临时测试目录。未重跑完整浏览器及单元回归，既有上游构建警告保持。
-
-## 2026-10-22 全局配置、页面尺寸与词汇编辑表格
-
-按已批准方案，将字号和其余设置分为两张“参数 / 数值”表，采用用户指定的全部默认值；新增独立主旨、页眉页脚、词汇、表达、栏目字号及页面宽高。栏目标题和对应分隔线固定 #d9883d，移除强调色和分割线颜色配置。词汇页每词一张两列表格，各义项依次编辑含义（词性＋空格＋释义）、例句、翻译，保留义项管理、选中排序、插入、删除、前换页和统一高亮刷新；去掉折叠详情和内部独立滚动高度。Undo/Redo 改为英文，只保留最近 10 次操作。
-
-配置由 SettingsStore 在程序目录 config/settings.json 读写：缺失自动创建，损坏时保留原文并提示、暂用默认值，明确修改或恢复默认后才替换；写入串行执行并采用同目录临时文件替换。ViewModel 负责启动加载、有效配置的合并保存和错误状态，View 负责表格与输入。文章、草稿和 ZIP 中的 project.json 不再保存 styles，格式升级到 schemaVersion: 4；旧 schema1/2/3 及带 styles 的文章直接拒绝，不迁移或静默丢弃。运行时的 RenderProject 合并文章与当前配置，仅用于预览及点击导出时的不可变快照，后台不重读后续配置；布局指纹仍包含完整配置。
-
-页宽/高为 400..4000 的整数；校验边距、页眉和页脚所需空间，无效组合暂停导出；分页器测量固定页眉是否可完整容纳。预览缩放框跟随配置尺寸，PNG 使用实际宽高。测试和演示使用独立配置路径，不覆盖用户配置。README、文章 JSON skill、校验脚本及当前样例已同步，原文、译文及参考资源未改写。
-
-独立复核指出并修复保存中撤销导致磁盘落后、损坏文件下恢复默认未强制写回、窄页大页脚计算负字号，以及保存中撤销后立即关闭遗漏未保存提示。受控浏览器回归复现最后一种提示缺失后修复通过；保存中的请求与后续最新设置串行协调，关闭保护涵盖尚未完成的写入。
-
-验证：34 项单元、44 项完整浏览器回归通过；最后的关闭保护及各项默认字号断言补充后，配置相关 4 项浏览器回归再次通过。TypeScript + Vite 构建及 noUnusedLocals/noUnusedParameters 检查通过。实际解析器验证 skill 完整示例和当前 BrainCo 文件通过；官方 skill quick_validate 因缺少 PyYAML 未能运行，不能报告官方校验通过。生产演示 4 页 1200×1600，全部预览/PNG 和重复导出逐字节一致、无外网请求；浏览器回归另外验证 1000×1400 PNG、独立字号、配置重建和损坏保护、10 次历史边界、多义项定位及高亮。已查看两组设置表、词汇编辑区和最终卡片图片。
-
-仅清理本轮生成的测试截图及隔离配置目录，保留实际 config/settings.json（Git 忽略）、依赖、生产构建、演示和原始资料。未覆盖其他操作系统或非 Chromium 浏览器，未模拟进程被强制终止时的操作系统写盘；既有上游 Zod 注释和颜色环境警告保持。
-
-## 2026-10-23 键盘数值编辑与异常提示栏
-
-样式参数改用普通文本框，滚轮只滚动页面，上下方向键不增减数值；通过本地字符串草稿保留小数点和无效输入，Model 继续统一校验范围与组合，无效配置不保存、不导出。移除 View 中已无用途的数字微调范围/步长元数据。独立复核发现 Number('') 等于 0 会让 Undo 恢复零值后输入框仍空白，浏览器回归先复现，再用一致的数字语法解析修复；同时覆盖 Redo 恢复无效空值，避免界面与实际配置不一致。
-
-左下角现有提示区改为所有标签共用的固定 84px 信息栏，消息出现/消失不改变编辑区高度。正常加载、草稿恢复、保存、导出成功、高亮刷新，以及自动安全行高和换行调整均静默。Warning: 显示 6 秒，新消息重新计时，旧计时器不会清空较新的消息；Error: 按问题来源分别保存，持续到对应操作成功或手动关闭，警告不覆盖错误，不相关操作不清除尚未解决的错误。错误横幅、样式内成功提示和重复警告列表移除，旧草稿下载入口继续保留。自动防裁切与分页算法保持，只移除正常调整提示及不再读取的标志。
-
-验证：34 项单元测试、46 项完整浏览器回归全部通过；TypeScript + Vite 构建和 noUnusedLocals/noUnusedParameters 检查通过。新增真实滚轮/方向键、小数连续输入、零值/空值 Undo/Redo、6 秒精确消失、新警告续时、错误优先/持久及提示栏尺寸不变的回归。原配置恢复和保存竞态测试改为等待实际写入完成，不再依赖已移除的成功提示，也不将损坏文件的默认值回退误认为保存完成。
-
-生产演示 4 页，预览与导出 PNG、重复导出逐字节一致，无外网请求；四页 PNG 及项目 JSON 的 SHA-256 与基线 8a5c8ca 完全相同。已查看普通文本设置表及正常状态下空白信息栏。独立只读复核提出的数值草稿问题已通过回归确认修复，无格式或 skill 契约变更。同步 README 和演示/验证产物，只清理本轮临时测试截图及隔离配置；保留实际配置、原始资料、依赖和生产构建。验证范围为本机 Windows Chromium/Chrome，既有上游构建警告保持。
-
-## 2026-10-23 两栏工作区、悬浮操作与取消手动分页
-
-按连续确认的方案调整：应用与左栏标题改为“英语阅读卡片编辑器”，删除品牌、说明、JSON 状态及预览工具栏；打开/保存/导出改为右栏右下角三个带完整 hover/无障碍名称的图标按钮，不随卡片滚动、不属于卡片内容。左栏保留所有编辑、设置和异常提示，原有点击预览定位并聚焦左侧字段的行为保持。JSON 正常操作静默，异常统一进入底部提示栏，旧草稿下载入口保留在历史操作栏。
-
-词汇表删除义项操作行及文字添加按钮，词汇行输入框外右上方用 16×16px 圆角加号添加义项，含义框外右上方用同尺寸减号删除，最后一项不能删除。五个词汇操作按钮按 ↑ ↓ + × ↻ 排列，20×20px、间隔 4px、透明背景，贴左栏右边线和提示栏上边缘；加号与刷新 hover 分别为“添加新空白词汇”“更新正文高亮内容”。样式数值右对齐，键盘输入和数值校验保持。
-
-提示栏无消息时不占高度，约 200ms 从底部展开/收起，字号 26px、最大总高度 120px，长信息内部滚动；保留 Warning 6 秒、Error 持久及优先级规则。补充短暂错误在展开动画开始前已解决时的清理兜底，避免隐藏栏残留旧文字；新消息会取消旧清理。所有动画和焦点属于 View，ViewModel 保持错误来源和操作协调，四个界面组件直接复用现有命令，不增加框架或依赖。
-
-右栏点击激活后，Ctrl＋滚轮在 20%..200% 范围缩放，普通滚轮仍上下浏览；比例在右上角浮现，停滚 1.5 秒后淡出。使用非 passive 原生 wheel 监听抑制浏览器整页缩放，按指针锚点修正预览滚动位置，卸载时清理监听和计时器。缩放和悬浮控件不进入项目数据或导出图像。
-
-删除全部前换页 UI、ViewModel 命令、模型标记校验/义项标记重映射、分页器的人工换页分支。移除仅含手动排版字段及未应用占位项的 layoutOverrides 容器，schemaVersion 升级为 5；旧 schema1..4 或当前版本中的 layoutOverrides 明确拒绝，不静默迁移。运行时编码内容键仍用于诊断和定位，不作为用户分页功能。JSON skill、校验脚本、当前样例及测试同步更新，原文/译文/词条数据经语义比较保持。
-
-验证：34 项单元测试、49 项完整浏览器测试均通过，无失败或跳过；TypeScript + Vite 构建及 noUnusedLocals/noUnusedParameters 检查通过。覆盖按钮尺寸/位置/间距、提示栏伸缩时按钮贴边、6 秒续时、最大高度与字号、普通滚轮浏览、Ctrl 缩放及比例淡出、中间卡片双轴锚点误差不超过 1px、旧格式拒绝、多义项与定位、撤销重做、草稿、配置恢复及保存竞态。独立只读复核未发现阻断问题，并按建议补充了缩放锚点实测。已查看词汇编辑区与最终双栏界面。实际解析器验证 skill 完整示例及 BrainCo 文件通过，标准库检查元数据与代码围栏；官方 skill 校验缺 PyYAML 的环境限制保持。
-
-生产演示 4 页 1200×1600，重复导出一致、无外网请求；卡片预览截图临时排除屏幕上的悬浮控件后与导出 PNG 逐字节一致。新增控件曾覆盖第 2/4 页的屏幕截图，已查明原因；验收仍严格比较原始图片，不放宽排版或像素校验。四页 PNG 哈希与基线 87b54ad 相同，JSON 哈希仅因 schema 和字段移除变化。仅清理本轮测试截图和隔离配置目录，保留实际配置、原始资料、依赖、生产构建及正式演示。验证仍限本机 Windows Chromium/Chrome，既有上游 Zod 构建注释警告保持。
-
-## 2026-10-23 提示栏与段落操作调整
-
-按确认方案将提示正文改为 14px、行距 1.5，关闭按钮改为 12px；Warning 自动消失改为 10 秒，新警告重新计时，Error 持续显示规则不变。保留最大总高度 120px 和滑入滑出动画。移除全部中英文段落删除按钮及无调用的 ViewModel 删除命令，保留段落编辑、添加和原有数据。高亮按钮与辅助提示同步改为“高亮 / 取消高亮”，使用普通斜杠。README 与受影响浏览器测试同步更新。
-
-验证：34 项单元测试通过；8 项相关 Chromium 浏览器测试通过，覆盖字号、行距、10 秒消失及续时、Error 持续与关闭、段落按钮移除、编辑历史、导入、词条高亮，以及预览与重复导出一致性。TypeScript + Vite 构建与 git diff --check 通过；保留既有上游 Zod 注释警告。本轮未重跑其余浏览器测试。首次新增字号断言误在 Warning 场景查找仅 Error 显示的关闭按钮，已移到正确场景并完成通过的整组复验。
-
-## 2026-10-23 过度设计、重复与残留代码复审
-
-基线 e1d0436，起始工作区干净。按 project-code-review skill 检查全部 src、测试、构建/演示工具、数据与配置职责及文档。现有轻量 MVVM 分层合理，未发现需要整体重构的过度设计，不引入框架、依赖、通用仓储或额外协调层。配置串行写入、旧草稿保护、字体就绪与严格导出校验均有实际用途，保留这些机制。
-
-推荐的局部整理：中英文段落编辑共用 Model.editParagraph，原三参数调用仍默认编辑原文，ViewModel 不再重复翻译段落映射；projectDocument 正确接受文章或带配置的运行时数据，去掉将纯文章强制断言成 RenderProject 的写法。移除无消费者的 ViewModel 页数和脏状态返回字段（离页保护仍使用内部脏状态），删除已无 details 元素对应的展开分支。分页器合并相同栏目标题样式分支，固定页脚宽度与缩放改为每次分页测量一次，与页眉测量复用 Canvas，上述测量结果供所有页面复用。CSS 合并后续覆盖的有效声明，移除被 SplitPane 内联列宽完全覆盖的默认/媒体查询列宽规则，保持当前界面最终样式。
-
-未发现必须改变数据格式或外部行为的正确性问题；未删除源文件、历史参考资料或用户数据。独立只读审查未发现必改项，确认默认参数、序列化、焦点定位、样式和页脚计算与原行为一致。
-
-验证：34/34 单元测试、49/49 完整浏览器测试通过，无失败、跳过或重试；TypeScript + Vite 构建及 noUnusedLocals/noUnusedParameters 检查通过。回归覆盖中英文编辑、历史/草稿/导入、词汇与表达高亮、设置持久化及保存竞态、异常提示、分隔线、缩放与焦点定位、分页及 Chrome 100%/125%/150%/200% 显示比例下的导出。生产演示 4 页 1200×1600，预览/导出逐字节一致、重复导出一致、无外网请求，四页 PNG 及项目 JSON 哈希均与 e1d0436 基线相同；已查看更新的编辑器截图。验证记录与演示产物同步更新，仅清理本轮生成的 artifacts/test-results、artifacts/test-runtime，实际 config/settings.json、debug.log、原始资源和依赖保留。既有上游 Zod 注释构建警告不影响成功；验证范围仍限当前本机浏览器环境。
+Keep WPF + WebView2 + React and the existing lightweight structure. No broad refactor is justified. The immediate work is contract/agent documentation normalization, followed by targeted bridge, persistence, export and runtime-UX reliability review.

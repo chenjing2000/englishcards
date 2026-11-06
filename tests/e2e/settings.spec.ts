@@ -46,7 +46,7 @@ test('shared settings persist independently of articles and determine exact expo
   await expect(page.getByText(/配置无效，未保存/)).toBeVisible();
   await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toBeDisabled();
   expect((await (await request.get('/api/settings')).json()).settings.pageWidth).toBe(1000);
-  await page.getByRole('button', { name: '默认配置', exact: true }).click();
+  await page.getByRole('button', { name: '恢复模板默认', exact: true }).click();
   await expect.poll(async () => (await (await request.get('/api/settings')).json()).settings).toEqual(defaults);
   expect((await (await request.get('/api/settings')).json()).settings).toEqual(defaults);
 });
@@ -74,7 +74,7 @@ test('missing settings are rebuilt and damaged settings require an explicit rese
   await page.getByRole('button', { name: '样式', exact: true }).click();
   await expect(page.getByText(/配置无法读取，暂用默认值/)).toBeVisible();
   expect(await readFile(path, 'utf8')).toBe('{broken');
-  await page.getByRole('button', { name: '默认配置', exact: true }).click();
+  await page.getByRole('button', { name: '恢复模板默认', exact: true }).click();
   await expect.poll(async () => (await (await request.get('/api/settings')).json())).toEqual({ settings: defaults });
   expect(JSON.parse(await readFile(path, 'utf8'))).toEqual(defaults);
 });

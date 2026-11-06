@@ -2,7 +2,7 @@
 
 **EnglishCards** 是面向 Windows x64 的本地英语精读卡片编辑器。使用 **WPF (.NET 10) + WebView2 + React/TypeScript**，支持文章编辑、词汇与表达管理、卡片自动分页、实时预览、JSON 项目保存，以及将**全部卡片图片和项目 JSON 打包为 ZIP**。
 
-> **项目状态：开发中。** 已配置单文件发布，但 WPF / WebView2 的实际启动、资源提取及完整 ZIP 导出仍需在 Windows 实机验收。本仓库提供源码，不应将当前构建视为已验证的正式发行版。
+> **项目状态：Windows 桌面版候选发布。** 用户已报告完成 ZIP 导出、JSON 可读性、Win11 进度窗口及取消行为的 Windows 实机验收。发布前仍须对最终源码重新运行完整测试与发布检查；历史验收结果不自动代表后续源码版本。
 
 ## 主要功能
 
@@ -10,7 +10,7 @@
 - **编辑内容**：Article、Vocabulary、Useful Expressions、Main Idea、Translation。
 - **自动分页**：保留现有按实际字体和行进行的分页逻辑；页面尺寸和排版样式可配置。
 - **本地文件**：使用 schemaVersion 5 的 JSON 项目格式，支持打开、保存和草稿。
-- **导出全部 ZIP**：将每一页 PNG 和文章 JSON 打入一个 ZIP；不提供单页 PNG 导出入口。
+- **导出全部 ZIP**：将每一页 PNG 和文章 JSON 打入一个 ZIP；JSON 使用 2 空格缩进的 UTF-8 Pretty JSON；导出进度采用可复用的 Win11 风格 WPF 对话框；不提供单页 PNG 导出入口。
 - **便携式用户数据**：首次启动自动创建 EXE 同级的 `userdata/`；默认保存于该目录，也允许主动选择外部路径。
 
 ## 运行要求
@@ -41,7 +41,7 @@ npx.cmd playwright install chromium
 npm.cmd run test:e2e
 ```
 
-Playwright / Chromium **只用于开发测试**。部分现有测试仍涉及旧的 HTTP 测试服务，因此通过与否不等同于真实桌面 ZIP 导出验证；详见 [`docs/implementation-status.md`](docs/implementation-status.md)。
+Playwright / Chromium **只用于开发测试**。部分现有测试仍涉及旧的 HTTP 测试服务，因此通过与否不等同于真实桌面 ZIP 导出验证；详见 [`docs/project-contract.md`](docs/project-contract.md) 与 [`docs/CODE_REVIEW_REPORT.md`](docs/CODE_REVIEW_REPORT.md)。
 
 ## 桌面发布
 
@@ -94,7 +94,7 @@ EnglishCards/
 │   ├── services/         # 分页、桌面桥接及文件服务
 │   ├── viewmodels/       # 编辑状态管理
 │   ├── views/            # React 编辑界面和预览
-│   └── server/           # 仅供当前开发测试使用的旧 HTTP 服务
+│   └── server/           # 仅供开发期 E2E 使用的测试 HTTP 服务
 ├── tests/                # Vitest 与 Playwright 测试
 ├── assets/               # 随仓库保留的样例及回归参考素材
 ├── tools/                # Vite、Playwright 和可选发布脚本
@@ -116,3 +116,10 @@ EnglishCards/
 请先阅读 [`docs/GITHUB_SETUP.md`](docs/GITHUB_SETUP.md)。`.gitignore` 已排除 `node_modules/`、`dist/`、`artifacts/dist/`、.NET `bin/obj/`、Playwright 结果、`userdata/`、本地配置及常见密钥文件。**`package-lock.json`、源码和必要测试样本应该提交。**
 
 公开仓库前，请人工检查 `assets/` 中的示例文章、图片及其他素材是否有公开分发权限；`.gitignore` 无法替你完成版权审核。
+
+## 开发代理与代码审查
+
+- 仓库工作入口见 [`AGENTS.md`](AGENTS.md)。
+- Windows 桌面应用审查规范见 [`docs/skills/windows-app-review/SKILL.md`](docs/skills/windows-app-review/SKILL.md)。
+- 桥接与导出契约见 [`docs/specs/EDITOR_BRIDGE_CONTRACT.md`](docs/specs/EDITOR_BRIDGE_CONTRACT.md) 和 [`docs/specs/EXPORT_CONTRACT.md`](docs/specs/EXPORT_CONTRACT.md)。
+- 审查结论及整改计划见 [`docs/CODE_REVIEW_REPORT.md`](docs/CODE_REVIEW_REPORT.md) 和 [`docs/remediation-plan.md`](docs/remediation-plan.md)。

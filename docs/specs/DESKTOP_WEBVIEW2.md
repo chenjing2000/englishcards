@@ -1,3 +1,5 @@
+> **历史设计稿**：本文包含 LocalAppData、安装器及早期发布方案等已被后续决定取代的内容。当前约定以 [`../project-contract.md`](../project-contract.md) 为准。
+
 # EnglishCards Windows 桌面版设计
 
 本设计落实已同意的 WPF + WebView2 路线。代码基线为 c367e51。首版目标是 Windows x64 安装包：从桌面或开始菜单启动，在运行环境齐备时断网可编辑、预览和导出。正式运行无需终端、localhost 服务、外部浏览器、系统 Node.js/npm 或另装 Playwright Chromium。发布包不附带 .NET 和 WPF 运行库，要求预装 x64 .NET 10 Desktop Runtime。应用使用系统 WebView2 Evergreen；安装器负责检查先决条件。开发和打包仍使用 npm。首版不做纯 WPF 界面重写、自动更新或其他平台适配。

@@ -1,3 +1,5 @@
+> **历史文档**：这是早期 MVP/Web 形态的交接材料。当前产品行为以 [`project-contract.md`](project-contract.md) 为准；其中单页 PNG、独立 HTML 和早期架构建议不构成当前需求。
+
 # Codex Handoff — 英语精读卡片可视化编辑器（MVP）
 
 > **执行指令**：请先阅读本文件、`docs/specs/ACCEPTANCE.md`、`docs/specs/DATA_AND_PAGINATION.md`，再分析 `assets/reference/v17/preview.html` 和四张 PNG。然后按本文验收标准**实际实现、运行和测试**一个本地可视化编辑器，不要只输出架构建议或空壳 UI。遇到模糊细节优先采用最小、可维护的实现；只在会改变内容完整性或项目格式的地方提出阻断性问题。请保留原文准确性。

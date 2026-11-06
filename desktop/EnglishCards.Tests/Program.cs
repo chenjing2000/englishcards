@@ -1,6 +1,7 @@
 using System.IO;
 using System.Reflection;
 using System.Text;
+using System.Text.Json.Nodes;
 
 var bridgeType = Assembly.Load("EnglishCards").GetType("EnglishCards.EditorBridge", throwOnError: true)!;
 var bridge = Activator.CreateInstance(bridgeType, [null, null, null, null]);
@@ -152,9 +153,9 @@ try
     if (!firstSaveFailed) throw new Exception("The first save must fail while the data root is a file.");
 
     File.Delete(blockedRoot);
-    Directory.CreateDirectory(blockedRoot);
+    Directory.CreateDirectory(Path.Combine(blockedRoot, "drafts"));
     const string restoredOriginal = "restored original rejected draft";
-    await File.WriteAllTextAsync(Path.Combine(blockedRoot, "draft.json"), restoredOriginal);
+    await File.WriteAllTextAsync(Path.Combine(blockedRoot, "drafts", "draft.json"), restoredOriginal);
     await SaveDraft(retryStore, "successful replacement");
     ensureDraft.Invoke(retryStore, null);
     await (Task)exportDraft.Invoke(retryStore, [retryRecovery])!;
@@ -169,7 +170,9 @@ finally
 }
 
 var rejectedDirectory = Directory.CreateTempSubdirectory("EnglishCards-reject-test-");
-var rejectedPath = Path.Combine(rejectedDirectory.FullName, "settings.json");
+var rejectedSettingsDirectory = Path.Combine(rejectedDirectory.FullName, "settings");
+Directory.CreateDirectory(rejectedSettingsDirectory);
+var rejectedPath = Path.Combine(rejectedSettingsDirectory, "settings.json");
 const string rejectedContents = "original unreadable settings";
 await File.WriteAllTextAsync(rejectedPath, rejectedContents);
 var rejectedBytes = File.ReadAllBytes(rejectedPath);
@@ -182,7 +185,8 @@ try
         try { await SaveSettings(rejectedStore, "replacement settings"); }
         catch (IOException) { preserveFailed = true; }
     }
-    if (!preserveFailed || !File.ReadAllBytes(rejectedPath).SequenceEqual(rejectedBytes) || rejectedDirectory.GetFiles().Length != 1)
+    if (!preserveFailed || !File.ReadAllBytes(rejectedPath).SequenceEqual(rejectedBytes) ||
+        Directory.GetFiles(rejectedDirectory.FullName, "*", SearchOption.AllDirectories).Length != 1)
         throw new Exception("An unreadable rejected source must block replacement and remain byte-identical.");
     Console.WriteLine("PASS unreadable rejected source blocks replacement and retains original bytes");
 }
@@ -198,3 +202,17 @@ if (!resources.Contains("ECUI/index.html") || !resources.Contains("ECUI/render.h
     !resources.Any(name => name.StartsWith("ECUI/assets/", StringComparison.Ordinal) && name.EndsWith(".woff2", StringComparison.Ordinal)))
     throw new Exception("Single-file resources are missing index.html, render.html or bundled fonts.");
 Console.WriteLine("PASS embedded React editor, render page and font resources");
+
+// Exported article JSON must be readable, UTF-8 without BOM, and semantically identical.
+var formatterType = bridgeType.Assembly.GetType("EnglishCards.ArticleJsonFormatter", throwOnError: true)!;
+var formatJson = formatterType.GetMethod("FormatUtf8", BindingFlags.Static | BindingFlags.NonPublic)!;
+const string compactArticle = """{"schemaVersion":5,"title":"中文标题","nested":{"items":[{"word":"neuro-tech","meaning":"神经科技的"},{"word":"showcase","meaning":"展示"}]}}""";
+var prettyBytes = (byte[])formatJson.Invoke(null, [compactArticle])!;
+var prettyArticle = Encoding.UTF8.GetString(prettyBytes);
+if ((prettyBytes.Length >= 3 && prettyBytes[0] == 0xEF && prettyBytes[1] == 0xBB && prettyBytes[2] == 0xBF) ||
+    !prettyArticle.Contains("\n  \"schemaVersion\": 5", StringComparison.Ordinal) ||
+    !prettyArticle.Contains("中文标题", StringComparison.Ordinal) ||
+    !prettyArticle.EndsWith('\n') ||
+    !JsonNode.DeepEquals(JsonNode.Parse(compactArticle), JsonNode.Parse(prettyArticle)))
+    throw new Exception("Exported article JSON must use readable two-space indentation without changing its data.");
+Console.WriteLine("PASS exported article JSON is pretty-printed UTF-8 without BOM and preserves its data");

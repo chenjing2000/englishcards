@@ -70,7 +70,7 @@ test('damaged files are reported and preserved when a validated import and new d
   expect(await requests(page, 'saveSettings')).toHaveLength(0);
   expect(await requests(page, 'saveDraft')).toHaveLength(0);
   await page.getByRole('button', { name: '样式', exact: true }).click();
-  const input = page.getByLabel('导入配置 JSON 文件', { exact: true });
+  const input = page.getByLabel('导入设置 JSON');
   await input.setInputFiles({ name: 'old-settings.json', mimeType: 'application/json', buffer: Buffer.from('{"bodySize":0}') });
   await expect(page.getByRole('alert')).toContainText('配置导入失败');
   expect(await requests(page, 'saveSettings')).toHaveLength(0);

@@ -44,7 +44,7 @@ test('workspace has compact sense controls and edge-aligned floating actions', a
   await notice.getByRole('button', { name: '关闭', exact: true }).click();
   await expect.poll(() => notice.evaluate(node => node.getBoundingClientRect().height)).toBe(0);
   await page.getByRole('button', { name: '样式', exact: true }).click();
-  for (const input of await page.locator('.settings-table input').all()) await expect(input).toHaveCSS('text-align', 'center');
+  for (const input of await page.locator('.settings-table input').all()) await expect(input).toHaveCSS('text-align', 'right');
 });
 
 test('preview scrolls normally and only Ctrl plus wheel zooms its activated content', async ({ page }) => {

@@ -1,3 +1,5 @@
+> **历史计划**：本文记录早期实施阶段，不代表当前待办或当前产品状态。当前状态以 [`project-contract.md`](project-contract.md) 和 [`implementation-status.md`](implementation-status.md) 为准。
+
 # 英语精读编辑器实施计划
 
 > 本文是初次交接时的历史实施计划。下述“没有既有代码或 Git 仓库”等环境说明仅适用于当时；当前启动方法与目录以 [README](../README.md) 为准。

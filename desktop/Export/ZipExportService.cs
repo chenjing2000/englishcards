@@ -3,7 +3,6 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
-using System.Windows.Controls;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using Microsoft.Win32;
@@ -15,8 +14,13 @@ namespace EnglishCards;
 internal sealed class ZipExportService(Window owner, LocalWebContent content, UserDataStore data)
 {
     private CancellationTokenSource? cancellation;
+    private ProgressDialog? activeProgress;
     internal bool IsRunning => cancellation is not null;
-    internal void Cancel() => cancellation?.Cancel();
+    internal void Cancel()
+    {
+        if (activeProgress is not null) activeProgress.RequestCancellationFromOwner();
+        else cancellation?.Cancel();
+    }
 
     internal async Task<bool?> ExportAsync(JsonElement request)
     {
@@ -52,26 +56,13 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
 
         using var cts = new CancellationTokenSource();
         cancellation = cts;
-        var progressText = new TextBlock { Text = "正在准备导出…", Margin = new Thickness(12) };
-        var cancelButton = new Button { Content = "取消导出", Width = 100, Margin = new Thickness(12) };
-        cancelButton.Click += (_, _) => { cancelButton.IsEnabled = false; cts.Cancel(); };
-        var panel = new StackPanel();
-        panel.Children.Add(progressText); panel.Children.Add(cancelButton);
-        var progressWindow = new Window
-        {
-            Title = "正在导出全部卡片", Owner = owner, Content = panel, Width = 350, Height = 160,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize,
-            ShowInTaskbar = false
-        };
-        progressWindow.Closing += (_, args) =>
-        {
-            if (!cts.IsCancellationRequested && IsRunning) { args.Cancel = true; cancelButton.IsEnabled = false; cts.Cancel(); }
-        };
-        progressWindow.Show();
+        var progressWindow = new ProgressDialog(owner, "正在导出全部卡片", cts.Cancel);
+        activeProgress = progressWindow;
         try
         {
+            progressWindow.Show();
             await GenerateAsync(selected.FileName, project.GetRawText(), document.GetRawText(), signature,
-                pages, width, height, progressText, cts.Token);
+                pages, width, height, progressWindow, cts.Token);
             return true;
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
@@ -80,13 +71,14 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
         }
         finally
         {
+            activeProgress = null;
             cancellation = null;
-            progressWindow.Close();
+            progressWindow.CloseAfterOperation();
         }
     }
 
     private async Task GenerateAsync(string destination, string projectJson, string documentJson,
-        string signature, int pages, int width, int height, TextBlock progress, CancellationToken ct)
+        string signature, int pages, int width, int height, ProgressDialog progress, CancellationToken ct)
     {
         string stage = Path.Combine(Path.GetDirectoryName(destination)!, $".englishcards-{Guid.NewGuid():N}.zip.tmp");
         var renderer = new WebView2 { Focusable = false, IsHitTestVisible = false };
@@ -105,7 +97,7 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
             var web = renderer.CoreWebView2;
             await web.CallDevToolsProtocolMethodAsync("Emulation.setDeviceMetricsOverride",
                 """{"width":0,"height":0,"deviceScaleFactor":1,"mobile":false}""").WaitAsync(ct);
-            progress.Text = "正在验证字体和分页…";
+            progress.SetIndeterminate("正在验证字体和分页…", "正在检查页面数量、字体和预览一致性。");
             var actual = await LocalWebContent.EvaluateAsync(web, $$"""
                 (async () => {
                     await document.fonts.ready;
@@ -119,6 +111,10 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
                 actual.GetProperty("cards").GetInt32() != pages)
                 throw new InvalidOperationException("预览与导出分页不一致；已拒绝导出。");
 
+            progress.SetIndeterminate("正在生成文章 JSON…", "正在按 2 空格缩进格式化文章数据。");
+            var formattedDocument = ArticleJsonFormatter.FormatUtf8(documentJson);
+            ct.ThrowIfCancellationRequested();
+            progress.SetIndeterminate("正在打包 ZIP 文件…", "正在写入文章 JSON，并准备逐页生成 PNG。");
             await using (var file = new FileStream(stage, FileMode.CreateNew, FileAccess.Write, FileShare.None,
                              65536, FileOptions.Asynchronous))
             {
@@ -126,27 +122,39 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
                 {
                     var jsonEntry = zip.CreateEntry("article.json", CompressionLevel.Optimal);
                     await using (var output = jsonEntry.Open())
-                    await using (var writer = new StreamWriter(output, new UTF8Encoding(false)))
-                        await writer.WriteAsync(documentJson.AsMemory(), ct);
+                        await output.WriteAsync(formattedDocument, ct);
+
                     var capture = new CardCapture(web);
                     for (int i = 0; i < pages; i++)
                     {
                         ct.ThrowIfCancellationRequested();
-                        progress.Text = $"正在渲染第 {i + 1} / {pages} 页…";
+                        progress.SetProgress($"正在生成图片（{i + 1}/{pages}）…", (double)i / pages,
+                            $"正在渲染第 {i + 1} 页，并写入 ZIP 文件。");
                         var image = await capture.CapturePageAsync(i, width, height, ct);
                         var entry = zip.CreateEntry($"images/page-{i + 1:D3}.png", CompressionLevel.Optimal);
                         await using var stream = entry.Open();
                         await stream.WriteAsync(image, ct);
+                        progress.SetProgress($"已生成图片（{i + 1}/{pages}）", (double)(i + 1) / pages,
+                            "正在继续处理剩余页面。");
                     }
                 }
                 await file.FlushAsync(ct);
             }
             ct.ThrowIfCancellationRequested();
-            progress.Text = "正在验证压缩包…";
+            progress.SetIndeterminate("正在验证压缩包…", "正在检查文章 JSON 和全部页面图片。");
             using (var zip = ZipFile.OpenRead(stage))
             {
-                if (zip.Entries.Count != pages + 1 || zip.GetEntry("article.json") is null)
-                    throw new InvalidDataException("导出 ZIP 页面数量不完整。");
+                if (zip.Entries.Count != pages + 1)
+                    throw new InvalidDataException("导出 ZIP 文件数量不完整。");
+                var articleEntry = zip.GetEntry("article.json")
+                    ?? throw new InvalidDataException("导出 ZIP 缺少 article.json。");
+                await using (var articleStream = articleEntry.Open())
+                using (var exportedArticle = await JsonDocument.ParseAsync(articleStream, cancellationToken: ct))
+                {
+                    if (!exportedArticle.RootElement.TryGetProperty("schemaVersion", out var exportedVersion) ||
+                        exportedVersion.GetInt32() != 5)
+                        throw new InvalidDataException("导出的 article.json 结构无效。");
+                }
                 for (int i = 0; i < pages; i++)
                 {
                     var entry = zip.GetEntry($"images/page-{i + 1:D3}.png")

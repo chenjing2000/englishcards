@@ -1,10 +1,10 @@
-# EnglishCards 桌面改造工作副本 — 实施状态
+# EnglishCards 桌面版实施状态与验收记录
 
-2026-11-06；依据 `docs/project-contract.md`（v1.2）。
+2026-11-06；当前行为以 `docs/project-contract.md` 为准。本文包含历史执行环境记录及用户补充的 Windows 验收结果。
 
 ## 已修改源码（未声称 Windows 实机通过）
 
-- React 两栏位置交换，默认预览 45% / 编辑与设置 55%，分隔条保留。
+- React 两栏位置交换，默认预览 70% / 编辑与设置 30%，分隔条保留。
 - `App.xaml.cs` 正常运行的用户数据根目录改为 EXE 同级 `userdata/`；`UserDataStore` 在使用 WebView2 前创建并检查数据目录可写。设置、草稿、WebView2 Profile、默认 JSON/ZIP 保存目录独立到子文件夹；不访问旧 LocalAppData。
 - React 桌面导出请求改为 `exportAllZip`，包含不可变项目快照、schema 5 文档、预览分页签名、页数。
 - 新增 `ZipExportService.cs`：独立 WebView2 加载 `render.html`，校验分页签名、页数及 PNG 尺寸，写入文章 JSON 与所有页面 PNG，按目标目录临时文件验证后提交。提供取消按钮；在导出期间关闭主窗口时要求先取消。
@@ -71,3 +71,13 @@ dotnet run --project desktop\EnglishCards.Tests\EnglishCards.Tests.csproj -c Rel
 ```
 
 特别验收：删除 `dist\wpf\userdata` 后首次启动自动创建；打开并保存 JSON；设置页在真实 WPF 中显示两个按钮；字体、预览和 ZIP 多页导出；二次发布不得擦除 `userdata`；检查 `dist\wpf` 是否存在额外运行必需的附属文件。
+
+## 2026-11-06：ZIP 导出窗口与 JSON 可读性优化
+
+- 新增可复用 WPF `ProgressDialog`，使用自定义无边框窗口、浅色背景、圆角、轻阴影和居中布局；ZIP 导出窗口宽 460 DIP、高约 180 DIP。
+- 取消按钮仅显示“取消”，尺寸为 48 × 32 DIP；标题栏关闭按钮执行同一取消流程。取消后禁用重复操作，显示“正在取消……”，等待导出任务退出并清理临时 ZIP 后关闭窗口。
+- 进度窗口支持不确定进度与确定进度；验证字体/分页、生成文章 JSON、逐页渲染并写入 ZIP、验证压缩包分别显示阶段信息。页面渲染阶段按已完成页数更新进度。
+- 新增 `ArticleJsonFormatter`：导出的 `article.json` 使用 UTF-8 无 BOM、2 空格缩进、中文不转义，并追加末尾换行；通过 JSON 结构比较测试确保格式化前后数据等价。
+- 保持 ZIP 文件名、`article.json`、`images/page-XXX.png` 路径、PNG 截图与分页校验流程不变。
+- 新增桌面测试覆盖 JSON 格式化的缩进、UTF-8、中文可读性及语义等价性。
+- 当前执行环境不含 Windows/.NET SDK，尚未完成 WPF 编译与实机视觉验收；需要在 Windows 上重新 `dotnet publish` 并验证导出窗口、取消和 ZIP 内容。
