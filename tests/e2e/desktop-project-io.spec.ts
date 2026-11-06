@@ -99,3 +99,31 @@ test('a delayed open result cannot replace a newer project', async ({ page }) =>
   await expect(title(page)).toHaveValue('Newest project');
   expect(await dirty(page)).toBe(false);
 });
+
+
+test('opening a project locks edits and history until cancellation or failure, while allowing another open', async ({ page }) => {
+  await title(page).fill('Protected working edit');
+  const first = await clickRequest(page, 'openProject');
+  await expect(page.locator('.fields')).toHaveAttribute('inert', '');
+  await expect(page.locator('.history-toolbar')).toHaveAttribute('inert', '');
+  await expect(title(page)).toHaveValue('Protected working edit');
+
+  // Keep the Open action reachable, so a newer selection can supersede a slow one.
+  const latest = await clickRequest(page, 'openProject');
+  await reply(page, { id: latest.id, ok: true, value: null });
+  await expect(page.locator('.fields')).not.toHaveAttribute('inert', '');
+  await expect(page.locator('.history-toolbar')).not.toHaveAttribute('inert', '');
+  await expect(title(page)).toHaveValue('Protected working edit');
+
+  // A stale response must not change the working document or relock editing.
+  await reply(page, { id: first.id, ok: true, value: { name: 'older.json', text: JSON.stringify(fixture) } });
+  await expect(title(page)).toHaveValue('Protected working edit');
+  await expect(page.locator('.fields')).not.toHaveAttribute('inert', '');
+
+  const failed = await clickRequest(page, 'openProject');
+  await expect(page.locator('.fields')).toHaveAttribute('inert', '');
+  await reply(page, { id: failed.id, ok: false, error: 'Access denied' });
+  await expect(page.locator('.fields')).not.toHaveAttribute('inert', '');
+  await expect(title(page)).toHaveValue('Protected working edit');
+  await expect(page.getByRole('alert')).toContainText('Access denied');
+});

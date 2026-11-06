@@ -1,4 +1,5 @@
 using System.IO;
+using System.IO.Compression;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -84,6 +85,56 @@ finally
     File.Delete(destination);
     if (directory.GetFiles().Length == 0) directory.Delete();
 }
+
+// A failed writer must leave the committed target untouched and remove only its staging file.
+var stageAndMove = storeType.GetMethod("StageAndMoveAsync", BindingFlags.Static | BindingFlags.NonPublic)!;
+Task Stage(string path, Func<Stream, Task> fill) => (Task)stageAndMove.Invoke(null, [path, fill])!;
+var failureDirectory = Directory.CreateTempSubdirectory("EnglishCards-stage-failure-");
+try
+{
+    var originalPath = Path.Combine(failureDirectory.FullName, "original.json");
+    await File.WriteAllTextAsync(originalPath, "committed original");
+    bool writerFailed = false;
+    try
+    {
+        await Stage(originalPath, async stream =>
+        {
+            await stream.WriteAsync(Encoding.UTF8.GetBytes("incomplete replacement"));
+            throw new IOException("injected staging failure");
+        });
+    }
+    catch (IOException error) when (error.Message == "injected staging failure") { writerFailed = true; }
+    if (!writerFailed || File.ReadAllText(originalPath) != "committed original" ||
+        Directory.GetFiles(failureDirectory.FullName).Length != 1)
+        throw new Exception("Failed staging must preserve the committed target and clean its temporary file.");
+    Console.WriteLine("PASS staging writer failure preserves the committed target and removes its temporary file");
+
+    // If another writer creates a new destination while the staging write is in flight,
+    // the pending save must fail instead of overwriting that other writer's new file.
+    var contestedPath = Path.Combine(failureDirectory.FullName, "contested.json");
+    var stagingStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var continueStaging = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var pendingSave = Stage(contestedPath, async stream =>
+    {
+        await stream.WriteAsync(Encoding.UTF8.GetBytes("our staged content"));
+        stagingStarted.SetResult();
+        await continueStaging.Task;
+    });
+    try
+    {
+        await stagingStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await File.WriteAllTextAsync(contestedPath, "externally created content");
+    }
+    finally { continueStaging.TrySetResult(); }
+    bool collisionRejected = false;
+    try { await pendingSave; }
+    catch (IOException) { collisionRejected = true; }
+    if (!collisionRejected || File.ReadAllText(contestedPath) != "externally created content" ||
+        Directory.GetFiles(failureDirectory.FullName).Length != 2)
+        throw new Exception("A newly created destination must not be overwritten by an in-flight first save.");
+    Console.WriteLine("PASS concurrent new destination is preserved and task staging is cleaned");
+}
+finally { failureDirectory.Delete(recursive: true); }
 
 var storeCtor = storeType.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
     binder: null, [typeof(string)], modifiers: null)!;
@@ -218,7 +269,7 @@ finally
 // Embedded React resource names can contain platform-specific path separators because
 // MSBuild's %(RecursiveDir) metadata is evaluated on the build host.
 var resources = bridgeType.Assembly.GetManifestResourceNames()
-    .Select(name => name.Replace('\\\\', '/'))
+    .Select(name => name.Replace("\\", "/"))
     .ToArray();
 
 var missingResources = new List<string>();
@@ -248,6 +299,30 @@ if (missingResources.Count > 0)
 }
 Console.WriteLine("PASS embedded React editor, render page, JS/CSS bundles and fonts");
 
+// WebView2 navigation and resource requests must remain on the exact local HTTPS origin.
+var localWebType = bridgeType.Assembly.GetType("EnglishCards.LocalWebContent", throwOnError: true)!;
+var isLocalOriginMethod = localWebType.GetMethod("IsLocalOrigin", BindingFlags.Static | BindingFlags.NonPublic)!;
+bool IsLocalOrigin(string value) => (bool)isLocalOriginMethod.Invoke(null, [value])!;
+string[] allowedOrigins =
+[
+    "https://englishcards.invalid/",
+    "https://ENGLISHCARDS.INVALID/index.html",
+    "https://englishcards.invalid/assets/app.js",
+    "https://englishcards.invalid:443/render.html"
+];
+string[] rejectedOrigins =
+[
+    "http://englishcards.invalid/",
+    "https://englishcards.invalid.evil.example/",
+    "https://englishcards.invalid@evil.example/",
+    "https://evil.example/englishcards.invalid/",
+    "https://englishcards.invalid:444/",
+    "not a URL"
+];
+if (allowedOrigins.Any(uri => !IsLocalOrigin(uri)) || rejectedOrigins.Any(uri => IsLocalOrigin(uri)))
+    throw new Exception("WebView2 must accept only the exact local HTTPS origin and default port.");
+Console.WriteLine("PASS WebView2 origin validation accepts only the exact local HTTPS origin");
+
 // Exported article JSON must be readable, UTF-8 without BOM, and semantically identical.
 var formatterType = bridgeType.Assembly.GetType("EnglishCards.ArticleJsonFormatter", throwOnError: true)!;
 var formatJson = formatterType.GetMethod("FormatUtf8", BindingFlags.Static | BindingFlags.NonPublic)!;
@@ -261,3 +336,66 @@ if ((prettyBytes.Length >= 3 && prettyBytes[0] == 0xEF && prettyBytes[1] == 0xBB
     !JsonNode.DeepEquals(JsonNode.Parse(compactArticle), JsonNode.Parse(prettyArticle)))
     throw new Exception("Exported article JSON must use readable two-space indentation without changing its data.");
 Console.WriteLine("PASS exported article JSON is pretty-printed UTF-8 without BOM and preserves its data");
+
+// Validate the staged ZIP before the final destination is replaced.
+var exportType = bridgeType.Assembly.GetType("EnglishCards.ZipExportService", throwOnError: true)!;
+var validateArchive = exportType.GetMethod("ValidateArchiveAsync", BindingFlags.Static | BindingFlags.NonPublic)!;
+Task ValidateArchive(string path, int pages, int width, int height) =>
+    (Task)validateArchive.Invoke(null, [path, pages, width, height, CancellationToken.None])!;
+
+byte[] ValidPng() => Convert.FromBase64String(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==");
+
+async Task WriteTestArchive(string path, byte[] png, string article = """{"schemaVersion":5,"title":"test"}""")
+{
+    await using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+    using var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: true);
+    var articleEntry = archive.CreateEntry("article.json");
+    await using (var stream = articleEntry.Open())
+        await stream.WriteAsync(Encoding.UTF8.GetBytes(article));
+    var imageEntry = archive.CreateEntry("images/page-001.png");
+    await using (var stream = imageEntry.Open())
+        await stream.WriteAsync(png);
+}
+
+var archiveTestDirectory = Directory.CreateTempSubdirectory("EnglishCards-zip-validation-test-");
+try
+{
+    var validArchive = Path.Combine(archiveTestDirectory.FullName, "valid.zip");
+    await WriteTestArchive(validArchive, ValidPng());
+    await ValidateArchive(validArchive, 1, 1, 1);
+
+    var invalidSignature = Path.Combine(archiveTestDirectory.FullName, "invalid-signature.zip");
+    var invalidPng = ValidPng();
+    invalidPng[0] = 0;
+    await WriteTestArchive(invalidSignature, invalidPng);
+    bool signatureRejected = false;
+    try { await ValidateArchive(invalidSignature, 1, 1, 1); }
+    catch (InvalidDataException) { signatureRejected = true; }
+    if (!signatureRejected) throw new Exception("ZIP validation must reject a non-PNG page payload.");
+
+    var wrongDimensions = Path.Combine(archiveTestDirectory.FullName, "wrong-dimensions.zip");
+    await WriteTestArchive(wrongDimensions, ValidPng());
+    bool dimensionsRejected = false;
+    try { await ValidateArchive(wrongDimensions, 1, 2, 1); }
+    catch (InvalidDataException) { dimensionsRejected = true; }
+    if (!dimensionsRejected) throw new Exception("ZIP validation must reject a PNG with unexpected dimensions.");
+
+    var truncated = Path.Combine(archiveTestDirectory.FullName, "truncated.zip");
+    await WriteTestArchive(truncated, ValidPng()[..23]);
+    bool truncatedRejected = false;
+    try { await ValidateArchive(truncated, 1, 1, 1); }
+    catch (InvalidDataException) { truncatedRejected = true; }
+    if (!truncatedRejected) throw new Exception("ZIP validation must reject a truncated PNG header.");
+
+    var invalidArticle = Path.Combine(archiveTestDirectory.FullName, "invalid-article.zip");
+    await WriteTestArchive(invalidArticle, ValidPng(), """{"schemaVersion":"5"}""");
+    bool articleRejected = false;
+    try { await ValidateArchive(invalidArticle, 1, 1, 1); }
+    catch (InvalidDataException) { articleRejected = true; }
+    if (!articleRejected) throw new Exception("ZIP validation must reject an invalid article schema version.");
+
+    Console.WriteLine("PASS ZIP validation checks PNG signature, dimensions and reads the complete entry");
+    Console.WriteLine("PASS ZIP validation rejects truncated images and invalid article schema");
+}
+finally { archiveTestDirectory.Delete(recursive: true); }

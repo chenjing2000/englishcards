@@ -81,8 +81,8 @@ export default function EditorView() {
   return <div className="app-shell" inert={vm.desktop && (!settingsReady || vm.closing)}>
     <SplitPane right={<aside className="editor-panel" id="editor-panel"><div className="panel-heading"><h1>英语阅读卡片编辑器</h1></div>
       <nav aria-label="编辑板块">{(['原文', '词汇', '表达', '主旨与译文', '样式'] as Tab[]).map(name => <button key={name} className={name === tab ? 'active' : ''} onClick={() => setTab(name)}>{name}</button>)}</nav>
-      <div className="history-toolbar"><button onClick={vm.undo} disabled={!canUndo}>Undo</button><button onClick={vm.redo} disabled={!canRedo}>Redo</button><span>支持最近 10 次修改</span>{rejectedDraft && <button onClick={vm.downloadRejectedDraft}>下载原始草稿</button>}</div>
-      <div inert={!settingsReady} className="fields">
+      <div className="history-toolbar" inert={vm.opening}><button onClick={vm.undo} disabled={!canUndo}>Undo</button><button onClick={vm.redo} disabled={!canRedo}>Redo</button><span>支持最近 10 次修改</span>{rejectedDraft && <button onClick={vm.downloadRejectedDraft}>下载原始草稿</button>}</div>
+      <div inert={!settingsReady || vm.opening} className="fields">
         {tab === '原文' && <>
           <label className="field"><span>个性化页眉</span><input type="text" aria-label="个性化页眉" value={project.personalizedHeader} onChange={event => vm.setProjectText('personalizedHeader', event.target.value)} /></label>
           {field('英文标题', project.title, value => vm.setProjectText('title', value), 'project:title')}

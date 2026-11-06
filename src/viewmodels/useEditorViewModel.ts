@@ -323,7 +323,7 @@ export function useEditorViewModel() {
   }
 
   return {
-    project, warning, error, settingsReady, ready, exporting, desktop, closing,
+    project, warning, error, settingsReady, ready, exporting, opening, desktop, closing,
     canUndo: history.past.length > 0, canRedo: history.future.length > 0,
     layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
     undo, redo, open, save, exportImages, setProjectText, setParagraphText, addParagraph,

@@ -49,3 +49,11 @@ Observed request:
 ## Required checks for bridge changes
 
 Test unknown commands, missing/wrong payload fields, malformed JSON, invalid IDs, wrong source origin, stale navigation, dialog cancellation, I/O failure, and WebView disposal. Event-boundary asynchronous handlers must observe and contain exceptions. Keep filesystem authority in WPF; do not accept arbitrary caller-selected paths unless a native user action authorizes them.
+
+
+## WebView2 origin and navigation lifecycle
+
+- Local navigation and resource requests must use an absolute URI with HTTPS, host `englishcards.invalid`, port 443, and no user information.
+- Prefix string comparisons are not the origin authority; use parsed URI components.
+- A `LoadAsync` call completes only for the `NavigationCompleted` event whose `NavigationId` matches the navigation it initiated and whose final source is the expected local page.
+- Cancellation of a `WaitAsync` wrapper does not cancel the underlying WebView2 initialization or DevTools operation. Callers must dispose/retire the associated WebView2 instance when abandoning work; do not assume the underlying operation was cancelled.

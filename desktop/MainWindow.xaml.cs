@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows;
@@ -99,8 +100,30 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        Editor.Dispose();
-        data?.Dispose();
-        base.OnClosed(e);
+        try
+        {
+            Editor.Dispose();
+        }
+        catch (Exception error)
+        {
+            // A failed WebView2/browser process must not prevent releasing the single-instance lease.
+            Trace.TraceWarning("EnglishCards WebView2 disposal failed during window close: {0}", error);
+        }
+        finally
+        {
+            try
+            {
+                data?.Dispose();
+            }
+            catch (Exception error)
+            {
+                Trace.TraceWarning("EnglishCards user-data lease disposal failed during window close: {0}", error);
+            }
+            finally
+            {
+                data = null;
+                base.OnClosed(e);
+            }
+        }
     }
 }

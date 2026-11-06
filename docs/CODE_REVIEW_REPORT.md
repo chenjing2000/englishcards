@@ -74,3 +74,115 @@ The owner previously reported 35/35 Vitest, 58/58 Playwright E2E, 9/9 .NET check
 ## Conclusion
 
 Keep WPF + WebView2 + React and the existing lightweight structure. No broad refactor is justified. The immediate work is contract/agent documentation normalization, followed by targeted bridge, persistence, export and runtime-UX reliability review.
+
+## Round 3 — UserDataStore persistence review (2026-11-06)
+
+**Scope:** `desktop/Persistence/UserDataStore.cs`, its `EditorBridge` callers, `src/services/projectIO.ts`, and the C# desktop test executable.
+
+**Verified from source (not an execution result):**
+
+- The application saves settings and drafts under the executable-relative `userdata/settings/` and `userdata/drafts/` directories. It does not depend on legacy LocalAppData data.
+- Each staged file is created with `FileMode.CreateNew` and a random name in the destination directory. The writer is disposed before `File.Move`, and the owned staging file is removed in a `finally` block after a failure.
+- For a destination that **did not exist at staging start**, `overwrite` is false. A different writer creating the destination before commit should cause the save to fail without replacing that new file. Added a deterministic regression test covering this boundary.
+- For a destination that **already existed at staging start**, `File.Move(... overwrite: true)` commits unconditionally. The store does **not** detect an out-of-process edit made while the staged write is in progress. This is a **documented concurrency limitation**, not yet an approved behavior change; existing calls are serialised by `EditorBridge`, but external programs are not.
+- Both `preserveOriginal` paths copy a readable rejected source into an independently named backup before attempting to commit replacement. The copy keeps the input stream open while staging. A missing original is handled separately from an unreadable original.
+- Exception handling in the staging cleanup explicitly ignores cleanup I/O errors so as not to hide the primary save failure; if cleanup itself fails, a task-owned temporary file could remain. This is an unavoidable possible I/O failure and warrants an operational cleanup policy only if evidenced in practice.
+
+**Changes in Round 3:** Added two regression cases to `desktop/EnglishCards.Tests/Program.cs` for a writer exception during staging and a new destination created by a competing writer before commit. No production C# or TypeScript code changed.
+
+**Review outcome:** No confirmed production defect requiring a change to `UserDataStore` was found from the reachable scenarios inspected. Avoid changing external-overwrite policy without explicitly specifying expected ownership/conflict behavior. Do not describe the file move as durable across power loss (no explicit file/directory flush-to-disk guarantee was verified).
+
+**Verification:** Source inspected; ZIP integrity verified. Windows/.NET tests **not executed in this environment**. Owner should rerun the desktop checks before merge/release.
+
+
+## Round 4 — ZIP export lifecycle review (2026-11-06)
+
+**Scope:** `desktop/Export/ZipExportService.cs`, `CardCapture.cs`, `ProgressDialog.xaml(.cs)`, `LocalWebContent.LoadAsync`, `EditorBridge` export caller, and `docs/specs/EXPORT_CONTRACT.md`.
+
+### Confirmed findings
+
+1. **Important — archive validation did not inspect PNG payloads.** The pre-commit check previously verified entry count, entry names, and `Length >= 24`, but never opened any PNG entry. A ZIP entry with a valid directory record but damaged/truncated compressed payload could pass the metadata-only check. The check also did not validate PNG signature, IHDR dimensions, or force a full read of each entry.
+   - **Change:** Extracted `ValidateArchiveAsync`; it validates the article schema version, PNG signature, IHDR chunk and expected dimensions, and reads each PNG entry to EOF before final commit. This also makes cancellation observable during the validation pass.
+   - **Regression coverage:** valid header, invalid signature, wrong dimensions, truncated header, and invalid article schema.
+
+2. **Reliability — cleanup operations were sequential and unguarded.** If `renderer.Dispose()` or `renderWindow.Close()` throws a WebView2/WPF lifecycle exception, later cleanup statements could be skipped, including deletion of the task-owned staged ZIP.
+   - **Change:** Each cleanup action is attempted independently; expected COM/WPF and file-system cleanup exceptions are logged without preventing later cleanup actions. The stage path remains task-specific.
+
+### Reviewed and retained
+
+- The stage ZIP is created with `CreateNew` in the destination directory, so the final move remains on the same volume.
+- The old destination is not deleted before validation. `File.Move(stage, destination, overwrite: true)` is the sole commit operation; failures before successful move leave the old destination in place.
+- Cancellation checks exist during page capture/write, after archive creation, during archive validation, and immediately before commit. The final synchronous check-and-move section has no dispatcher yield, so a UI cancellation event cannot interleave between those two statements on the WPF UI thread.
+- `CardCapture` checks the raw screenshot's PNG signature and dimensions before writing it to the ZIP.
+- The progress dialog's Cancel and title-bar close both request the same cancellation token; its own close is deferred until the operation completes.
+- `MainWindow.OnClosing` asks whether to cancel an active export and leaves the application open after cancellation, requiring a subsequent close action. This matches the previously confirmed interaction.
+- A numeric upper page-count limit is not defined by the current product contract. The request's page count is checked for positivity and then compared against the renderer's actual page count. No arbitrary maximum was introduced in this pass; a product-level cap remains an explicit specification decision if desired.
+
+### Verification
+
+- Static source review completed.
+- Added C# regression coverage for archive validation.
+- `dotnet` is not installed in this execution environment; compilation and Windows/WebView2 tests are **not run**.
+- Existing user-reported 35/35 React, 58/58 Playwright and 12/12 C# results apply to the prior UserDataStore review package, not this new export patch.
+
+
+## Fifth-round review — WebView2 and EditorBridge
+
+### Important — WebView2 origin checks should parse the origin
+
+**Evidence:** `LocalWebContent.LoadAsync` previously used `StartsWith("https://englishcards.invalid/")` for navigation and resource requests.
+
+**Assessment:** The trailing slash blocks common lookalike-host suffixes, so this was not a demonstrated bypass. However, parsed URI comparison is clearer and explicitly constrains HTTPS, host, port and user-info.
+
+**Action:** Replaced prefix checks with `IsLocalOrigin` and added tests for valid local paths, host case normalization, explicit default port, HTTP, lookalike hosts, user-info, non-default ports and malformed input.
+
+### Important — Navigation completion was not correlated to the requested navigation
+
+**Evidence:** The previous `NavigationCompleted` handler accepted the first completion event without checking `NavigationId` or final `web.Source`.
+
+**Impact:** An unrelated or overlapping navigation completion could satisfy the wait for the requested page.
+
+**Action:** Capture the requested `NavigationId`; accept completion only for that ID and expected final local URI. Unsubscribe the per-load handlers in `finally`.
+
+### Important — Main window close cleanup was not exception-isolated
+
+**Evidence:** `MainWindow.OnClosed` called `Editor.Dispose()` before `data.Dispose()` without a `finally`.
+
+**Impact:** If WebView2 disposal throws after a browser-process failure, the single-instance lease release and base close notification could be skipped.
+
+**Action:** Isolate disposal failures, always attempt to release the data store, clear the reference, and call `base.OnClosed`.
+
+### Lifecycle caveat — WaitAsync does not cancel the WebView2 operation
+
+`EnsureCoreWebView2Async` and `CallDevToolsProtocolMethodAsync` are wrapped with `WaitAsync(ct)`. Cancelling the wait does not cancel the underlying WebView2 operation. This remains a lifecycle consideration: the owning WebView2 instance must be retired/disposed after an abandoned operation, and callers must not assume cancellation stopped the browser-side work. No generalized cancellation framework was added in this round.
+
+### Verification
+
+- Source inspection and targeted C# regression test added.
+- Windows compilation and execution not performed in this environment.
+- Owner must rerun the .NET test project and exercise startup-close, browser-process failure, and ordinary editor close on Windows.
+
+
+## Round 6 — React / TypeScript state and editing lifecycle (2026-11-06)
+
+**Scope:** `useEditorViewModel`, `EditorView`, `DesktopPersistence`, desktop bridge, pagination, and existing unit/E2E coverage.
+
+### Confirmed reliability issue: edits remained active during asynchronous project opening
+
+- **Evidence:** `open()` in `src/viewmodels/useEditorViewModel.ts` sets `opening` while awaiting file selection/read, but the editor fields and Undo/Redo toolbar were not made inert. The existing `ready` gate disabled export, not editing.
+- **Impact:** A user could keep editing the old project during an in-flight open; successful completion would then replace the working project with the opened file, discarding those new edits from the active view.
+- **Fix:** Expose `opening` from the ViewModel; make only the editor fields and history toolbar inert while opening. Keep the external project action controls accessible, allowing a later Open request to supersede a slower one. Cancellation or failure restores editing. Do not modify the project schema or persistence code.
+- **Regression:** Added desktop Playwright scenario for the in-flight inert state, newer-open cancellation, stale older response, and failed open recovery.
+
+### Reviewed and retained
+
+- `DesktopPersistence` serializes settings/draft requests and snapshots state per `save` call. The final close path enqueues the latest snapshot.
+- The project file dirty marker deliberately compares document content without shared styles, preserving the separate settings contract.
+- Pagination sets `ready` only when the published layout matches the current immutable project object. ZIP export uses that ready snapshot and signature.
+- No broad ViewModel split, new state library, or pagination rewrite is justified by the evidence in this pass.
+
+### Verification status
+
+- Source and tests inspected; full and incremental archives checked for integrity.
+- React/Vite and Playwright not executed in this container (project dependencies not installed).
+- Owner should rerun all unit/E2E tests and the WPF build before release.

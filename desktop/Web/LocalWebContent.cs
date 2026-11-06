@@ -18,34 +18,57 @@ internal sealed class LocalWebContent(CoreWebView2Environment environment, strin
         var web = view.CoreWebView2;
         web.SetVirtualHostNameToFolderMapping(Host, uiFolder,
             CoreWebView2HostResourceAccessKind.Deny);
-        web.NavigationStarting += (_, args) => args.Cancel = !args.Uri.StartsWith(Origin, StringComparison.Ordinal);
+        web.NavigationStarting += (_, args) => args.Cancel = !IsLocalOrigin(args.Uri);
         web.NewWindowRequested += (_, args) => args.Handled = true;
         web.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All, CoreWebView2WebResourceRequestSourceKinds.All);
         web.WebResourceRequested += (_, args) =>
         {
-            if (!args.Request.Uri.StartsWith(Origin, StringComparison.Ordinal))
+            if (!IsLocalOrigin(args.Request.Uri))
                 args.Response = environment.CreateWebResourceResponse(null, 403, "Local content only", "");
         };
         configure?.Invoke(web);
+
+        var target = new Uri(Origin + file, UriKind.Absolute);
+        ulong? targetNavigationId = null;
         var loaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void OnStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
+        {
+            if (IsLocalOrigin(args.Uri) &&
+                Uri.TryCreate(args.Uri, UriKind.Absolute, out var uri) &&
+                uri == target)
+                targetNavigationId = args.NavigationId;
+        }
         void OnLoaded(object? sender, CoreWebView2NavigationCompletedEventArgs args)
         {
-            if (args.IsSuccess)
-                loaded.TrySetResult();
-            else
+            if (targetNavigationId is null || args.NavigationId != targetNavigationId.Value)
+                return;
+            if (!args.IsSuccess)
                 loaded.TrySetException(new InvalidOperationException($"Could not load {file}: {args.WebErrorStatus}"));
+            else if (!Uri.TryCreate(web.Source, UriKind.Absolute, out var current) || current != target)
+                loaded.TrySetException(new InvalidOperationException($"Could not load the expected local page: {file}."));
+            else
+                loaded.TrySetResult();
         }
+        web.NavigationStarting += OnStarting;
         web.NavigationCompleted += OnLoaded;
         try
         {
-            web.Navigate(Origin + file);
+            web.Navigate(target.AbsoluteUri);
             await loaded.Task.WaitAsync(ct);
         }
         finally
         {
+            web.NavigationStarting -= OnStarting;
             web.NavigationCompleted -= OnLoaded;
         }
     }
+
+    internal static bool IsLocalOrigin(string value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+        string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(uri.Host, Host, StringComparison.OrdinalIgnoreCase) &&
+        uri.Port == 443 &&
+        string.IsNullOrEmpty(uri.UserInfo);
 
     internal static async Task<JsonElement> EvaluateAsync(CoreWebView2 web, string expression, CancellationToken ct)
     {

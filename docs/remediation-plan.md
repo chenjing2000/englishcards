@@ -78,3 +78,30 @@ dotnet publish desktop\EnglishCards.csproj -c Release -r win-x64 --self-containe
 Then manually verify the published EXE on Windows x64 with .NET 10 Desktop Runtime and WebView2 Evergreen: first-run userdata creation, save/reopen, complete ZIP export, cancel/close cancellation, temporary cleanup, and preservation of an existing ZIP.
 
 No Git commit, push or tag is part of this plan until separately authorized.
+
+## Round 3 review update
+
+- [x] Inspect actual `UserDataStore` staged-write and rejected-backup paths.
+- [x] Add deterministic regression coverage for staging writer failures and creation of a new destination during staging.
+- [ ] Run the C# test executable on Windows against this exact revision.
+- [ ] If external tools editing an already-existing settings/draft file during a save must be supported, first agree on conflict policy (fail and request reload vs. last-writer-wins). No compatibility layer or automatic migration is planned.
+- [ ] Continue with `ZipExportService` review after the Windows test run.
+
+
+## Fifth-round WebView2/EditorBridge actions
+
+- [x] Replace prefix origin checks with exact parsed HTTPS origin validation.
+- [x] Correlate navigation completion with the requested NavigationId and final source.
+- [x] Ensure WebView2 disposal failure cannot skip user-data lease disposal or base window close.
+- [x] Add exact-origin regression tests.
+- [ ] Verify startup cancellation while WebView2 is initializing on Windows.
+- [ ] Verify WebView2 browser-process failure during editor use and export.
+- [ ] Verify normal close and close after failed initialization.
+
+
+## Round 6 — React / TypeScript
+
+- [x] Review ViewModel, bridge persistence, history, pagination, preview/export data flow.
+- [x] Prevent edits/history actions during an in-flight project open without disabling later Open requests.
+- [x] Add E2E coverage for open cancellation, stale response, and failure restoring editing.
+- [ ] Verify Vitest, Playwright and production build on Windows.

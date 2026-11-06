@@ -17,7 +17,7 @@ The editor sends an immutable export request containing `project`, `document`, `
 - Rendering uses bundled fonts and the shared React pagination/render implementation.
 - Every page is captured at the configured page dimensions.
 - A task-specific temporary ZIP is staged in the destination directory.
-- Before commit, reopen and validate the archive, article entry, expected entry count, page entries, and PNG payloads.
+- Before commit, reopen and validate the archive, article schema version, expected entry count, every page entry, each PNG signature and IHDR dimensions, and read each PNG entry fully to detect ZIP payload/decompression errors.
 - Commit only after validation. Failure/cancellation must clean only the current task's temporary archive and preserve an existing destination.
 - The reusable WPF `ProgressDialog` reports status and requests cancellation through the export cancellation token.
 

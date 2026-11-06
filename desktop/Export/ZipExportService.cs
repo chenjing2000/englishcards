@@ -1,5 +1,8 @@
 using System.IO;
 using System.IO.Compression;
+using System.Buffers.Binary;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
@@ -142,34 +145,83 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
             }
             ct.ThrowIfCancellationRequested();
             progress.SetIndeterminate("正在验证压缩包…", "正在检查文章 JSON 和全部页面图片。");
-            using (var zip = ZipFile.OpenRead(stage))
-            {
-                if (zip.Entries.Count != pages + 1)
-                    throw new InvalidDataException("导出 ZIP 文件数量不完整。");
-                var articleEntry = zip.GetEntry("article.json")
-                    ?? throw new InvalidDataException("导出 ZIP 缺少 article.json。");
-                await using (var articleStream = articleEntry.Open())
-                using (var exportedArticle = await JsonDocument.ParseAsync(articleStream, cancellationToken: ct))
-                {
-                    if (!exportedArticle.RootElement.TryGetProperty("schemaVersion", out var exportedVersion) ||
-                        exportedVersion.GetInt32() != 5)
-                        throw new InvalidDataException("导出的 article.json 结构无效。");
-                }
-                for (int i = 0; i < pages; i++)
-                {
-                    var entry = zip.GetEntry($"images/page-{i + 1:D3}.png")
-                        ?? throw new InvalidDataException($"缺少第 {i + 1} 页图片。");
-                    if (entry.Length < 24) throw new InvalidDataException($"第 {i + 1} 页图片不完整。");
-                }
-            }
+            await ValidateArchiveAsync(stage, pages, width, height, ct);
             ct.ThrowIfCancellationRequested();
             File.Move(stage, destination, overwrite: true);
         }
         finally
         {
-            renderer.Dispose();
-            renderWindow.Close();
-            try { File.Delete(stage); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            // A renderer can already be disconnected when WebView2 or its browser process fails.
+            // Cleanup must still attempt to close the window and remove this task's staging file.
+            try { renderer.Dispose(); }
+            catch (Exception error) when (error is COMException or InvalidOperationException)
+            {
+                Trace.TraceWarning("EnglishCards export renderer disposal failed: {0}", error);
+            }
+
+            try { renderWindow.Close(); }
+            catch (Exception error) when (error is COMException or InvalidOperationException)
+            {
+                Trace.TraceWarning("EnglishCards export renderer window close failed: {0}", error);
+            }
+
+            try { File.Delete(stage); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                Trace.TraceWarning("EnglishCards export staging cleanup failed for {0}: {1}", stage, error);
+            }
+        }
+    }
+
+    internal static async Task ValidateArchiveAsync(
+        string archivePath, int pages, int width, int height, CancellationToken ct)
+    {
+        using var zip = ZipFile.OpenRead(archivePath);
+        if (zip.Entries.Count != pages + 1)
+            throw new InvalidDataException("导出 ZIP 文件数量不完整。");
+
+        var articleEntry = zip.GetEntry("article.json")
+            ?? throw new InvalidDataException("导出 ZIP 缺少 article.json。");
+        await using (var articleStream = articleEntry.Open())
+        using (var exportedArticle = await JsonDocument.ParseAsync(articleStream, cancellationToken: ct))
+        {
+            var root = exportedArticle.RootElement;
+            if (root.ValueKind != JsonValueKind.Object ||
+                !root.TryGetProperty("schemaVersion", out var exportedVersion) ||
+                exportedVersion.ValueKind != JsonValueKind.Number ||
+                !exportedVersion.TryGetInt32(out int schemaVersion) || schemaVersion != 5)
+                throw new InvalidDataException("导出的 article.json 结构无效。");
+        }
+
+        byte[] pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+        for (int i = 0; i < pages; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var entry = zip.GetEntry($"images/page-{i + 1:D3}.png")
+                ?? throw new InvalidDataException($"缺少第 {i + 1} 页图片。");
+            if (entry.Length < 24)
+                throw new InvalidDataException($"第 {i + 1} 页图片不完整。");
+
+            await using var imageStream = entry.Open();
+            var header = new byte[24];
+            try
+            {
+                await imageStream.ReadExactlyAsync(header, ct);
+            }
+            catch (EndOfStreamException error)
+            {
+                throw new InvalidDataException($"第 {i + 1} 页图片头部不完整。", error);
+            }
+
+            if (!header.AsSpan(0, 8).SequenceEqual(pngSignature) ||
+                BinaryPrimitives.ReadInt32BigEndian(header.AsSpan(8, 4)) != 13 ||
+                Encoding.ASCII.GetString(header, 12, 4) != "IHDR" ||
+                BinaryPrimitives.ReadInt32BigEndian(header.AsSpan(16, 4)) != width ||
+                BinaryPrimitives.ReadInt32BigEndian(header.AsSpan(20, 4)) != height)
+                throw new InvalidDataException($"第 {i + 1} 页图片不是预期尺寸的 PNG。");
+
+            // Read the complete entry so ZIP decompression/data errors are detected before commit.
+            await imageStream.CopyToAsync(Stream.Null, 81920, ct);
         }
     }
 }
