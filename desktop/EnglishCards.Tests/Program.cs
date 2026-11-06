@@ -32,6 +32,25 @@ if (!replies.SequenceEqual(["saved", "saved project"]))
 
 Console.WriteLine("PASS open waits for the previous save replacement and reply");
 
+bool failedCommandObserved = false;
+try
+{
+    await Send(() => Task.FromException(new InvalidOperationException("expected test failure")));
+}
+catch (InvalidOperationException error) when (error.Message == "expected test failure")
+{
+    failedCommandObserved = true;
+}
+var afterFailure = false;
+await Send(() =>
+{
+    afterFailure = true;
+    return Task.CompletedTask;
+});
+if (!failedCommandObserved || !afterFailure)
+    throw new Exception("A failed bridge command must be observable without blocking subsequent commands.");
+Console.WriteLine("PASS failed bridge command does not block subsequent commands");
+
 var storeType = bridgeType.Assembly.GetType("EnglishCards.UserDataStore", throwOnError: true)!;
 var write = storeType.GetMethod("WriteAtomicallyAsync", BindingFlags.Static | BindingFlags.NonPublic)!;
 Task Save(string path, string text) => (Task)write.Invoke(null, [path, text])!;
@@ -196,12 +215,38 @@ finally
     Directory.Delete(rejectedDirectory.FullName, recursive: true);
 }
 
-// Embedded single-file React resources must include both entry pages and at least one font.
-var resources = bridgeType.Assembly.GetManifestResourceNames();
-if (!resources.Contains("ECUI/index.html") || !resources.Contains("ECUI/render.html") ||
-    !resources.Any(name => name.StartsWith("ECUI/assets/", StringComparison.Ordinal) && name.EndsWith(".woff2", StringComparison.Ordinal)))
-    throw new Exception("Single-file resources are missing index.html, render.html or bundled fonts.");
-Console.WriteLine("PASS embedded React editor, render page and font resources");
+// Embedded React resource names can contain platform-specific path separators because
+// MSBuild's %(RecursiveDir) metadata is evaluated on the build host.
+var resources = bridgeType.Assembly.GetManifestResourceNames()
+    .Select(name => name.Replace('\\\\', '/'))
+    .ToArray();
+
+var missingResources = new List<string>();
+if (!resources.Contains("ECUI/index.html", StringComparer.Ordinal))
+    missingResources.Add("ECUI/index.html");
+if (!resources.Contains("ECUI/render.html", StringComparer.Ordinal))
+    missingResources.Add("ECUI/render.html");
+if (!resources.Any(name => name.StartsWith("ECUI/assets/", StringComparison.Ordinal) &&
+                           name.EndsWith(".js", StringComparison.Ordinal)))
+    missingResources.Add("ECUI/assets/*.js");
+if (!resources.Any(name => name.StartsWith("ECUI/assets/", StringComparison.Ordinal) &&
+                           name.EndsWith(".css", StringComparison.Ordinal)))
+    missingResources.Add("ECUI/assets/*.css");
+if (!resources.Any(name => name.StartsWith("ECUI/assets/", StringComparison.Ordinal) &&
+                           name.EndsWith(".woff2", StringComparison.Ordinal)))
+    missingResources.Add("ECUI/assets/*.woff2");
+
+if (missingResources.Count > 0)
+{
+    var discovered = resources
+        .Where(name => name.StartsWith("ECUI/", StringComparison.Ordinal))
+        .OrderBy(name => name, StringComparer.Ordinal)
+        .Take(20);
+    throw new Exception(
+        $"Embedded React resources are incomplete. Missing: {string.Join(", ", missingResources)}. " +
+        $"Discovered resources: {string.Join(", ", discovered)}");
+}
+Console.WriteLine("PASS embedded React editor, render page, JS/CSS bundles and fonts");
 
 // Exported article JSON must be readable, UTF-8 without BOM, and semantically identical.
 var formatterType = bridgeType.Assembly.GetType("EnglishCards.ArticleJsonFormatter", throwOnError: true)!;

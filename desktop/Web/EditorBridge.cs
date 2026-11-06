@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -24,8 +25,16 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
     {
         if (!IsEditor(args.Source) || !IsEditor(web.Source)) return;
         long page = navigation;
-        string message = args.WebMessageAsJson;
-        await RunFileCommandAsync(() => HandleFileCommandAsync(page, message));
+        try
+        {
+            string message = args.WebMessageAsJson;
+            await RunFileCommandAsync(() => HandleFileCommandAsync(page, message));
+        }
+        catch (Exception error)
+        {
+            // WebView2 event handlers are async void boundaries: no exception may escape to the WPF dispatcher.
+            Trace.TraceError("EnglishCards editor bridge event failed: {0}", error);
+        }
     }
 
     private async Task RunFileCommandAsync(Func<Task> command)
@@ -78,6 +87,12 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         {
             if (id <= 0) return;
             response = new { id, ok = false, error = error.Message };
+        }
+        catch (Exception error)
+        {
+            Trace.TraceError("EnglishCards editor command failed: {0}", error);
+            if (id <= 0) return;
+            response = new { id, ok = false, error = "操作失败，请重试。" };
         }
 
         try
