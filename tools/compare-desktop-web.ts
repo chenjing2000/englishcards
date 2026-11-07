@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const [runDirectory] = process.argv.slice(2);
 if (!runDirectory) throw new Error('Usage: tsx tools/compare-desktop-web.ts <desktop-verification-directory>');
-const webRoot = fileURLToPath(new URL('../artifacts/dist/', import.meta.url));
+const webRoot = fileURLToPath(new URL('../EnglishCards/.build/frontend-dist/', import.meta.url));
 const origin = 'https://englishcards-web.test';
 const browser = await chromium.launch();
 try {

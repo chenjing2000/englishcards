@@ -1,11 +1,30 @@
-> **历史设计稿**：本文包含 LocalAppData、安装器及早期发布方案等已被后续决定取代的内容。当前约定以 [`../project-contract.md`](../project-contract.md) 为准。
+# WPF + WebView2 桌面宿主规格
 
-# EnglishCards Windows 桌面版设计
+> 本文只记录当前仍然有效的宿主技术边界。旧版 LocalAppData、安装器和 schema v5 方案均已被后续决定取代；当前权威规则见 [`../project-contract.md`](../project-contract.md)。
 
-本设计落实已同意的 WPF + WebView2 路线。代码基线为 c367e51。首版目标是 Windows x64 安装包：从桌面或开始菜单启动，在运行环境齐备时断网可编辑、预览和导出。正式运行无需终端、localhost 服务、外部浏览器、系统 Node.js/npm 或另装 Playwright Chromium。发布包不附带 .NET 和 WPF 运行库，要求预装 x64 .NET 10 Desktop Runtime。应用使用系统 WebView2 Evergreen；安装器负责检查先决条件。开发和打包仍使用 npm。首版不做纯 WPF 界面重写、自动更新或其他平台适配。
+## 目标架构
 
-WPF 负责窗口、文件对话框、本机持久化和 PNG/ZIP 输出；同一个编辑 WebView2 保留现有两栏、全部编辑交互、TypeScript 校验及分页。第二个专用 WebView2 用同一内核、字体、代码和项目快照渲染导出；预览缩放不进入导出。截图能力是首个关口；不预设后台视图可正常截图，不放宽现有排版校验。
+- Windows x64 桌面应用采用 WPF + WebView2 + React/TypeScript。
+- WPF 负责窗口、原生文件对话框、EXE 同级 `userdata/` 持久化和完整 ZIP 导出。
+- WebView2 使用 Microsoft Edge Evergreen Runtime；不捆绑 Fixed Version Runtime。
+- React 前端由 Vite 构建为静态资源，嵌入 WPF 程序集，运行时提取到 `userdata/cache/ui/<module-version>/`。
+- 正式用户不需要 Node.js、npm、Express、Vite、Playwright 或 Chromium。
+- .NET 采用 Framework-dependent、win-x64、单文件发布，目标机需安装 .NET 10 Desktop Runtime x64。
 
-文章只接受现行 schema 5，导出包仍包含逐页 PNG 和当次项目 JSON；全局设置不写入文章。配置、自动草稿及 WebView2 用户数据放在当前用户的 LocalAppData/EnglishCards 下。旧文章 JSON 直接打开；旧浏览器草稿先另存 JSON，旧 settings.json 由用户显式选取导入，不扫描浏览器配置。原文件与损坏草稿保留；安装升级保留用户目录。
+## 数据边界
 
-最终验收：清洁 Windows x64 环境离线安装、启动、重启、编辑、保存、恢复和导出；覆盖 100% / 125% / 150% / 200% 显示缩放，保证导出尺寸精确、无裁切、与本版预览逐行一致。与网页版的比较分开记录页数、换行和像素差异；不能以像素差异解释实际分页变化。导出失败不得覆盖目标旧文件。
+- 目标文章格式为严格 Article schemaVersion 6。
+- WPF `openProject` / `saveProject`、自动草稿和 ZIP 导出必须共享同一 Article v6 校验边界。
+- 不兼容 schema v5，不做静默迁移或双写。
+- 用户数据位于真实 EXE 所在目录同级 `userdata/`；不扫描或迁移旧 `%LOCALAPPDATA%\\EnglishCards`。
+
+## 发布和恢复
+
+- 唯一正式发布输出为 `dist/EnglishCards/`。
+- 发布/升级不得删除其中的 `userdata/`；发布工具只处理应用产物。
+- 缺少 .NET Desktop Runtime 时由 .NET Host 报告运行时缺失，README 提供 Microsoft 官方下载入口；不增加 Native Launcher。
+- WebView2 缺失或初始化失败时显示中文恢复说明及 Microsoft 官方 Evergreen 安装/修复入口。
+
+## 验收
+
+在干净 Windows x64 环境验证 .NET Desktop Runtime、WebView2 Evergreen、离线启动、用户数据目录创建、项目打开/保存/恢复、完整 ZIP 导出和取消保护。自动化测试不能替代真实 WPF/WebView2 验收。

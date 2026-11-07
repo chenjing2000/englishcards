@@ -19,7 +19,7 @@ Date: 2026-11-07
 - `src/views/CardPreview.tsx`
 - `src/views/editor.css`
 - `desktop/MainWindow.xaml`
-- `tests/e2e/workspace.spec.ts`
+- `EnglishCards.Tests/frontend/e2e/workspace.spec.ts`
 - `README.md`
 - `docs/project-contract.md`
 - `docs/specs/ACCEPTANCE.md`

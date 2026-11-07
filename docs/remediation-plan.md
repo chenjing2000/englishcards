@@ -1,3 +1,5 @@
+> **历史记录：** 本文记录较早的实施阶段，可能包含旧目录、schemaVersion 5 或旧发布路径。当前有效目录、Article v6 契约和实施状态以 [`docs/project-contract.md`](project-contract.md) 与 [`docs/implementation-status.md`](implementation-status.md) 为准。
+
 # EnglishCards Remediation Plan
 
 This plan follows the supplied `windows-app-review` Skill. It avoids architecture rewrites and behavior changes without evidence and approval.

@@ -1,7 +1,7 @@
 # EnglishCards — Final Windows Release Acceptance
 
-Status: **Release Candidate — external-machine acceptance pending**  
-Evidence baseline: Windows PowerShell logs supplied by the project owner on 2026-11-06, after the system-font optimization.  
+Status: **Historical v5 release candidate; Article v6 migration is in progress**  
+Historical evidence baseline: Windows PowerShell logs supplied by the project owner on 2026-11-06, after the system-font optimization. These results validate the prior v5 source, not the current v6 migration tree.  
 Product contract: [`project-contract.md`](project-contract.md).
 
 ## A. Verified on the owner's Windows development machine
@@ -12,8 +12,8 @@ Product contract: [`project-contract.md`](project-contract.md).
 | `npm.cmd test` | PASS — 35/35 | 9 Vitest test files |
 | `npm.cmd run build` | PASS | TypeScript and Vite completed; third-party Zod/Rollup comments were nonfatal warnings |
 | `npm.cmd run test:e2e` | PASS — 59/59 | Playwright, one worker |
-| `dotnet run --project desktop\EnglishCards.Tests\EnglishCards.Tests.csproj -c Release` | PASS — 16/16 | Includes resource embedding, WebView2 origin/startup guidance, persistence, ZIP validation |
-| `dotnet publish desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\wpf` | PASS | Windows win-x64 framework-dependent publish succeeded |
+| `dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Release` | PASS — 16/16 | Includes resource embedding, WebView2 origin/startup guidance, persistence, ZIP validation |
+| `dotnet publish EnglishCards\desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\EnglishCards` | PASS | Windows win-x64 framework-dependent publish succeeded |
 | EXE size | Owner-reported ~1.9 MB | Previous ~14.9 MB, ~87.2% smaller after removing bundled Noto Sans SC |
 | Preview/PNG CJK visual comparison | Owner-reported acceptable | No obvious differences on the owner's Windows installation |
 
@@ -26,15 +26,15 @@ Use a disposable Windows x64 VM snapshot or another isolated Windows installatio
 - [ ] On a clean Windows x64 machine without Node.js, npm, Visual Studio or the .NET SDK, copy the **entire** publish folder (not only the EXE); install the .NET **10 Desktop Runtime x64** and WebView2 **Evergreen Runtime**. Verify normal startup.
 - [ ] On an isolated VM without .NET 10 Desktop Runtime, verify the standard .NET host reports the missing runtime and the README's official link is sufficient. The application cannot display a custom WPF dialog before the runtime loads.
 - [ ] On an isolated VM without WebView2 Evergreen, verify the app offers understandable Chinese instructions and the official Microsoft installation/repair page.
-- [ ] Create/open/edit/save a schema 5 article JSON, close the EXE and reopen; confirm the saved content and settings persist.
+- [ ] Create/open/edit/save an Article v6 JSON, close the EXE and reopen; confirm the saved content and settings persist.
 - [ ] Preview multiple pages with Chinese punctuation, English accents and mixed text. Verify page breaks, visible glyphs and no clipping on the target Windows installation.
 - [ ] Export a complete ZIP; verify root `article.json`, `images/page-001.png` and all expected pages, and compare PNGs with preview.
 - [ ] Cancel an in-progress ZIP export; verify task-local staging is cleaned, any existing destination ZIP is unchanged, and the app remains responsive.
 - [ ] Test closing during export, following the current cancellation/close behavior, and confirm no orphaned renderer remains.
 - [ ] Confirm first-run `userdata/` creation under the EXE's directory in a writable portable folder; moving the portable folder should preserve access to its data.
-- [ ] **Prove upgrade preservation safely:** create a disposable copy of `dist\wpf`, place marker files inside its `userdata/`, publish again to that *disposable destination*, and compare marker SHA-256 values. Never delete a live `userdata/` to test publishing.
+- [ ] **Prove upgrade preservation safely:** create a disposable copy of `dist\EnglishCards`, place marker files inside its `userdata/`, publish again to that *disposable destination*, and compare marker SHA-256 values. Never delete a live `userdata/` to test publishing.
 - [ ] Confirm a failed or interrupted publish does not remove the existing `userdata/`; avoid interpreting an in-place publish as an atomic software upgrade.
-- [ ] Review `assets/` sample articles/images for permission to redistribute before publicly posting a source ZIP or repository.
+- [ ] Review `EnglishCards/frontend/assets/` sample articles/images for permission to redistribute before publicly posting a source ZIP or repository.
 - [ ] Confirm the intended public version label; `package.json` currently declares `1.0.0`, whereas earlier plans mentioned `v0.1.0`.
 
 ## C. Recommended repeatable build (Windows PowerShell)
@@ -46,16 +46,16 @@ npm.cmd ci
 npm.cmd test
 npm.cmd run build
 npm.cmd run test:e2e
-dotnet run --project desktop\EnglishCards.Tests\EnglishCards.Tests.csproj -c Release
-dotnet publish desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\wpf
+dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Release
+dotnet publish EnglishCards\desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\EnglishCards
 ```
 
-The executable will be at `dist\wpf\EnglishCards.exe`. Keep any other files generated by publish beside the EXE. The host machine requires .NET 10 Desktop Runtime x64 and WebView2 Evergreen; it does **not** require npm, Node.js, Chromium, Vite, or Playwright.
+The executable will be at `dist\EnglishCards\EnglishCards.exe`. Keep any other files generated by publish beside the EXE. The host machine requires .NET 10 Desktop Runtime x64 and WebView2 Evergreen; it does **not** require npm, Node.js, Chromium, Vite, or Playwright.
 
 For an optional post-publish archive created **on Windows after testing**, compress the actual publish folder. Do not package `userdata/` containing private projects, settings, caches or logs:
 
 ```powershell
-$publish = (Resolve-Path 'dist\wpf').Path
+$publish = (Resolve-Path 'dist\EnglishCards').Path
 $stage = Join-Path $env:TEMP 'EnglishCards-release-stage'
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $stage | Out-Null
@@ -73,3 +73,8 @@ Do not publish a release archive from this Linux environment: it cannot produce 
 - **Clean-machine prerequisite, portability and update safety gate:** PENDING.
 - **Public redistribution of sample assets:** PENDING rights review.
 - **Release tag/push/GitHub Release:** NOT DONE; requires explicit authorization and final acceptance.
+
+
+## Article v6 migration gate (2026-11-07)
+
+The owner supplied a later Windows log for the Article v6 phase-1.1 source: Vitest 46/46, Vite build PASS, Playwright 61/61, and .NET win-x64 framework-dependent publish PASS. Those tests still exercised the old v5 running UI; the independent Article v6 model tests were included in Vitest, but full WPF v6 integration was not yet implemented. The subsequent repository directory migration has not yet been re-run on Windows. Do not use the historical v5 acceptance table as evidence that v6 is ready to release.

@@ -1,5 +1,5 @@
-import { defaults } from '../src/models/settings';
-import { SettingsStore } from '../src/server/settingsStore';
+import { defaults } from '../EnglishCards/frontend/src/models/settings';
+import { SettingsStore } from './test-server/settingsStore';
 import { chromium } from '@playwright/test';
 import { unzipSync } from 'fflate';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -10,11 +10,11 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const output = resolve(root, 'artifacts/demo');
+const output = resolve(root, '.build/demo');
 await mkdir(output, { recursive: true });
-const settingsPath = resolve(root, 'artifacts/test-runtime/demo-settings.json');
+const settingsPath = resolve(root, '.build/test-runtime/demo-settings.json');
 await new SettingsStore(settingsPath).save(defaults);
-const server = spawn(process.execPath, ['node_modules/tsx/dist/cli.mjs', 'src/server/index.ts', '--production'], { cwd: root, env: { ...process.env, PORT: '4318', SETTINGS_PATH: settingsPath }, stdio: 'pipe', windowsHide: true });
+const server = spawn(process.execPath, ['node_modules/tsx/dist/cli.mjs', 'tools/test-server/index.ts', '--production'], { cwd: root, env: { ...process.env, PORT: '4318', SETTINGS_PATH: settingsPath }, stdio: 'pipe', windowsHide: true });
 let serverLog = '';
 server.stdout.on('data', chunk => { serverLog += String(chunk); }); server.stderr.on('data', chunk => { serverLog += String(chunk); });
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
@@ -71,7 +71,10 @@ try {
     for (const [name, bytes] of Object.entries(original)) {
       const clean = name.replace(/^english-reading-editor-handoff\//, '');
       if (!(clean.startsWith('projects/') || clean.startsWith('reference/')) || clean.endsWith('/')) continue;
-      if (!Buffer.from(bytes).equals(await readFile(resolve(root, 'assets', clean)))) throw new Error(`原始参考文件被修改：${clean}`);
+      const expectedPath = clean.startsWith('projects/')
+        ? resolve(root, 'EnglishCards/frontend/assets', clean)
+        : resolve(root, 'docs/reference-assets', clean.replace(/^reference\//u, ''));
+      if (!Buffer.from(bytes).equals(await readFile(expectedPath))) throw new Error(`原始参考文件被修改：${clean}`);
       protectedFiles++;
     }
   } catch (reason) { if ((reason as NodeJS.ErrnoException).code !== 'ENOENT') throw reason; }

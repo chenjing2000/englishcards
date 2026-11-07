@@ -14,14 +14,8 @@ node_modules/
 
 # Web/TypeScript build output and generated files
 /dist/
-/artifacts/dist/
-/artifacts/desktop/
-/artifacts/coverage/
-/artifacts/test-results/
-/artifacts/playwright-report/
-/artifacts/blob-report/
-/artifacts/test-runtime/
-/artifacts/demo/preview-page-*.png
+/EnglishCards/.build/
+/.build/
 coverage/
 .vite/
 *.tsbuildinfo
@@ -75,5 +69,5 @@ Thumbs.db
 Desktop.ini
 ~$*
 
-# Intentionally tracked: package-lock.json, assets/ test fixtures,
-# docs/, tools/, desktop/, src/, and tests/.
+# Intentionally tracked: package-lock.json, EnglishCards/ production source,
+# EnglishCards.Tests/ tests, docs/, skills/, and tools/.

@@ -1,164 +1,184 @@
 # EnglishCards 项目契约
 
-> 本文记录当前确认的产品行为和技术边界。基线为用户提供的 `EnglishCards.zip`（2026-11-06）及此前用户在 Windows 上报告的实机验收结果。该源码 ZIP 不含 `.git` 元数据，无法据此确认当前分支、提交或工作区状态。旧计划和原型报告只用于追溯，不覆盖本契约。
+> **当前状态（2026-11-07）：** 用户已批准从 schemaVersion 5 破坏性升级至 Article v6。Article v6 数据模型、独立 JSON/TXT 导入基础及其单元测试已经建立；本轮完成了生产源码、测试、Skills、工具和构建输出目录的重组。桌面应用的实际读写、WPF 桥接、右侧编辑器、左侧预览及 ZIP 导出仍待接入 v6。过渡期间不得把 v5 与 v6 混合写入同一项目，也不得宣称整个应用已经完成 v6。
 
-## 1. 产品定位
+## 1. 产品定位与技术边界
 
-EnglishCards 是 Windows x64 本地英语精读卡片编辑器，正式产品只提供桌面版，采用 **WPF + WebView2 + React/TypeScript**。
+EnglishCards 是 Windows x64 本地英语精读卡片编辑器，正式产品采用 **WPF + WebView2 + React/TypeScript**。
 
-- React 负责编辑界面、文章状态、样式设置、分页和预览。
-- WPF 负责 Windows 窗口、原生文件对话框、用户数据持久化、WebView2 宿主和正式 ZIP 导出。
+- React 负责文章编辑状态、界面、样式设置、分页和卡片预览。
+- WPF 负责 Windows 窗口、原生文件对话框、用户数据持久化、WebView2 宿主及正式 ZIP 导出。
 - 不迁移到 Tauri、Electron 或纯 WPF；不增加 C++ Native Launcher。
 - 不引入重量级 MVVM、DI 或事件总线框架。
 - Node.js/npm、Express、Vite、TypeScript、Playwright/Chromium 仅用于开发、构建和测试，不属于最终用户运行依赖。
 - 不提供账号、云同步或在线文章处理。
 
-## 2. 已确认产品行为
+## 2. Article v6 正式数据契约
 
-### 编辑与预览
+### 2.1 顶层结构
 
-- 左侧为卡片预览，右侧为文章编辑与设置。
-- 初始宽度比例左 70%、右 30%；分隔条可拖动，不是固定宽度；左右面板最小宽度均为 280 DIP，WPF 主窗口最小宽度为 600 DIP。
-- 预览卡片原始尺寸与分页/导出尺寸不变；卡片仅受左侧预览区可用宽度约束，按原始宽高比等比例缩放。预览区高度不参与缩放计算，卡片超出预览区高度时仅纵向滚动。
-- 卡片显示宽度不得超过预览区扣除左右各 8 DIP 内边距后的可用宽度；显示比例上限为 100%。实际比例为用户当前要求比例与可用宽度比例两者中的较小值。
-- Ctrl + 鼠标滚轮缩放，用户要求比例限制为 20%–100%；不需要按下鼠标中键。删除缩放比例浮窗、比例标签和重置按钮。
-- 当预览区变窄导致当前比例超过可用宽度上限时，将当前比例永久下调至该上限；之后即使预览区变宽，也保持下调后的比例，不自动恢复之前的比例。用户可以再次使用 Ctrl + 滚轮放大。
-- 卡片始终水平居中，不出现水平滚动条，不得被分隔条遮挡；多张卡片纵向排列，间距固定。
-- 预览缩放只影响显示，不得改变分页计算、卡片原始尺寸或 PNG/ZIP 导出结果。
-- 保留 Article、Vocabulary、Useful Expressions、Main Idea、Translation 编辑能力，以及现有词汇/表达管理、样式设置、预览定位和撤销/重做行为。
-- 预览用于查看和定位，不替代右侧编辑器。
+Article v6 是唯一目标数据格式，`schemaVersion` 必须为数字 `6`。v5 及更早版本不兼容，不提供自动迁移、双写或静默兼容。
 
-### 分页与渲染
+```typescript
+interface Article {
+  schemaVersion: 6;
+  id: string;
+  title: string;
+  identityTag: string;
+  content: { paragraphs: Paragraph[] };
+  vocabulary: VocabularyItem[];
+  translation: { paragraphs: Paragraph[] };
+}
 
-- `src/services/pagination.ts` 是当前分页实现入口；修改前检查其调用方以及预览/导出共用关系。
-- 预览和导出必须基于同一文章快照、字体回退顺序、分页规则和渲染入口。
-- 英文内置 Nunito Sans，仅包含 Latin / Latin Extended 的 400 与 800 字重；不打包 Cyrillic、Cyrillic Extended、Vietnamese 子集。
-- 中文不打包 Noto Sans SC，按 `Microsoft YaHei UI`, `Microsoft YaHei`, `DengXian`, `sans-serif` 顺序使用目标 Windows / WebView2 可用字体。系统字体可能因 Windows 版本和语言组件不同而存在度量差异；发布验收必须在目标中文 Windows 环境检查分页、预览和 PNG 导出。
-- 默认画布 1200×1600，实际输出尺寸遵循项目样式设置。
+interface Paragraph {
+  id: string; // p001–p999
+  text: string;
+}
+
+interface VocabularyItem {
+  id: string; // v001–v999
+  word: string;
+  ipa?: string;
+  highlight: string[];
+  senses: Sense[];
+}
+
+interface Sense {
+  pos: string;
+  meaning: string;
+  example: string;
+  exampleTranslation: string;
+}
+```
+
+### 2.2 字段与容量
+
+- `title` 必须存在，允许空字符串。
+- `identityTag` 替代旧 `personalizedHeader`，必须存在，允许空字符串，并继续承担卡片页眉显示功能。
+- `content.paragraphs` 和 `translation.paragraphs` 分别最多 999 段，各自从 `p001` 连续编号至 `p999`。
+- `vocabulary` 最多 999 项，按当前顺序从 `v001` 连续编号至 `v999`。
+- 段落和词汇 ID 在各自集合内连续编号；正文与译文可以同时存在 `p001`，二者定位时必须带集合/区域上下文。
+- 删除段落或 Vocabulary 项后，相关集合按当前顺序重新编号。ID 表示集合中的顺序位置，不是永久身份。
+- Vocabulary 统一管理单词、词组、习语及用户选择的英文内容，核心字段保持 `word`。保留 `ipa`、`highlight`、`senses` 等已有辅助能力；不再使用独立 `expressions` 集合。
+- 删除 `expressions`、`mainIdea`、`source`、`personalizedHeader`、`readingLevel`、`theme` 和 Article 顶层 `warnings`。运行时警告属于 UI 状态，不属于文章数据。
+- 正文和译文自然段文本不能为空；字段和数组严格校验，未知字段拒绝，不静默丢弃。
+
+### 2.3 TXT 与 JSON 导入
+
+- 提供独立 `ArticleJsonImporter` 和 `PlainTextImporter`，由统一导入协调器负责调用。
+- 先尝试 Article v6 JSON 解析；只有可以确定为普通文本的输入才允许回退 TXT。
+- JSON 文件语法错误、schemaVersion 不是 6、缺字段、多余字段、ID 不连续或超出容量时，必须拒绝导入，不得把 JSON 内容静默当作正文。
+- TXT 文件名（去掉扩展名）作为默认 `title`；`identityTag` 默认为空，`vocabulary` 和 `translation.paragraphs` 默认为空。
+- TXT 采用 UTF-8；识别 BOM、CRLF、LF 和 CR。一个或多个空行分隔自然段，单个换行转换为空格。
+- 正文或译文超过 999 段、Vocabulary 超过 999 项时拒绝本次操作，保留当前 Article，不截断、不部分导入。
+
+## 3. 编辑器与选区目标行为
+
+### 3.1 右侧编辑器
+
+- 所有编辑内容放在同一个 TabPage。
+- 顺序为 **Vocabulary → Content → Translation**。
+- Vocabulary 位于第一个编辑区，正文第二，译文第三。
+- 正文和译文各使用一个连续的多段落编辑区域，不为每个自然段落创建独立输入框；向下滚动编辑完整文章。
+- 标题使用独立输入框，位于正文上方；标题可独立修改。
+- 右侧只负责编辑，不提供选词加入 Vocabulary 的交互。
+
+### 3.2 左侧预览与 Vocabulary 选择
+
+- 左侧显示完整文章并自动分页；段落是数据结构和分页单元，不再按段落分段导入或分段编辑。
+- 鼠标选中文字后，在选区右下角显示圆角方形加号；无 Tooltip。
+- 选区必须在同一张卡片、同一个自然段内，不允许跨卡片或跨自然段。
+- 选区必须至少包含一个英文字母（A–Z/a–z），且不得包含中文字符；纯数字、纯空白和含中文的混合选区不显示加号。
+- 可以选择单词、多个单词、词组或习语；不做词性、词组或习语分类。
+- 点击加号时必须在焦点变化前保存选区文本；执行空白规范化和大小写不敏感去重。重复项不新增、不覆盖现有释义。
+- 新增条目写入 `vocabulary`，使用 `word` 字段，并保留现有义项编辑能力。
+
+## 4. 分页、预览与渲染
+
+- 保留当前分页引擎的字体测量、逐行布局、分页连续性校验等成熟算法；先改数据输入和段落映射，不无故重写测量算法。
+- `EnglishCards/frontend/src/services/pagination.ts` 是当前分页实现入口；修改前检查调用方以及预览/导出共用关系。
+- 预览和导出必须基于同一 Article 快照、字体回退顺序、分页规则和渲染入口。
+- 段落 ID 重新编号后，分页和高亮定位必须使用区域上下文，不能仅凭 `p001` 在正文和译文之间定位。
+- 英文内置 Nunito Sans，仅包含 Latin / Latin Extended 的 400 与 800 字重。
+- 中文使用 Windows 系统字体回退：Microsoft YaHei UI、Microsoft YaHei、DengXian、sans-serif。
+- 默认画布 1200×1600；实际输出尺寸遵循样式设置。
 - 字体未就绪或分页/渲染校验失败时，不得提交错误导出。
 
-### 正式导出
+## 5. 正式 ZIP 导出
 
 - 唯一用户导出入口为**导出全部 ZIP**，不提供单页 PNG 或 PNG-only 导出。
 - ZIP 包含根目录 `article.json` 和 `images/page-001.png` 等全部页面图片。
-- `article.json` 为 UTF-8 无 BOM、2 空格缩进、中文不转义、末尾换行；格式化不得改变 Schema 5 数据。
-- 导出进度窗口为可复用 WPF `ProgressDialog`，采用 Win11 风格。取消按钮文字“取消”，48×32 DIP；标题栏关闭按钮执行同一取消流程。
-- 取消时显示“正在取消……”，禁用重复操作，等待渲染/写入停止并清理本任务临时 ZIP；不得损坏已有 ZIP。
-- 用户已报告 Windows 实机验收：ZIP 内容正常、Pretty JSON 可读、Win11 风格窗口正常；取消按钮或标题栏关闭可停止导出、清理临时 ZIP、保护已有 ZIP。该结果是用户报告的验收证据，不是本轮重新执行。
+- `article.json` 使用 UTF-8 无 BOM、2 空格缩进、中文不转义、末尾换行；完成 v6 集成后必须保存完整 Article v6，不含样式配置或运行时字段。
+- 保留现有 Win11 风格 WPF 导出进度对话框、取消流程、任务临时文件清理及原 ZIP 保护行为。
+- 取消时必须等待渲染/写入停止并清理当前任务临时 ZIP，不得损坏已有 ZIP。
 
-详细导出约定见 [`specs/EXPORT_CONTRACT.md`](specs/EXPORT_CONTRACT.md)。
+## 6. 运行环境与发布
 
-## 3. 运行环境与发布
-
-| 项目 | 当前约定 |
+| 项目 | 要求 |
 |---|---|
 | 操作系统/架构 | Windows x64 |
 | 桌面框架 | .NET 10 WPF |
 | 发布模式 | Framework-dependent、单文件、win-x64 |
 | .NET 运行依赖 | 兼容的 .NET 10 Desktop Runtime x64 |
 | WebView2 | Microsoft Edge WebView2 Evergreen Runtime |
-| 前端资源 | Vite 构建后嵌入程序集，运行时提取到 `userdata/cache/ui/<模块版本>/` |
 | Node.js | 最终用户不需要 |
 | Express/Playwright/Chromium | 最终用户不需要 |
 
-### 缺少 .NET Desktop Runtime
+目标机缺少兼容的 .NET 10 Desktop Runtime x64 时，用户需通过 Microsoft 官方入口安装后重新启动。保持 Framework-dependent，不实现自定义 Runtime 下载器，不增加 Native Launcher。
 
-- 保持 Framework-dependent 发布，不随应用打包 .NET Runtime。
-- 目标机缺少兼容的 .NET 10 Desktop Runtime x64 时，用户需通过 Microsoft 官方入口安装后重新启动。
-- 不实现自定义 Runtime 下载器，不增加 Native Launcher。
-- WPF 代码在 .NET Host 未启动前无法自行显示提示；因此 README 必须明确运行先决条件。若要定制启动前提示，须单独评估并取得确认。
+WebView2 使用 Evergreen Runtime；缺失或初始化失败时提供可理解的错误及 Microsoft 官方安装/修复入口。
 
-### WebView2
-
-- 使用 Evergreen Runtime，不随应用打包 Fixed Version Runtime。
-- WebView2 缺失或初始化失败时，应提供可理解的错误及 Microsoft 官方安装/修复入口。
-- WebView2 Profile 位于 `userdata/cache/WebView2/`。
-
-### 构建与发布命令
-
-```bat
-npm.cmd ci
-npm.cmd test
-npm.cmd run test:e2e
-npm.cmd run build
-dotnet run --project desktop\EnglishCards.Tests\EnglishCards.Tests.csproj -c Release
-dotnet publish desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\wpf
-```
-
-可选封装：`tools\publish.bat`。默认优先直接 `dotnet publish`；不以 `.ps1` 作为发布入口。Playwright E2E 是开发测试，不替代真实 WPF/WebView2 验收。
-
-## 4. 用户数据与文件保护
+## 7. 用户数据与文件保护
 
 - 数据根目录为真实 EXE 所在目录同级 `userdata/`，不是当前工作目录、快捷方式目录或 LocalAppData。
 - 首次启动自动创建；目录不可写或创建失败时明确报错，不静默回退到其他位置。
 - 不读取、不迁移、不合并、不提示迁移旧版 `%LOCALAPPDATA%\EnglishCards\` 数据；新版也不主动删除旧目录。
-- 典型目录：
-
-```text
-userdata/
-├── projects/
-├── drafts/
-├── settings/
-├── exports/
-├── cache/
-│   ├── ui/
-│   └── WebView2/
-├── temp/
-└── logs/
-```
-
-- 外部 JSON 可由用户明确打开；保存/另存遵循用户选择的路径。
-- 保存失败不得静默覆盖或丢弃原始数据。
 - 发布/更新不得清理 `userdata/`；发布脚本只处理应用产物。
 - 用户数据不纳入源码包、Git 提交或 GitHub Release。
 
-## 5. 架构职责
+## 8. 仓库目录和构建约定
 
-### React / TypeScript
+```text
+EnglishCards/
+├── desktop/                 # WPF 主程序、WebView2、持久化和 ZIP 导出
+├── frontend/                # React/TypeScript、前端入口及运行资源
+└── .build/                  # Vite 嵌入资源，自动生成、可删除重建
 
-- `src/models/`：文章/设置结构、Zod 校验及纯业务规则。
-- `src/viewmodels/`：编辑状态、命令协调、撤销/重做。
-- `src/views/`：界面、交互、焦点和预览挂载。
-- `src/services/pagination.ts`：分页与布局计算。
-- `src/services/projectIO.ts`：项目/草稿交互与桌面调用。
-- `src/services/desktopBridge.ts`：WebView2 桥接客户端。
-- `src/server/`：开发测试服务，不是正式桌面运行入口。
+EnglishCards.Tests/
+├── dotnet/                  # .NET 桌面测试
+└── frontend/
+    ├── unit/                # Vitest
+    └── e2e/                  # Playwright
 
-### WPF / WebView2
+docs/                        # 项目文档、规格、审查记录和历史材料
+skills/                      # 项目专属 Skills
+tools/                       # 构建、测试、发布及开发期测试服务
+.build/                      # 测试结果、报告和临时运行数据
+dist/EnglishCards/           # 唯一正式发布目录
+```
 
-- `desktop/MainWindow.xaml(.cs)`：主窗口和生命周期。
-- `desktop/Web/LocalWebContent.cs`：本地虚拟主机、导航边界和 WebView2 加载。
-- `desktop/Web/EditorBridge.cs`：受控命令桥接。
-- `desktop/Persistence/UserDataStore.cs`：用户数据、原子写入、实例租约及拒绝数据保护。
-- `desktop/Export/ZipExportService.cs`：完整 ZIP 导出任务。
-- `desktop/Export/CardCapture.cs`：ZIP 内逐页 PNG 截图。
-- `desktop/Export/ArticleJsonFormatter.cs`：可读 JSON 序列化。
-- `desktop/UI/Dialogs/ProgressDialog.xaml(.cs)`：可复用进度对话框。
+- `package.json`、`package-lock.json`、`tsconfig.json`、`AGENTS.md`、`README.md` 为仓库级配置，保留在根目录。
+- 不保留固定 `artifacts/` 目录。前端构建输出位于 `EnglishCards/.build/frontend-dist/`；测试输出位于根 `.build/`。
+- `node_modules/`、`.build/`、`EnglishCards/.build/`、`bin/`、`obj/` 和 `dist/` 不提交 Git。
+- 正式发布仅输出到 `dist/EnglishCards/`，不同时维护 `dist/wpf`、`publish`、`release` 等重复发布目录。
 
-桥接细节见 [`specs/EDITOR_BRIDGE_CONTRACT.md`](specs/EDITOR_BRIDGE_CONTRACT.md)。
+## 9. 构建与测试命令
 
-## 6. 验证证据
+在仓库根目录执行：
 
-用户此前报告：Vitest 35/35、Playwright E2E 58/58、.NET 桌面测试 9/9、Windows x64 发布成功，以及 ZIP/Pretty JSON/Win11 进度窗口/取消行为实机验收通过。以上是历史用户报告结果；必须在最终源码上重新执行后，才能作为该最终提交的发布证据。
+```bat
+npm.cmd ci
+npm.cmd test
+npm.cmd run build
+npm.cmd run test:e2e
+dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Release
+dotnet publish EnglishCards\desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\EnglishCards
+```
 
-本轮审查未在 Windows 上重新运行测试或发布。报告必须区分通过、失败、跳过和未验证。
+单元测试、浏览器 E2E、.NET 桌面测试和真实 Windows/WebView2 实机验收是不同层级，报告必须区分通过、失败、跳过和未验证。
 
-## 7. 变更原则
+## 10. 当前迁移状态
 
-- 用户当前明确指示优先于本文。
-- 修改前检查调用方、规格、测试和失败路径；优先最小修正。
-- 不擅自改变 Schema、用户数据位置、运行时策略、主交互或 ZIP 语义。
-- 不增加 Native Launcher、Tauri、Electron 或重量级 MVVM 框架。
-- 不删除仍承担测试、数据验证、样例或历史追溯作用的文件。
-- 不提交、推送、打标签或修改远程仓库，除非用户明确授权。
-- 未运行的测试必须标记为未验证。
-
-## 8. 当前待审查事项
-
-- WebView2 Evergreen 缺失/初始化失败时的实际提示。
-- `EditorBridge` 异步事件异常边界、消息顺序和导航切换竞态。
-- `UserDataStore` 原子替换、备份冲突和失败恢复边界。
-- ZIP 导出取消、校验、提交竞态及异常清理。
-- 发布脚本对已有 `dist/wpf/userdata` 的保护。
-- 历史网页导出测试与正式桌面 ZIP 的职责隔离。
-- 源码归档含 `desktop/bin/`、`desktop/obj/`、`artifacts/dist/` 等构建产物；正式源码归档应排除这些目录。
+- 已完成：Article v6 独立数据模型、严格校验、JSON/TXT 导入基础、v6 单元测试；目录迁移至 `EnglishCards/`、`EnglishCards.Tests/`、`skills/`、`tools/`；构建输出目标改为 `.build`。
+- 尚未完成：将 WPF 桥接、自动草稿、项目打开/保存、React 编辑器、预览、高亮和 ZIP 导出全部迁移到 Article v6；删除 v5 生产模型及旧分区 UI；在迁移后的目录结构上完成 Windows .NET 测试与正式发布。
+- 用户最近报告的验证结果：Vitest 46/46、Vite 构建成功、Playwright 61/61、.NET Release 发布成功。该日志对应目录迁移前的测试修复包；目录重组后的新路径尚未在 Windows 上验证。

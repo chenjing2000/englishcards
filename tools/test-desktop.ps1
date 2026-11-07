@@ -1,6 +1,6 @@
 param(
-    [string]$PublishDir = "$PSScriptRoot/../dist/wpf",
-    [string]$OutputDir = "$PSScriptRoot/../artifacts/desktop/verification",
+    [string]$PublishDir = "$PSScriptRoot/../dist/EnglishCards",
+    [string]$OutputDir = "$PSScriptRoot/../.build/desktop/verification",
     [int]$ExpectedDpi = 0
 )
 $ErrorActionPreference = 'Stop'

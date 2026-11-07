@@ -1,3 +1,5 @@
+> **历史记录：** 本文记录较早的实施阶段，可能包含旧目录、schemaVersion 5 或旧发布路径。当前有效目录、Article v6 契约和实施状态以 [`docs/project-contract.md`](project-contract.md) 与 [`docs/implementation-status.md`](implementation-status.md) 为准。
+
 # EnglishCards：GitHub 首次推送指南
 
 本指南针对**首次创建仓库**，不是更新已有仓库。所有命令从解压后的 `EnglishCards` 项目根目录执行；建议先在 GitHub 创建一个**空仓库**（不要预先添加 README、`.gitignore` 或 LICENSE，以避免首次推送历史冲突）。本项目不代替用户操作 GitHub，也不会自动推送。

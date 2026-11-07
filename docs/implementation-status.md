@@ -1,5 +1,7 @@
 # EnglishCards 桌面版实施状态与验收记录
 
+> 本文前半部分包含历史阶段记录，旧路径（`desktop/`、`src/`、`tests/`、`dist/wpf/`）仅用于追溯。当前目录与目标数据契约以 `docs/project-contract.md` 为准。
+
 2026-11-06；当前行为以 `docs/project-contract.md` 为准。本文包含历史执行环境记录及用户补充的 Windows 验收结果。
 
 ## 已修改源码（未声称 Windows 实机通过）
@@ -106,3 +108,29 @@ dotnet run --project desktop\EnglishCards.Tests\EnglishCards.Tests.csproj -c Rel
 ## 2026-11-07 — Responsive preview layout and zoom toolbar
 
 Superseded by the 2026-11-07 width-only preview update: 280 DIP pane minimums; cards are scaled only to fit the available preview width, remain horizontally centered, and scroll vertically. Ctrl + wheel controls a 20%–100% zoom. If a narrower pane forces the current zoom down, that lower value is committed and remains after the pane widens. The zoom toolbar, percentage label, reset control, and all fit-height behavior are removed. Pagination and export code paths are not changed. See `responsive-preview-change.md` for the current contract.
+
+## Article v6 migration — data foundation (2026-11-07)
+
+A separate v6 data model, JSON/TXT import coordinator and standalone tests have been added under `EnglishCards/frontend/src/v6/` and `EnglishCards.Tests/frontend/unit/`. **The running application and its bundled fixtures remain v5 until the coordinated migration**. See [`docs/architecture/ARTICLE_V6_PHASE1.md`](architecture/ARTICLE_V6_PHASE1.md). These files do not imply that the editor, desktop integration, export, or existing skills have been migrated.
+
+
+## 2026-11-07 — Article v6 phase 1.1 Windows verification
+
+The owner supplied a fresh PowerShell log after the Vitest test-file fix:
+
+- `npm ci`: PASS; 184 packages installed. npm printed a non-blocking esbuild `allow-scripts` notice.
+- `npm test`: PASS, 10 suites and 46 tests. The 11 Article v6 tests are now recognized by Vitest.
+- `npm run build`: PASS; TypeScript and Vite production build completed. Rollup printed non-blocking third-party Zod annotation warnings.
+- `npm run test:e2e`: PASS, 61/61. These tests still exercise the existing v5 editor/bridge and do not prove v6 integration.
+- `dotnet publish ...`: PASS on the owner's Windows x64 environment.
+
+## 2026-11-07 — Phase 2A directory/build migration (current work)
+
+- Production code moved to `EnglishCards/desktop/` and `EnglishCards/frontend/`.
+- Tests moved to `EnglishCards.Tests/dotnet/` and `EnglishCards.Tests/frontend/{unit,e2e}/`.
+- Skills moved from `docs/skills/` to root `skills/`; the Article-to-EnglishCards Skill now describes Article v6.
+- Development-only Express test server moved to `tools/test-server/`.
+- Vite output target changed from `artifacts/dist/` to `EnglishCards/.build/frontend-dist/`; test outputs use root `.build/`. The permanent `artifacts/` directory has been eliminated from the intended layout.
+- WPF embedded-resource paths, .NET test project reference, Vite, Playwright, TypeScript aliases and publish output target were updated.
+- The runtime editor and desktop bridge still use v5. This phase only reorganizes paths; it does not claim v6 app integration.
+- The new directory layout has not yet been re-run on Windows. Container verification is limited by unavailable npm dependencies and no Windows/.NET runtime in this environment.

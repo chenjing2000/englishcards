@@ -2,7 +2,7 @@
 
 ## Authority and scope
 
-This document records the current bridge observed in the supplied source baseline. `desktop/Web/EditorBridge.cs` and `src/services/desktopBridge.ts` are the implementation references. A disagreement between host and client is a defect to investigate, not a reason to silently expand host permissions.
+This document describes the approved WPF/WebView2 bridge contract. The current desktop implementation is still transitioning from schema v5 to Article v6; until integration is complete, existing v5 bridge behavior is an implementation detail, not the target data contract. `EnglishCards/desktop/Web/EditorBridge.cs` and `EnglishCards/frontend/src/services/desktopBridge.ts` are the implementation references.
 
 ## Trust boundary
 
@@ -26,18 +26,20 @@ Observed request:
 - Success response: `{ "id": 1, "ok": true, "value": ... }`.
 - Failure response: `{ "id": 1, "ok": false, "error": "..." }`.
 
-## Current command allow-list
+## Command allow-list
 
 | Command | Expected payload | Host responsibility |
 |---|---|---|
 | `openProject` | `null` | Native open dialog; return selected file name and text |
-| `saveProject` | JSON string | Validate schemaVersion 5 envelope; native save dialog; atomic write |
-| `loadSettings` | `null` | Read settings from userdata |
-| `loadDraft` | `null` | Read draft from userdata |
+| `saveProject` | Article v6 JSON string | Strictly validate Article schemaVersion 6; native save dialog; atomic write |
+| `loadSettings` | `null` | Read settings from EXE-sibling `userdata/` |
+| `loadDraft` | `null` | Read and validate the complete Article v6 draft |
 | `saveSettings` | `{text, preserveOriginal}` | Validate and persist settings |
-| `saveDraft` | `{text, preserveOriginal}` | Validate and persist draft |
+| `saveDraft` | `{text, preserveOriginal}` | Validate and persist complete Article v6 JSON |
 | `saveRejectedDraft` | `null` | Explicitly save retained rejected draft elsewhere |
-| `exportAllZip` | object | Validate snapshot and run full ZIP export |
+| `exportAllZip` | immutable Article v6 snapshot plus render signature/page metadata | Validate snapshot and run full ZIP export |
+
+The v6 payloads above are the target contract. Do not enable v6 UI writes until the React state, draft persistence, native save/open, and export pipeline all validate and consume the same Article v6 snapshot.
 
 ## Ordering and navigation
 
@@ -49,7 +51,6 @@ Observed request:
 ## Required checks for bridge changes
 
 Test unknown commands, missing/wrong payload fields, malformed JSON, invalid IDs, wrong source origin, stale navigation, dialog cancellation, I/O failure, and WebView disposal. Event-boundary asynchronous handlers must observe and contain exceptions. Keep filesystem authority in WPF; do not accept arbitrary caller-selected paths unless a native user action authorizes them.
-
 
 ## WebView2 origin and navigation lifecycle
 

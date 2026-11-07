@@ -4,7 +4,13 @@
     "module": "ESNext", "moduleResolution": "Bundler", "jsx": "react-jsx",
     "strict": true, "esModuleInterop": true, "skipLibCheck": true,
     "resolveJsonModule": true, "allowImportingTsExtensions": true, "noEmit": true,
-    "types": ["node", "vite/client"]
+    "types": ["node", "vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@frontend/*": ["EnglishCards/frontend/src/*"],
+      "@fixtures/*": ["EnglishCards/frontend/assets/*"],
+      "@test-server/*": ["tools/test-server/*"]
+    }
   },
-  "include": ["src", "tests", "tools"]
+  "include": ["EnglishCards/frontend/src", "EnglishCards.Tests/frontend", "tools", "skills"]
 }
