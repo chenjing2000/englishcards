@@ -26,11 +26,27 @@ public partial class MainWindow : Window
         userData.AcquireInstanceLease();
         try
         {
-            var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userData.ProfilePath).WaitAsync(ct);
+            CoreWebView2Environment environment;
+            try
+            {
+                environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userData.ProfilePath).WaitAsync(ct);
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                throw new WebView2StartupException(error);
+            }
+
             var uiFolder = EmbeddedUiAssets.ExtractToCache(dataRoot);
             content = new LocalWebContent(environment, uiFolder);
             exporter = new ZipExportService(this, content, userData);
-            await content.LoadAsync(Editor, "index.html", ct, web => new EditorBridge(this, web, userData, exporter).Attach());
+            try
+            {
+                await content.LoadAsync(Editor, "index.html", ct, web => new EditorBridge(this, web, userData, exporter).Attach());
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                throw new WebView2StartupException(error);
+            }
         }
         catch
         {

@@ -1,9 +1,9 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import '@fontsource/nunito-sans/400.css';
-import '@fontsource/nunito-sans/800.css';
-import '@fontsource/noto-sans-sc/400.css';
-import '@fontsource/noto-sans-sc/700.css';
+import '@fontsource/nunito-sans/latin-400.css';
+import '@fontsource/nunito-sans/latin-800.css';
+import '@fontsource/nunito-sans/latin-ext-400.css';
+import '@fontsource/nunito-sans/latin-ext-800.css';
 import './views/editor.css';
 import EditorView from './views/EditorView';
 import { paginate } from './services/pagination';

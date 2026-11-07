@@ -4,7 +4,7 @@ import type { LayoutDiagnostics, LayoutRecord } from './layoutVerification';
 export type Block = { id: string; text: string; kind: string; indent?: boolean; gap?: number; runs?: { start: number; end: number; kind: string; edit?: string }[] };
 export type Line = { block: Block; start: number; end: number; indent: boolean; height: number };
 export type Layout = { pages: HTMLElement[]; signature: string; warnings: string[]; diagnostics: LayoutDiagnostics };
-const FONT = '"Nunito Sans", "Noto Sans SC", "Microsoft YaHei", sans-serif';
+const FONT = '"Nunito Sans", "Microsoft YaHei UI", "Microsoft YaHei", "DengXian", sans-serif';
 const EXPRESSION_LABELS: Partial<Record<string, string>> = { meaning: '含义：', example: '例句：', exampleTranslation: '翻译：' };
 const LABELS = {
   header: 'ENGLISH READING', footer: 'ARTICLE - VOCABULARY- EXPRESSIONS - MAIN IDEA - TRANSLATION',
@@ -169,11 +169,15 @@ export async function paginate(project: Project): Promise<Layout> {
       ...project.expressions.map(item => item.phrase + item.senses.flatMap(sense => Object.values(sense)).join('')), project.mainIdea,
     ].join('');
     try {
-      await Promise.all([document.fonts.load('400 36px "Nunito Sans"', fontText), document.fonts.load('800 36px "Nunito Sans"', fontText), document.fonts.load('400 32px "Noto Sans SC"', fontText), document.fonts.load('700 32px "Noto Sans SC"', fontText)]);
+      await Promise.all([
+        document.fonts.load('400 36px "Nunito Sans"', fontText),
+        document.fonts.load('800 36px "Nunito Sans"', fontText),
+      ]);
     } catch { throw new Error('本地字体加载失败。请按 README 重新安装依赖并构建，再刷新页面；项目仍可保存 JSON。'); }
     await document.fonts.ready;
+    // CJK glyphs intentionally use the target Windows system font fallback.
+    // Only the bundled Nunito Sans web fonts are part of the app's font readiness gate.
     const warnings: string[] = [];
-    if (!document.fonts.check('400 32px "Noto Sans SC"', '中文')) warnings.push('中文字体未就绪，使用系统字体；请确认预览后重试导出。');
     const styles = project.styles;
     const width = styles.pageWidth - 2 * styles.marginX;
     const bodyTop = styles.marginTop + Math.max(42, styles.headerSize * 1.4 + 16);

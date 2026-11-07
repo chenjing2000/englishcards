@@ -14,7 +14,7 @@ The editor sends an immutable export request containing `project`, `document`, `
 ## Rendering and archive lifecycle
 
 - A dedicated WebView2 renderer loads the embedded local `render.html`.
-- Rendering uses bundled fonts and the shared React pagination/render implementation.
+- Rendering uses the shared React pagination/render implementation. Nunito Sans Latin / Latin Extended (400/800) is bundled; Chinese glyphs use the target Windows system fallback stack: Microsoft YaHei UI, Microsoft YaHei, DengXian, then sans-serif. Preview and export run in the same WebView2 environment and use the same font stack.
 - Every page is captured at the configured page dimensions.
 - A task-specific temporary ZIP is staged in the destination directory.
 - Before commit, reopen and validate the archive, article schema version, expected entry count, every page entry, each PNG signature and IHDR dimensions, and read each PNG entry fully to detect ZIP payload/decompression errors.

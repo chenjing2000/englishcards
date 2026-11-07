@@ -26,7 +26,7 @@
 3. 在运行中的 Windows WebView2 验证 ZIP 快照、字体、逐页 PNG、导出取消、覆盖已有 ZIP 的安全性、关闭窗口时的任务生命周期。
 4. 确认 `userdata/` 首次创建、目录不可写时失败提示、便携目录移动、完全不迁移旧 LocalAppData。
 5. 单实例“激活已有窗口”尚未实现，现有文件独占租约仍只阻止重复实例。
-6. WebView2 Evergreen 缺失时的官方安装引导尚未完善。
+6. WebView2 Evergreen 缺失或初始化失败时，程序会显示中文恢复提示，并可打开微软官方安装/修复页面；需在干净 Windows 环境实测。
 7. 浏览器开发测试中直接调用旧 Express `/api/export` 的历史回归用例需保留为测试夹具验证或迁移为桌面端到端用例；旧网页版 UI 导出测试不再代表正式产品。
 8. 尚未完成正式安装包、干净 Windows x64 交付验收。
 
@@ -81,3 +81,28 @@ dotnet run --project desktop\EnglishCards.Tests\EnglishCards.Tests.csproj -c Rel
 - 保持 ZIP 文件名、`article.json`、`images/page-XXX.png` 路径、PNG 截图与分页校验流程不变。
 - 新增桌面测试覆盖 JSON 格式化的缩进、UTF-8、中文可读性及语义等价性。
 - 当前执行环境不含 Windows/.NET SDK，尚未完成 WPF 编译与实机视觉验收；需要在 Windows 上重新 `dotnet publish` 并验证导出窗口、取消和 ZIP 内容。
+
+
+## 2026-11-06：第七轮 Windows 发布与运行环境审查
+
+- 检查了 `EnglishCards.csproj`、`tools/publish.bat`、`App.xaml.cs`、`MainWindow.xaml.cs`、`UserDataStore.cs`、`app.manifest`、`.gitignore`、README、项目契约及 Windows 应用审查 Skill。
+- 确认发布模式仍为 win-x64 / Framework-dependent / PublishSingleFile；Node.js、npm、Express、Vite、Playwright 和 Chromium 不属于最终用户运行依赖。
+- 确认 `tools/publish.bat` 不删除 `dist\wpf\userdata`；`.gitignore` 覆盖 `userdata/`、`dist/`、前端构建产物、.NET bin/obj 和测试输出。源码归档不含这些生成目录。
+- **修复：** WebView2 环境创建或主 WebView 初始化失败时，之前只显示底层异常。新增专用启动异常和中文恢复提示，询问用户是否打开微软官方 Evergreen Runtime 安装/修复页面。没有自动下载或静默安装。
+- **保留：** 缺少 .NET Desktop Runtime 时不增加自定义启动器；README 明确要求安装 .NET 10 Desktop Runtime x64。WPF 应用代码在 .NET Host 启动前无法自行执行。
+- 新增桌面回归检查，确保 WebView2 启动异常类型提供官方微软入口。
+- 当前执行环境未安装 Windows/.NET SDK；本轮 C# 编译、测试、发布及干净机器实测均未执行，须由用户在 Windows 上验证。
+
+
+## 2026-11-06：发布候选收尾证据（最新，优先于上述历史待办）
+
+- 用户在 Windows 上对字体优化后的源码运行：`npm.cmd ci` 成功（184 packages）、Vitest 35/35、Playwright 59/59、.NET 桌面测试 16/16。
+- `npm.cmd run build` 及 `dotnet publish ... --self-contained false -p:PublishSingleFile=true -o dist\wpf` 成功。
+- 用户实测 EXE 由约 14.9 MB 降至约 1.9 MB；中文卡片预览与导出图片无明显视觉差异。
+- 上文早期提及的脚本名、错误测试数量及当时尚未验证的事项是**历史记录**，不得覆盖这次最新验证证据。当前发布命令与检查事项见 [`RELEASE_ACCEPTANCE.md`](RELEASE_ACCEPTANCE.md)。
+- 独立 Windows 安装/Runtime 缺失测试、真实升级中 `userdata` 的数据保全、公开素材权利检查以及最终版本命名尚未完成；不应据此宣称正式发布已经完成。
+
+
+## 2026-11-07 — Responsive preview layout and zoom toolbar
+
+Superseded by the 2026-11-07 width-only preview update: 280 DIP pane minimums; cards are scaled only to fit the available preview width, remain horizontally centered, and scroll vertically. Ctrl + wheel controls a 20%–100% zoom. If a narrower pane forces the current zoom down, that lower value is committed and remains after the pane widens. The zoom toolbar, percentage label, reset control, and all fit-height behavior are removed. Pagination and export code paths are not changed. See `responsive-preview-change.md` for the current contract.

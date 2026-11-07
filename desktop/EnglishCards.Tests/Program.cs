@@ -323,6 +323,16 @@ if (allowedOrigins.Any(uri => !IsLocalOrigin(uri)) || rejectedOrigins.Any(uri =>
     throw new Exception("WebView2 must accept only the exact local HTTPS origin and default port.");
 Console.WriteLine("PASS WebView2 origin validation accepts only the exact local HTTPS origin");
 
+var startupExceptionType = bridgeType.Assembly.GetType("EnglishCards.WebView2StartupException", throwOnError: true)!;
+var runtimeUrl = (string)startupExceptionType.GetField("RuntimeDownloadUrl", BindingFlags.Static | BindingFlags.NonPublic)!.GetRawConstantValue()!;
+var startupExceptionCtor = startupExceptionType.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+    binder: null, [typeof(Exception)], modifiers: null)!;
+var startupException = (Exception)startupExceptionCtor.Invoke([new InvalidOperationException("test initialization failure")]);
+if (runtimeUrl != "https://developer.microsoft.com/microsoft-edge/webview2/" ||
+    !startupException.Message.Contains("WebView2 Evergreen Runtime", StringComparison.Ordinal))
+    throw new Exception("WebView2 startup failures must provide a clear Evergreen Runtime recovery route.");
+Console.WriteLine("PASS WebView2 startup failure exposes the official Microsoft Evergreen Runtime recovery URL");
+
 // Exported article JSON must be readable, UTF-8 without BOM, and semantically identical.
 var formatterType = bridgeType.Assembly.GetType("EnglishCards.ArticleJsonFormatter", throwOnError: true)!;
 var formatJson = formatterType.GetMethod("FormatUtf8", BindingFlags.Static | BindingFlags.NonPublic)!;

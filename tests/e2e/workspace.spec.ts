@@ -4,7 +4,7 @@ test('workspace has compact sense controls and edge-aligned floating actions', a
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
   await expect(page.getByRole('heading', { name: '英语阅读卡片编辑器', exact: true })).toBeVisible();
   await expect(page.locator('.app-header,.status-bar,.preview-toolbar')).toHaveCount(0);
-  await expect(page.getByLabel('预览缩放', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.zoom-toolbar')).toHaveCount(0);
   for (const tab of ['原文', '词汇', '表达', '主旨与译文']) {
     await page.getByRole('button', { name: tab, exact: true }).click();
     await expect(page.getByRole('checkbox')).toHaveCount(0);
@@ -47,50 +47,94 @@ test('workspace has compact sense controls and edge-aligned floating actions', a
   for (const input of await page.locator('.settings-table input').all()) await expect(input).toHaveCSS('text-align', 'center');
 });
 
-test('preview scrolls normally and only Ctrl plus wheel zooms its activated content', async ({ page }) => {
+test('preview scrolls normally and Ctrl plus wheel alone changes the stored zoom', async ({ page }) => {
+  await page.setViewportSize({ width: 2000, height: 1000 });
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
   const preview = page.locator('.preview-scroll');
+  const card = page.locator('.card').first();
   await preview.click({ position: { x: 12, y: 12 } });
-  const initial = await page.locator('.card').first().evaluate(node => node.getBoundingClientRect().width);
+  const initial = await card.evaluate(node => node.getBoundingClientRect().width);
   await page.mouse.wheel(0, 300);
   await expect.poll(() => preview.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
-  expect(await page.locator('.card').first().evaluate(node => node.getBoundingClientRect().width)).toBe(initial);
-  await page.keyboard.down('Control'); await page.mouse.wheel(0, -200); await page.keyboard.up('Control');
-  await expect.poll(() => page.locator('.card').first().evaluate(node => node.getBoundingClientRect().width)).toBeGreaterThan(initial);
-  await expect(page.getByLabel('预览缩放比例')).toBeVisible();
-  await expect(page.getByLabel('预览缩放比例')).not.toBeVisible({ timeout: 4000 });
+  expect(await card.evaluate(node => node.getBoundingClientRect().width)).toBeCloseTo(initial, 0);
+  await page.keyboard.down('Control'); await page.mouse.wheel(0, 500); await page.keyboard.up('Control');
+  await expect.poll(() => card.evaluate(node => node.getBoundingClientRect().width)).toBeLessThan(initial);
+  const reduced = await card.evaluate(node => node.getBoundingClientRect().width);
+  await page.keyboard.down('Control'); await page.mouse.wheel(0, -500); await page.keyboard.up('Control');
+  await expect.poll(() => card.evaluate(node => node.getBoundingClientRect().width)).toBeGreaterThan(reduced);
+  await expect(page.locator('.zoom-toolbar')).toHaveCount(0);
+  await expect(preview).toHaveCSS('overflow-x', 'hidden');
   const actions = page.getByRole('group', { name: '项目文件操作' });
   await expect(actions.getByRole('button')).toHaveCount(3);
   await expect(actions.getByRole('button').nth(0)).toHaveAttribute('title', '打开 JSON');
   await expect(actions.getByRole('button').nth(1)).toHaveAttribute('title', '保存 JSON');
   await expect(actions.getByRole('button').nth(2)).toHaveAttribute('title', '导出全部 ZIP');
   expect(await page.locator('.card button').count()).toBe(0);
-  await page.screenshot({ path: 'artifacts/test-results/new-workspace.png' });
 });
 
-test('Ctrl wheel keeps the pointed position stable on a middle card', async ({ page }) => {
+test('Ctrl wheel preserves the pointed reading position and cards remain centered', async ({ page }) => {
+  await page.setViewportSize({ width: 2000, height: 1000 });
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
   const preview = page.locator('.preview-scroll');
-  await preview.click({ position: { x: 12, y: 12 } });
-  await page.keyboard.down('Control'); await page.mouse.wheel(0, -1100); await page.keyboard.up('Control');
   const card = page.locator('.card').nth(1);
-  await expect.poll(() => card.evaluate(node => node.getBoundingClientRect().width)).toBeGreaterThan(1200);
   await card.evaluate(node => {
     const scroll = node.closest('.preview-scroll')!, rect = node.getBoundingClientRect(), view = scroll.getBoundingClientRect();
     scroll.scrollTop += rect.top - view.top + rect.height / 2 - scroll.clientHeight / 2;
-    scroll.scrollLeft = 200;
   });
   const before = (await card.boundingBox())!, view = (await preview.boundingBox())!;
   const point = { x: view.x + view.width / 2, y: view.y + view.height / 2 };
-  const relative = { x: (point.x - before.x) / before.width, y: (point.y - before.y) / before.height };
+  const relativeY = (point.y - before.y) / before.height;
   await page.mouse.move(point.x, point.y);
-  await page.keyboard.down('Control'); await page.mouse.wheel(0, -100); await page.keyboard.up('Control');
-  await expect.poll(() => card.evaluate(node => node.getBoundingClientRect().width)).toBeGreaterThan(before.width);
+  await page.keyboard.down('Control'); await page.mouse.wheel(0, 300); await page.keyboard.up('Control');
+  await expect.poll(() => card.evaluate(node => node.getBoundingClientRect().width)).toBeLessThan(before.width);
   const after = (await card.boundingBox())!;
-  expect(Math.abs(after.x + relative.x * after.width - point.x)).toBeLessThanOrEqual(1);
-  expect(Math.abs(after.y + relative.y * after.height - point.y)).toBeLessThanOrEqual(1);
+  const contentCenter = await preview.evaluate(node => {
+    const style = getComputedStyle(node);
+    return node.getBoundingClientRect().left + node.clientLeft + node.clientWidth / 2;
+  });
+  expect(Math.abs(after.x + after.width / 2 - contentCenter)).toBeLessThanOrEqual(1);
+  expect(Math.abs(after.y + relativeY * after.height - point.y)).toBeLessThanOrEqual(2);
 });
 
+test('card width is constrained by the preview pane and a narrower pane permanently reduces zoom', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  const separator = page.getByRole('separator', { name: '调整编辑与预览宽度' });
+  const preview = page.locator('.preview-scroll');
+  const card = page.locator('.card').first();
+  await separator.focus(); await separator.press('Home');
+  await expect.poll(() => card.evaluate(node => node.getBoundingClientRect().width)).toBeLessThanOrEqual(
+    await preview.evaluate(node => { const style = getComputedStyle(node); return node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight); }) + 1
+  );
+  const narrowWidth = (await card.boundingBox())!.width;
+  const narrowScale = Number.parseFloat(await page.locator('.preview').evaluate(node => getComputedStyle(node).getPropertyValue('--zoom')));
+  expect(narrowScale).toBeGreaterThanOrEqual(0.2);
+  expect(narrowScale).toBeLessThan(0.3);
+  await separator.press('End');
+  await expect.poll(() => card.evaluate(node => node.getBoundingClientRect().width)).toBeCloseTo(narrowWidth, 0);
+  const widenedScale = Number.parseFloat(await page.locator('.preview').evaluate(node => getComputedStyle(node).getPropertyValue('--zoom')));
+  expect(widenedScale).toBeCloseTo(narrowScale, 3);
+  await expect(preview).toHaveCSS('overflow-x', 'hidden');
+  const cardBox = (await card.boundingBox())!;
+  const previewBox = (await preview.boundingBox())!;
+  expect(cardBox.x).toBeGreaterThanOrEqual(previewBox.x);
+  expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(previewBox.x + previewBox.width);
+});
+
+test('manual zoom clamps to 20%–100% and does not impose a preview-height limit', async ({ page }) => {
+  await page.setViewportSize({ width: 2000, height: 1000 });
+  await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  const preview = page.locator('.preview-scroll');
+  const card = page.locator('.card').first();
+  await preview.click({ position: { x: 20, y: 20 } });
+  await page.keyboard.down('Control'); await page.mouse.wheel(0, 5000); await page.keyboard.up('Control');
+  await expect.poll(() => page.locator('.preview').evaluate(node => getComputedStyle(node).getPropertyValue('--zoom').trim())).toBe('0.2');
+  await page.keyboard.down('Control'); await page.mouse.wheel(0, -5000); await page.keyboard.up('Control');
+  await expect.poll(() => page.locator('.preview').evaluate(node => getComputedStyle(node).getPropertyValue('--zoom').trim())).toBe('1');
+  expect((await card.boundingBox())!.width).toBeCloseTo(1200, 0);
+  expect((await card.boundingBox())!.height).toBeCloseTo(1600, 0);
+  expect(await preview.evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
+});
 
 test('desktop target layout places preview on the left at 70%, editor on the right', async ({ page }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();

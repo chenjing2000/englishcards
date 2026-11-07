@@ -7,7 +7,7 @@ export default function SplitPane({ left, right }: { left: ReactNode; right: Rea
   const [ratio, setRatio] = useState(0.70);
   const [dragging, setDragging] = useState(false);
   const available = Math.max(0, width - 8);
-  const minimum = Math.min(320, Math.floor(available / 2));
+  const minimum = Math.min(280, Math.floor(available / 2));
   const maximum = available - minimum;
   const leftWidth = Math.round(Math.min(maximum, Math.max(minimum, available * ratio)));
   useEffect(() => {

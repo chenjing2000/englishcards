@@ -21,9 +21,9 @@ test('splitter resizes both panes by dragging and keyboard without changing pagi
   await expect.poll(async () => (await editor.boundingBox())!.width).toBeCloseTo(before - 56, 0);
   await page.setViewportSize({ width: 1000, height: 900 });
   await separator.press('Home');
-  await expect.poll(async () => (await page.locator('.preview-panel').boundingBox())!.width).toBeCloseTo(320, 0);
+  await expect.poll(async () => (await page.locator('.preview-panel').boundingBox())!.width).toBeCloseTo(280, 0);
   await separator.press('End');
-  await expect.poll(async () => (await editor.boundingBox())!.width).toBeCloseTo(320, 0);
+  await expect.poll(async () => (await editor.boundingBox())!.width).toBeCloseTo(280, 0);
   expect(await page.evaluate(() => window.editor.signature)).toBe(signature);
   await page.screenshot({ path: 'artifacts/test-results/resizable-layout.png' });
 });

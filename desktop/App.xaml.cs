@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
@@ -33,6 +34,27 @@ public partial class App : Application
 
             await window.VerifyAsync(output, int.Parse(args.Args[2]), timeout.Token);
             Shutdown(0);
+        }
+        catch (WebView2StartupException error) when (output is null)
+        {
+            Trace.TraceError("EnglishCards WebView2 startup failed: {0}", error);
+            var answer = MessageBox.Show(
+                $"{error.Message}\n\n微软官方安装与修复入口：\n{WebView2StartupException.RuntimeDownloadUrl}\n\n是否现在打开官方页面？",
+                "EnglishCards - WebView2 运行环境", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (answer == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(WebView2StartupException.RuntimeDownloadUrl) { UseShellExecute = true });
+                }
+                catch (Exception launchError)
+                {
+                    MessageBox.Show(
+                        $"无法自动打开浏览器。请复制以下地址，在浏览器中手动打开：\n{WebView2StartupException.RuntimeDownloadUrl}\n\n{launchError.Message}",
+                        "EnglishCards", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            Shutdown(1);
         }
         catch (Exception error)
         {

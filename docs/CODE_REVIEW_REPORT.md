@@ -186,3 +186,96 @@ Keep WPF + WebView2 + React and the existing lightweight structure. No broad ref
 - Source and tests inspected; full and incremental archives checked for integrity.
 - React/Vite and Playwright not executed in this container (project dependencies not installed).
 - Owner should rerun all unit/E2E tests and the WPF build before release.
+
+
+## Round 7 — Windows runtime, publishing and repository hygiene (2026-11-06)
+
+### Confirmed findings and actions
+
+1. **Reliability — WebView2 startup failure had no user-oriented recovery route.** `MainWindow.InitializeAsync` created the Evergreen environment and initialized the main WebView; failures propagated to `App.OnStartup`, which displayed the raw exception message. This did not satisfy `project-contract.md`'s requirement for an understandable message and Microsoft recovery entry point.
+   - **Change:** Added `WebView2StartupException`; wrap only WebView2 environment creation and main-view initialization failures. `App` now shows a Chinese explanation and asks whether to open Microsoft's official Evergreen Runtime page. If the browser cannot be opened, the URL is shown for manual copying. No download or installation is automated.
+   - **Regression:** Added a desktop test that checks the dedicated exception message and official Microsoft URL.
+
+2. **.NET Desktop Runtime policy reviewed and retained.** The app is framework-dependent and its managed startup code cannot run before the .NET host has found a compatible runtime. Per the explicit project contract, no native launcher or custom runtime downloader is added. README now explicitly names the .NET 10 Desktop Runtime x64 prerequisite and official Microsoft download page.
+
+3. **Publishing and data protection reviewed and retained.** `tools/publish.bat` builds React assets, publishes to `dist\wpf`, and does not delete the destination directory or `userdata`. It refuses to continue when it detects `coreclr.dll` from a self-contained output, rather than silently mixing deployment modes. `.gitignore` excludes `dist/`, `artifacts/dist/`, .NET `bin/obj`, test outputs and any `userdata/` directory. The reviewed source archive contains none of those generated/user-data directories.
+
+4. **Runtime dependency boundary reviewed and retained.** `package.json` declares Node.js for development/build tooling. The WPF project embeds the Vite output; the README and project contract correctly state that Node.js/npm, Express, Vite, Playwright and Chromium are not end-user runtime requirements. WebView2 Evergreen remains a machine prerequisite.
+
+### Verification status
+
+- Source and project contract inspected.
+- Source archive checked: no `node_modules`, `dist`, `artifacts/dist`, `desktop/bin`, `desktop/obj`, or `userdata` entries.
+- Windows/.NET build, C# tests, publish output inspection, missing-runtime simulation, and clean-machine launch were **not executed in this environment**.
+- Owner must run the desktop test project, publish, inspect the actual `dist\wpf` contents, and test WebView2 recovery on a Windows x64 machine.
+
+
+## Round 8 — Font payload reduction and Windows CJK fallback (2026-11-06)
+
+### Scope
+
+Reviewed `package.json`, `package-lock.json`, `src/main.tsx`, `src/views/editor.css`, `src/services/pagination.ts`, font readiness tests, README, project contract and export contract.
+
+### Changes
+
+- Removed `@fontsource/noto-sans-sc` from runtime dependencies and the lockfile.
+- Restricted bundled Nunito Sans imports to Latin and Latin Extended subsets, weights 400 and 800.
+- Removed the Noto Sans SC font load/check requirement from pagination. The export readiness gate now waits only for the bundled Nunito Sans faces.
+- Set the same CJK fallback order in editor UI and card pagination: `Microsoft YaHei UI`, `Microsoft YaHei`, `DengXian`, `sans-serif`.
+- Updated cold-font regression coverage from a Cyrillic-only stress glyph to Latin Extended `Ł`, and asserted that the renderer exposes the agreed CJK fallback stack.
+- Updated product and export documentation to make the system-font dependency explicit.
+
+### Compatibility and rendering note
+
+This is an intentional destructive dependency/resource change. No legacy font asset or migration compatibility is retained. CJK rendering now depends on fonts available on the target Windows installation. Windows language optional features and customized images can affect which named font is present; generic `sans-serif` remains the final browser fallback. Different system fonts can have different glyph metrics, so target-machine pagination and PNG export must be visually checked.
+
+### Verification status
+
+- Source/manifest/lockfile consistency and targeted static checks performed.
+- ZIP archive integrity checked.
+- npm install/build/Vitest/Playwright and Windows .NET publish were not executed in this environment because the source archive contains no `node_modules`, and package registry access is unavailable.
+- Owner must run `npm.cmd ci`, `npm.cmd test`, `npm.cmd run build`, `npm.cmd run test:e2e`, then the .NET test and publish commands on Windows.
+
+
+## Round 9 — Responsive preview and floating zoom controls (2026-11-07)
+
+### Confirmed product behavior implemented
+
+- Changed both pane minimum widths from 320 DIP to 280 DIP, retaining the existing 70% / 30% initial split and draggable splitter.
+- Default preview mode fits one card to the preview content height, leaving 12 DIP above and below. The fit ratio uses the rendered card's untransformed height; it is recalculated when the preview viewport height changes, not when only its width changes.
+- Preview cards remain horizontally centered. If a card is wider than the preview viewport, the preview scroll container provides horizontal scrolling rather than compressing the card.
+- Ctrl + mouse wheel switches to manual zoom and clamps it to 40%–150%. Manual zoom is not changed by subsequent window resizing.
+- Added a compact horizontal floating toolbar at the preview's top-right: non-editable percentage label plus a reset icon. It has no border, 15 DIP radius, a 95%-opaque white background, and a subtle shadow.
+- Toolbar appears during zoom and on hover/focus, then fades after approximately one second without further zoom input or pointer hover. Reset switches to manual 100%. There is intentionally no separate fit-height button, per the latest user decision.
+- Preview zoom remains a presentation-only transform; pagination and export rendering paths are unchanged.
+
+### Regression coverage
+
+- Updated splitter minimum-width assertions to 280 DIP.
+- Added E2E checks for initial single-card height fit, no zoom change from width-only resizing, refit on height changes, horizontal centering, toolbar hover/timeout, manual zoom limits, reset to 100%, and persistence of manual zoom across viewport resizing.
+- Updated the zoom-anchor test to verify vertical reading-position stability while preserving horizontal centering.
+
+### Verification status
+
+- Source, CSS, contract and test changes reviewed statically.
+- `npm ci` could not complete in this environment because the package registry artifact was not available; offline install confirmed the required package tarball was not cached.
+- `npm run build` therefore stopped before TypeScript compilation with missing `@types/node` and `vite/client`; Vitest and Playwright were not run.
+- Full Windows verification remains required: `npm.cmd ci`, `npm.cmd test`, `npm.cmd run build`, `npm.cmd run test:e2e`, followed by the existing .NET tests and publish.
+
+
+## Round 10 — Width-constrained preview zoom (2026-11-07)
+
+### Current product behavior
+
+- Removed the fit-height mode and all preview-height-based zoom calculations. Preview height is unrestricted; cards scroll vertically. The WPF main window minimum width is 600 DIP so both 280 DIP panes and the 8 DIP splitter remain available.
+- Cards retain their 1200 × 1600 source dimensions and aspect ratio. The displayed width is capped by the preview content width after 8 DIP left/right padding.
+- Ctrl + mouse wheel is the only zoom gesture; the middle button is not pressed. Requested zoom is bounded to 20%–100%.
+- When a narrower pane forces the current zoom down, the reduced value is committed. Widening the pane does not restore the prior scale.
+- Cards remain horizontally centered; horizontal overflow and the zoom toolbar/percentage/reset controls are removed.
+- Pagination and export rendering are not changed.
+
+### Verification status
+
+- Updated E2E coverage for ordinary vertical scrolling, Ctrl + wheel zoom, centering, width cap, permanent clamping, zoom bounds and unrestricted card height.
+- Source and test changes reviewed statically. `node_modules` is absent from the supplied source archive; npm build, Vitest and Playwright were not run in this environment.
+- Windows .NET tests and publish remain to be run by the owner after the browser tests pass.
