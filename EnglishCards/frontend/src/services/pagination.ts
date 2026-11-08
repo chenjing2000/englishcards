@@ -5,10 +5,10 @@ export type Block = { id: string; text: string; kind: string; indent?: boolean; 
 export type Line = { block: Block; start: number; end: number; indent: boolean; height: number };
 export type Layout = { pages: HTMLElement[]; signature: string; warnings: string[]; diagnostics: LayoutDiagnostics };
 const FONT = '"Nunito Sans", "Microsoft YaHei UI", "Microsoft YaHei", "DengXian", sans-serif';
-const EXPRESSION_LABELS: Partial<Record<string, string>> = { meaning: '含义：', example: '例句：', exampleTranslation: '翻译：' };
+const VOCABULARY_LABELS = { example: '例句：', exampleTranslation: '翻译：' } as const;
 const LABELS = {
-  header: 'ENGLISH READING', footer: 'ARTICLE - VOCABULARY- EXPRESSIONS - MAIN IDEA - TRANSLATION',
-  vocabulary: 'VOCABULARY', expressions: 'USEFUL EXPRESSIONS · 有用表达', mainIdea: 'MAIN IDEA · 主要内容', translation: 'CHINESE TRANSLATION · 中文译文',
+  header: 'ENGLISH READING', footer: 'ARTICLE · VOCABULARY · TRANSLATION',
+  vocabulary: 'VOCABULARY', translation: 'CHINESE TRANSLATION · 中文译文',
 };
 
 function typography(block: Block, styles: Styles): Partial<CSSStyleDeclaration> {
@@ -27,26 +27,13 @@ function typography(block: Block, styles: Styles): Partial<CSSStyleDeclaration> 
     case 'vocab-meaning': fontSize = styles.vocabularySize; break;
     case 'vocab-label': fontSize = styles.vocabularySize; color = '#006d87'; break;
     case 'vocab-example': fontSize = styles.vocabularySize; break;
-    case 'phrase': fontSize = styles.phraseSize; lineHeight = 1.25; fontWeight = '800'; color = '#b81a35'; break;
-    case 'meaning': fontSize = styles.expressionSize; lineHeight = styles.translationLineHeight; break;
-    case 'example': fontSize = styles.expressionSize; lineHeight = styles.lineHeight; break;
-    case 'exampleTranslation': fontSize = styles.expressionSize; lineHeight = styles.translationLineHeight; color = '#555'; break;
     case 'translation': fontSize = styles.translationSize; lineHeight = styles.translationLineHeight; break;
-    case 'mainIdea': fontSize = styles.mainIdeaSize; lineHeight = styles.translationLineHeight; break;
   }
   return { fontSize: `${fontSize}px`, lineHeight: String(lineHeight), fontWeight, color, fontFamily: FONT, letterSpacing: block.kind === 'article' ? '-0.2px' : 'normal' };
 }
 
 function appendText(element: HTMLElement, project: Project, block: Block, start: number, end: number, highlights: HighlightRange[]) {
-  const label = EXPRESSION_LABELS[block.kind];
-  const content = label ? document.createElement('span') : element;
-  if (label) {
-    if (start === 0) {
-      const prefix = document.createElement('span'); prefix.className = 'expression-label'; prefix.textContent = label;
-      prefix.style.color = '#006d87'; element.append(prefix);
-    }
-    content.className = 'line-content'; element.append(content);
-  }
+  const content = element;
   const marks = block.kind === 'article' ? highlights.filter(mark => mark.paragraphId === block.id && mark.start < end && mark.end > start) : [];
   const runs = block.runs?.filter(run => run.start < end && run.end > start) ?? [];
   const boundaries = [...new Set([start, end, ...marks.flatMap(mark => [Math.max(start, mark.start), Math.min(end, mark.end)]), ...runs.flatMap(run => [Math.max(start, run.start), Math.min(end, run.end)])])].sort((first, second) => first - second);
@@ -163,10 +150,9 @@ export async function paginate(project: Project): Promise<Layout> {
   document.body.append(host);
   try {
     const fontText = [
-      ...Object.values(LABELS), ...Object.values(EXPRESSION_LABELS), '0123456789/', project.personalizedHeader, project.title,
-      ...project.source.paragraphs.map(item => item.text), ...project.translation.paragraphs.map(item => item.text),
+      ...Object.values(LABELS), ...Object.values(VOCABULARY_LABELS), '0123456789/', project.identityTag, project.title,
+      ...project.content.paragraphs.map(item => item.text), ...project.translation.paragraphs.map(item => item.text),
       ...project.vocabulary.map(item => item.word + (item.ipa ?? '') + item.senses.flatMap(sense => Object.values(sense)).join('')),
-      ...project.expressions.map(item => item.phrase + item.senses.flatMap(sense => Object.values(sense)).join('')), project.mainIdea,
     ].join('');
     try {
       await Promise.all([
@@ -199,9 +185,9 @@ export async function paginate(project: Project): Promise<Layout> {
       const eyebrow = document.createElement('div'); eyebrow.className = 'eyebrow'; eyebrow.textContent = LABELS.header;
       const header = document.createElement('header'); header.className = 'page-header';
       Object.assign(header.style, { top: `${styles.marginTop}px`, left: `${styles.marginX}px`, right: `${styles.marginX}px` });
-      const personalized = document.createElement('span'); personalized.className = 'eyebrow personalized-header'; personalized.textContent = project.personalizedHeader;
-      eyebrow.style.fontSize = personalized.style.fontSize = `${styles.headerSize}px`;
-      header.append(eyebrow, personalized);
+      const identity = document.createElement('span'); identity.className = 'eyebrow identity-tag'; identity.textContent = project.identityTag;
+      eyebrow.style.fontSize = identity.style.fontSize = `${styles.headerSize}px`;
+      header.append(eyebrow, identity);
       pageBody = document.createElement('main'); pageBody.className = 'page-body';
       Object.assign(pageBody.style, { top: `${bodyTop}px`, left: `${styles.marginX}px`, width: `${width}px`, height: `${bodyHeight}px` });
       const footer = document.createElement('footer'); footer.className = 'footer';
@@ -235,50 +221,35 @@ export async function paginate(project: Project): Promise<Layout> {
       lines.forEach((line, index) => addRow([line], width, index === 0 ? (value.gap ?? 0) : 0));
     }
     block({ id: 'title', text: project.title, kind: 'title', gap: 0 });
-    project.source.paragraphs.forEach(item => block({ ...item, kind: 'article', indent: true, gap: styles.paragraphGap }));
+    project.content.paragraphs.forEach(item => block({ ...item, kind: 'article', indent: true, gap: styles.paragraphGap }));
     if (project.vocabulary.length) {
       block({ id: 'vocab-heading', text: LABELS.vocabulary, kind: 'vocab-heading', gap: 25 });
-      const middle = Math.ceil(project.vocabulary.length / 2);
-      const columnWidth = (width - 36) / 2;
-      for (let index = 0; index < middle; index++) {
-        const entries = [project.vocabulary[index * 2], project.vocabulary[index * 2 + 1]];
-        const columns = entries.map(entry => {
-          if (!entry) return [];
-          let text = '';
-          const runs: NonNullable<Block['runs']> = [];
-          function append(value: string, kind: string, edit?: string, separator = ' ') {
-            if (!value) return;
-            if (text && !text.endsWith('\n')) text += separator;
-            const start = text.length; text += value;
-            runs.push({ start, end: text.length, kind, edit });
+      for (const entry of project.vocabulary) {
+        let text = '';
+        const runs: NonNullable<Block['runs']> = [];
+        function append(value: string, kind: string, edit?: string, separator = ' ') {
+          if (!value) return;
+          if (text && !text.endsWith('\n')) text += separator;
+          const start = text.length;
+          text += value;
+          runs.push({ start, end: text.length, kind, edit });
+        }
+        append(entry.word, 'word', `${entry.id}:word`);
+        append(entry.ipa ?? '', 'ipa', `${entry.id}:ipa`);
+        entry.senses.forEach((sense, senseIndex) => {
+          if (text) text += '\n';
+          if (sense.pos) append(sense.pos, 'pos', senseSourceId(entry.id, senseIndex, 'pos'));
+          append(sense.meaning, 'vocab-meaning', senseSourceId(entry.id, senseIndex, 'meaning'));
+          for (const field of ['example', 'exampleTranslation'] as const) {
+            if (!sense[field]) continue;
+            if (text) text += '\n';
+            append(VOCABULARY_LABELS[field], 'vocab-label', senseSourceId(entry.id, senseIndex, field));
+            append(sense[field], 'vocab-example', senseSourceId(entry.id, senseIndex, field), '');
           }
-          append(entry.word, 'word'); append(entry.ipa ?? '', 'ipa');
-          entry.senses.forEach((sense, senseIndex) => {
-            if (senseIndex && text) text += '\n';
-            append(sense.pos, 'pos', senseSourceId(entry.id, senseIndex, 'pos'));
-            append(sense.meaning, 'meaning', senseSourceId(entry.id, senseIndex, 'meaning'));
-            for (const field of ['example', 'exampleTranslation'] as const) if (sense[field]) {
-              if (text) text += '\n';
-              append(EXPRESSION_LABELS[field]!, 'vocab-label', senseSourceId(entry.id, senseIndex, field));
-              append(sense[field], 'vocab-example', senseSourceId(entry.id, senseIndex, field), '');
-            }
-          });
-          return measureLines(project, { id: entry.id, text, kind: 'vocab', runs }, columnWidth, host, columnWidth, highlights);
         });
-        for (let lineIndex = 0; lineIndex < Math.max(...columns.map(column => column.length)); lineIndex++) addRow([columns[0][lineIndex], columns[1][lineIndex]], columnWidth, lineIndex === 0 ? 15 : 0);
+        block({ id: entry.id, text, kind: 'vocab', runs, gap: 15 });
       }
     }
-    block({ id: 'expressions-heading', text: LABELS.expressions, kind: 'section-heading', gap: 25 });
-    for (const entry of project.expressions) {
-      block({ id: `${entry.id}:phrase`, text: entry.phrase, kind: 'phrase', gap: 20 });
-      entry.senses.forEach((sense, index) => {
-        for (const field of ['meaning', 'example', 'exampleTranslation'] as const) {
-          block({ id: senseSourceId(entry.id, index, field), text: field === 'meaning' ? [sense.pos, sense.meaning].filter(Boolean).join(' ') : sense[field], kind: field, gap: field === 'example' ? 10 : 7 });
-        }
-      });
-    }
-    block({ id: 'main-heading', text: LABELS.mainIdea, kind: 'section-heading', gap: 25 });
-    block({ id: 'mainIdea', text: project.mainIdea, kind: 'mainIdea', indent: true, gap: 14 });
     block({ id: 'translation-heading', text: LABELS.translation, kind: 'section-heading', gap: 25 });
     project.translation.paragraphs.forEach(item => block({ ...item, kind: 'translation', indent: true, gap: styles.paragraphGap }));
     for (const [id, source] of coverage) {

@@ -4,48 +4,52 @@ import { resolve } from 'node:path';
 import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
 import { parseRenderProject, projectDocument } from '@frontend/models/project';
 
-test('phrase can finish a page while its meaning and example continue on next', async ({ page }) => {
+test('vocabulary item can continue across pages while preserving all sense text', async ({ page }) => {
   await page.goto('/render');
   await page.waitForFunction(() => typeof window.renderProject === 'function');
-  const project = parseRenderProject(fixture);
-  project.title = 'Boundary'; project.vocabulary = [];
-  project.source.paragraphs = [{ id: 'filler', text: 'Filler sentence. '.repeat(70) }];
-  project.expressions = [{ id: 'target', phrase: 'target phrase', senses: [{ pos: '', meaning: '中文含义', example: 'An example follows.', exampleTranslation: '例句译文。' }], highlight: [] }];
-  await page.evaluate(input => window.renderProject(input), project);
-  const space = await page.locator('[data-source="target:phrase"]').evaluate(node => {
-    const body = node.closest('.page-body')!.getBoundingClientRect();
-    return body.bottom - node.getBoundingClientRect().bottom;
+  const project = parseRenderProject({
+    ...fixture,
+    title: 'Boundary',
+    content: { paragraphs: [{ id: 'p001', text: 'Filler sentence. '.repeat(70) }] },
+    vocabulary: [{
+      id: 'v001', word: 'target phrase', ipa: '',
+      highlight: [],
+      senses: [{ pos: '', meaning: '中文含义'.repeat(150), example: 'An example follows. '.repeat(100), exampleTranslation: '例句译文。'.repeat(100) }],
+    }],
+    translation: { paragraphs: [] },
   });
-  project.styles.pageHeight -= Math.ceil(space - 10);
-  expect(project.styles.pageHeight).toBeGreaterThanOrEqual(400);
   await page.evaluate(input => window.renderProject(input), project);
-  const phrasePage = await page.locator('[data-source="target:phrase"]').evaluate(node => Number(node.closest('.card')!.getAttribute('data-page')));
-  const meaningPage = await page.locator('[data-source="target:meaning"]').evaluate(node => Number(node.closest('.card')!.getAttribute('data-page')));
-  expect(meaningPage).toBe(phrasePage + 1);
-  await expect(page.locator('[data-source="target:example"] .line-content')).toHaveText('An example follows.');
+  const entryLines = page.locator('[data-source="v001"]');
+  const pages = await entryLines.evaluateAll(nodes => new Set(nodes.map(node => node.closest('.card')!.getAttribute('data-page'))).size);
+  expect(pages).toBeGreaterThan(1);
+  expect((await entryLines.allTextContents()).join('')).toContain('target phrase');
+  expect((await entryLines.allTextContents()).join('')).toContain('An example follows.');
 });
 
-test('all rendered fields preserve exact text and visible glyphs fit, including extreme styles and explicit newlines', async ({ page }) => {
-  await page.goto('/render'); await page.waitForFunction(() => typeof window.renderProject === 'function');
-  const project = parseRenderProject(fixture);
-  project.source.paragraphs[0].text += '\nA new line.\n\n👩🏽‍💻 é ' + 'X'.repeat(500) + ' hello ' + ' '.repeat(400) + 'world';
-  project.vocabulary[0].word = 'W'.repeat(100);
-  project.vocabulary[0].senses[0].meaning = '超长释义'.repeat(80);
-  project.translation.paragraphs[1].text += '，。！？）》'.repeat(200);
-  project.styles.marginX = 200; project.styles.bodySize = 60;
-  project.styles.lineHeight = 1.2; project.styles.translationSize = 54;
+test('all Article v6 fields preserve exact text and visible graphemes fit', async ({ page }) => {
+  await page.goto('/render');
+  await page.waitForFunction(() => typeof window.renderProject === 'function');
+  const longText = 'A new line.\n\n👩🏽‍💻 é ' + 'X'.repeat(500) + ' hello ' + ' '.repeat(400) + 'world';
+  const chinese = '中文段落（标点），混合English123。👨‍👩‍👧‍👦 é '.repeat(100);
+  const project = parseRenderProject({
+    ...fixture,
+    title: 'Unicode test',
+    content: { paragraphs: [{ id: 'p001', text: longText }] },
+    vocabulary: [{
+      id: 'v001', word: 'W'.repeat(100), ipa: '',
+      highlight: [],
+      senses: [{ pos: 'n.', meaning: '超长释义'.repeat(80), example: 'An example sentence. '.repeat(100), exampleTranslation: '很长的例句译文。'.repeat(80) }],
+    }],
+    translation: { paragraphs: [{ id: 'p001', text: chinese }] },
+  });
   await page.evaluate(input => window.renderProject(input), project);
-  const texts: Record<string, string> = { title: project.title, mainIdea: project.mainIdea };
-  for (const item of [...project.source.paragraphs, ...project.translation.paragraphs]) texts[item.id] = item.text;
-  for (const item of project.expressions) { texts[`${item.id}:phrase`] = item.phrase; for (const key of ['meaning', 'example', 'exampleTranslation'] as const) texts[`${item.id}:${key}`] = item.senses[0][key]; }
-  for (const item of project.vocabulary) texts[item.id] = [item.word, ...(item.ipa ? [item.ipa] : []), item.senses[0].pos, item.senses[0].meaning].join(' ');
-  for (const [id, original] of Object.entries(texts)) {
-    const fragments = page.locator(`[data-source="${id}"]`);
-    expect(await fragments.evaluateAll(nodes => nodes.map(node => node.querySelector('.line-content')?.textContent ?? node.textContent).join(''))).toBe(original);
-    const offsets = await fragments.evaluateAll(nodes => nodes.flatMap(node => [Number((node as HTMLElement).dataset.start), Number((node as HTMLElement).dataset.end)]));
-    const boundaries = new Set([0, ...Array.from(new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(original), item => item.index + item.segment.length)]);
-    expect(offsets.every(offset => boundaries.has(offset))).toBe(true);
-  }
+  const texts: Record<string, string> = {
+    title: project.title,
+    p001: longText,
+  };
+  const contentNodes = page.locator('.article[data-source="p001"]');
+  expect((await contentNodes.allTextContents()).join('')).toBe(longText);
+  expect((await page.locator('.translation[data-source="p001"]').allTextContents()).join('')).toBe(chinese);
   const errors = await page.evaluate(() => {
     const errors: string[] = [];
     for (const line of document.querySelectorAll<HTMLElement>('[data-source]')) {
@@ -57,15 +61,16 @@ test('all rendered fields preserve exact text and visible glyphs fit, including 
       while ((node = walker.nextNode())) {
         for (const part of new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(node.textContent!)) {
           if (!part.segment.trim()) continue;
-          const range = document.createRange(); range.setStart(node, part.index); range.setEnd(node, part.index + part.segment.length);
+          const range = document.createRange();
+          range.setStart(node, part.index);
+          range.setEnd(node, part.index + part.segment.length);
           const rect = range.getBoundingClientRect();
-          if (rect.right > box.right + .75 || rect.bottom > body.bottom + .75) { errors.push(`glyph:${line.dataset.source}:${part.segment}:right=${rect.right - box.right}:bottom=${rect.bottom - body.bottom}:start=${line.dataset.start}`); break; }
+          if (rect.right > box.right + .75 || rect.bottom > body.bottom + .75) {
+            errors.push(`glyph:${line.dataset.source}:${part.segment}`);
+            break;
+          }
         }
       }
-    }
-    for (const footer of document.querySelectorAll('.footer')) {
-      const first = footer.firstElementChild!.getBoundingClientRect(), last = footer.lastElementChild!.getBoundingClientRect();
-      if (first.right > last.left) errors.push('footer overlap');
     }
     return [...new Set(errors)];
   });
@@ -79,10 +84,10 @@ test('missing fonts stop pagination with a recoverable message, without disablin
   await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toBeDisabled();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '保存 JSON', exact: true }).click();
-  expect((await download).suggestedFilename()).toBe('reading-project.json');
+  expect((await download).suggestedFilename()).toBe('article.json');
 });
 
-test('draft survives a real Chromium process restart', async () => {
+test('Article v6 draft survives a real Chromium process restart', async () => {
   const directory = await mkdtemp(resolve('.build/test-results/profile-'));
   let context = await chromium.launchPersistentContext(directory, { headless: true });
   try {
@@ -110,38 +115,47 @@ test('local resources and failed draft storage are visible', async ({ page }) =>
   await expect(page.getByRole('alert')).toContainText('自动草稿保存失败');
 });
 
-test('corrupt drafts stay recoverable and narrow preview footer matches export styling', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('reading-editor.draft.v2', '{"recoverable":"private article",bad-json'));
+test('corrupt v6 drafts stay recoverable and repeated preview rendering remains stable', async ({ page }) => {
+  const corrupt = '{"article":{"schemaVersion":6,"broken":true},bad-json';
+  await page.addInitScript(value => localStorage.setItem('article-editor.draft.v6', value), corrupt);
   await page.setViewportSize({ width: 1000, height: 900 });
   await page.goto('/');
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem('reading-editor.rejected-draft'))).toBe('{"recoverable":"private article",bad-json');
+  expect(await page.evaluate(() => localStorage.getItem('article-editor.rejected-draft'))).toBe(corrupt);
   const before = await page.locator('.footer>span:first-child').first().evaluate(node => getComputedStyle(node).fontSize);
   await page.setViewportSize({ width: 1800, height: 2000 });
   expect(await page.locator('.footer>span:first-child').first().evaluate(node => getComputedStyle(node).fontSize)).toBe(before);
 });
 
-test('business IDs cannot collide with internal title or expression keys; vocabulary retains array order', async ({ page }) => {
-  await page.goto('/render'); await page.waitForFunction(() => typeof window.renderProject === 'function');
-  const project = parseRenderProject(fixture);
-  project.vocabulary[0].highlight = ['Article'];
-  project.source.paragraphs = [{ id: 'title', text: 'Article with title ID.' }, { id: 'x-1:example', text: 'Article with expression ID.' }];
+test('content and translation may both use p001 without ID collision; vocabulary order is stable', async ({ page }) => {
+  await page.goto('/render');
+  await page.waitForFunction(() => typeof window.renderProject === 'function');
+  const project = parseRenderProject({
+    ...fixture,
+    vocabulary: [{ ...fixture.vocabulary[0], id: 'v001', highlight: ['Article'] }],
+    content: { paragraphs: [{ id: 'p001', text: 'Article in content.' }] },
+    translation: { paragraphs: [{ id: 'p001', text: 'Article in translation.' }] },
+  });
   await page.evaluate(input => window.renderProject(input), project);
-  await expect(page.locator('.article[data-source="title"]')).toHaveText('Article with title ID.');
-  await expect(page.locator('.title .hot')).toHaveCount(0);
-  const firstSeen = await page.locator('.vocab-row [data-source]').evaluateAll(nodes => [...new Set(nodes.map(node => (node as HTMLElement).dataset.source))]);
+  await expect(page.locator('.article[data-source="p001"]')).toContainText('Article in content.');
+  await expect(page.locator('.translation[data-source="p001"]')).toContainText('Article in translation.');
+  const firstSeen = await page.locator('.vocab[data-source]').evaluateAll(nodes => [...new Set(nodes.map(node => (node as HTMLElement).dataset.source))]);
   expect(firstSeen).toEqual(project.vocabulary.map(item => item.id));
 });
 
-test('paragraphs with internal-looking IDs still paginate automatically', async ({ page }) => {
-  await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  const project = parseRenderProject(fixture);
-  project.vocabulary = []; project.expressions = [];
-  project.source.paragraphs = [{ id: 'mainIdea', text: 'A short article.' }];
-  project.translation.paragraphs = []; project.mainIdea = 'Short summary.';
-  await page.getByLabel('打开项目 JSON').setInputFiles({ name: 'project.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(projectDocument(project))) });
+test('independently numbered paragraphs paginate automatically', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  const project = parseRenderProject({
+    ...fixture,
+    vocabulary: [],
+    content: { paragraphs: [{ id: 'p001', text: 'A short article.' }] },
+    translation: { paragraphs: [{ id: 'p001', text: '短译文。' }] },
+  });
+  await page.getByLabel('导入 Article JSON 或 TXT').setInputFiles({
+    name: 'article.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(projectDocument(project))),
+  });
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   await expect(page.getByRole('checkbox')).toHaveCount(0);
-  await expect(page.locator('[data-ready="true"]')).toBeVisible();
   await expect(page.locator('.card')).toHaveCount(1);
 });

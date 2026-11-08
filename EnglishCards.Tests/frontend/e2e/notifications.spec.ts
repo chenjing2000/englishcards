@@ -45,11 +45,11 @@ test('warnings slide from the bottom for ten seconds and errors remain until clo
   await page.getByRole('button', { name: '高亮 / 取消高亮 1', exact: true }).click();
   await page.clock.runFor(1000); await expect(bar).toContainText('Warning:');
   await page.clock.runFor(9000); await expect(bar).toHaveText('');
-  await page.getByLabel('打开项目 JSON').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('{') });
+  await page.getByLabel('导入 Article JSON 或 TXT').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('{') });
   await expect(bar.getByRole('alert')).toContainText('Error:');
   await expect(bar.getByRole('button', { name: '关闭', exact: true })).toHaveCSS('font-size', '12px');
   await page.getByRole('button', { name: '高亮 / 取消高亮 1', exact: true }).click();
-  await expect(bar.getByRole('alert')).toContainText('无法打开项目');
+  await expect(bar.getByRole('alert')).toContainText('无法打开文章');
   await page.clock.runFor(10001); await expect(bar.getByRole('alert')).toContainText('Error:');
   await bar.getByRole('button', { name: '关闭', exact: true }).click();
   await expect(bar).toHaveText('');

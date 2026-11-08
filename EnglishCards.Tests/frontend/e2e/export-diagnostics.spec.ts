@@ -13,7 +13,7 @@ test('export diagnoses project and line differences without misleading installat
   expect(detail).toContain('第 1 条'); expect(detail).toContain('行高');
   expect(detail).not.toContain('安装');
   const old = await request.post('/api/export', { data: { project: snapshot.project, signature: 'stale' } });
-  expect(await old.text()).toContain('旧版');
+  expect(await old.text()).toContain('导出与预览分页不一致');
   // Desktop ZIP exports are tested by WPF integration tests; the browser has no desktop bridge.
   await page.getByRole('button', { name: '导出全部 ZIP', exact: true }).click();
   const alert = page.getByRole('alert');

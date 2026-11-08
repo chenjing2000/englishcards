@@ -59,7 +59,7 @@ app.post('/api/export', async (request, response) => {
       if (requested !== undefined) { single = png; break; }
       files[`page-${String(index + 1).padStart(2, '0')}.png`] = png;
     }
-    files['project.json'] = strToU8(JSON.stringify(projectDocument(project), null, 2));
+    files['article.json'] = strToU8(JSON.stringify(projectDocument(project), null, 2));
     result = single ?? Buffer.from(zipSync(files));
     contentType = single ? 'png' : 'application/zip';
   } catch (reason) {

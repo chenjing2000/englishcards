@@ -71,8 +71,8 @@ internal static class PrototypeVerification
                 (() => {
                     const { styles, ...project } = window.editor.project;
                     project.title = 'Desktop prototype long article';
-                    project.source.paragraphs = Array.from({ length: 8 }, (_, index) => ({
-                        id: 'prototype-long-' + index, text: 'Filler sentence. '.repeat(70)
+                    project.content.paragraphs = Array.from({ length: 8 }, (_, index) => ({
+                        id: 'p' + String(index + 1).padStart(3, '0'), text: 'Filler sentence. '.repeat(70)
                     }));
                     const files = new DataTransfer();
                     files.items.add(new File([JSON.stringify(project)], 'long.json', {type: 'application/json'}));

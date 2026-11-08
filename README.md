@@ -68,7 +68,7 @@ EnglishCards.Tests/              # 独立测试代码
     └── e2e/                     # Playwright
 
 docs/                            # 项目契约、架构、规格、审查和历史记录
-skills/                          # 项目专属 Skills
+docs/skills/                    # 项目专属 Skills
 tools/                           # 构建、测试、发布和开发辅助工具
 .build/                          # 临时测试结果、报告和测试运行数据
 dist/EnglishCards/               # 唯一正式发布目录
@@ -84,8 +84,8 @@ dist/EnglishCards/               # 唯一正式发布目录
 
 - 项目契约：[`docs/project-contract.md`](docs/project-contract.md)
 - Article v6 阶段记录：[`docs/architecture/ARTICLE_V6_PHASE1.md`](docs/architecture/ARTICLE_V6_PHASE1.md)
-- Article v6 生成 Skill：[`skills/article-to-englishcards/SKILL.md`](skills/article-to-englishcards/SKILL.md)
-- Windows 桌面审查 Skill：[`skills/windows-app-review/SKILL.md`](skills/windows-app-review/SKILL.md)
+- Article v6 生成 Skill：[`docs/skills/article-to-englishcards/SKILL.md`](docs/skills/article-to-englishcards/SKILL.md)
+- Windows 桌面审查 Skill：[`docs/skills/windows-app-review/SKILL.md`](docs/skills/windows-app-review/SKILL.md)
 - 仓库代理规则：[`AGENTS.md`](AGENTS.md)
 
-当前重构状态和未完成的集成工作以 `docs/implementation-status.md` 为准。历史审查报告和历史实施计划用于追溯，不覆盖用户后来确认的 Article v6 规则。
+当前重构状态和未完成的集成工作以 `docs/implementation-status.md` 为准；本轮新增产品规则以 `docs/specs/PHASE2B_PRODUCT_ADDITIONS.md` 为准。历史审查报告和历史实施计划用于追溯，不覆盖用户后来确认的 Article v6 规则。

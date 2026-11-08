@@ -1,10 +1,10 @@
 import { test, expect } from './fixtures';
 
-test('personalized headers repeat on every page, match typography and persist edits', async ({ page }) => {
+test('IdentityTag headers repeat on every page, match typography and persist edits', async ({ page }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  const input = page.getByRole('textbox', { name: '个性化页眉', exact: true });
+  const input = page.getByRole('textbox', { name: 'IdentityTag', exact: true });
   await expect(input).toHaveValue('SOME BIRDS ON TREE');
-  const headers = page.locator('.preview .personalized-header');
+  const headers = page.locator('.preview .identity-tag');
   await expect(headers).toHaveCount(await page.locator('.preview .card').count());
   expect(await headers.count()).toBeGreaterThan(1);
   for (const header of await headers.all()) {
@@ -29,7 +29,7 @@ test('personalized headers repeat on every page, match typography and persist ed
   await page.reload();
   await expect(input).toHaveValue('My reading notes');
   await expect(headers.first()).toHaveText('My reading notes');
-  await page.screenshot({ path: '.build/test-results/personalized-header.png' });
+  await page.screenshot({ path: '.build/test-results/identity-tag.png' });
   await input.fill('');
   await expect(headers.first()).toBeEmpty();
 });

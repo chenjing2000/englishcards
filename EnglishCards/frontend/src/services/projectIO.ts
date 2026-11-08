@@ -1,17 +1,42 @@
 import fixture from '../../assets/projects/brainco/project.json';
-import { defaults, parseProject, projectDocument, type Project, type RenderProject } from '../models/project';
-import { settingsSchema, type Styles } from '../models/settings';
+import {
+  parseProject, projectDocument, type Project, type RenderProject,
+} from '../models/project';
+import { settingsSchema, defaults, type Styles } from '../models/settings';
+import { ArticleImportCoordinator, type ImportResult } from '../v6/importers';
 import { desktopRequest, isDesktop } from './desktopBridge';
 
-const DRAFT = 'reading-editor.draft.v2';
-const sampleNotice = '已加载 BrainCo 完整样例。所有处理均在本机完成。';
-const restoredNotice = '已恢复本机自动草稿；请另存 JSON 作为可移植备份。';
-const readDraft = (text: string) => parseProject(JSON.parse(text).project);
-const draftText = (project: Project) => JSON.stringify({ project, modifiedAt: new Date().toISOString() });
-type RestoredDraft = { project: Project; notice: string; cacheBlocked: boolean; rejected?: string; desktopRejected?: boolean };
+const DRAFT = 'article-editor.draft.v6';
+const LEGACY_DRAFT = 'reading-editor.draft.v2';
+const restoredNotice = '已恢复本机 Article v6 自动草稿。';
+const sampleNotice = '已创建空白 Article v6 文档。';
+
+type RestoredDraft = {
+  project: Project;
+  notice: string;
+  cacheBlocked: boolean;
+  rejected?: string;
+  desktopRejected?: boolean;
+};
+
+const readDraft = (text: string) => {
+  const wrapper = JSON.parse(text) as Record<string, unknown>;
+  if (!wrapper || typeof wrapper !== 'object' || !Object.hasOwn(wrapper, 'article')) {
+    throw new Error('草稿不是 Article v6 格式。');
+  }
+  return parseProject(wrapper.article);
+};
+const draftText = (project: Project) => JSON.stringify({
+  article: projectDocument(project),
+  modifiedAt: new Date().toISOString(),
+});
 
 export function sampleDraft(): RestoredDraft {
-  return { project: parseProject(fixture), notice: sampleNotice, cacheBlocked: false };
+  return {
+    project: parseProject(fixture),
+    notice: sampleNotice,
+    cacheBlocked: false,
+  };
 }
 
 export function restoreDraft(): RestoredDraft {
@@ -19,14 +44,41 @@ export function restoreDraft(): RestoredDraft {
   try {
     saved = localStorage.getItem(DRAFT);
     if (saved) return { project: readDraft(saved), notice: restoredNotice, cacheBlocked: false };
+
+    // The previous application used a different key and a v5 `{ project }` wrapper.
+    // Preserve its exact bytes for explicit recovery, but never parse or migrate it.
+    const legacy = localStorage.getItem(LEGACY_DRAFT);
+    if (legacy) {
+      let preserved = false;
+      try {
+        localStorage.setItem(`article-editor.rejected-draft.${Date.now()}`, legacy);
+        localStorage.setItem('article-editor.rejected-draft', legacy);
+        preserved = true;
+      } catch { preserved = false; }
+      return {
+        project: parseProject(fixture),
+        notice: preserved
+          ? '检测到旧版自动草稿（v5），不兼容 Article v6；原始内容已隔离备份，请下载后按新格式重新整理。'
+          : '检测到旧版自动草稿（v5），不兼容 Article v6；备份失败，自动缓存已停用以保护原数据。',
+        cacheBlocked: !preserved,
+        rejected: legacy,
+      };
+    }
   } catch {
     let preserved = false;
     if (saved) try {
-      localStorage.setItem(`reading-editor.rejected-draft.${Date.now()}`, saved);
-      localStorage.setItem('reading-editor.rejected-draft', saved);
+      localStorage.setItem(`article-editor.rejected-draft.${Date.now()}`, saved);
+      localStorage.setItem('article-editor.rejected-draft', saved);
       preserved = true;
     } catch { preserved = false; }
-    return { project: parseProject(fixture), notice: preserved ? '草稿格式不受支持或无法读取，已隔离备份，可下载原始草稿。当前显示样例。' : '草稿无法读取或备份，自动缓存已停用以保护旧数据；请保存 JSON。', cacheBlocked: !preserved, rejected: saved ?? undefined };
+    return {
+      project: parseProject(fixture),
+      notice: preserved
+        ? '草稿格式不受支持或无法读取，已隔离备份；当前创建空白文章。'
+        : '草稿无法读取或备份，自动缓存已停用以保护原数据。',
+      cacheBlocked: !preserved,
+      rejected: saved ?? undefined,
+    };
   }
   return sampleDraft();
 }
@@ -35,9 +87,14 @@ export function cacheDraft(project: RenderProject) {
   localStorage.setItem(DRAFT, draftText(projectDocument(project)));
 }
 
-export const readSettingsFile = async (file: File) => settingsSchema.parse(JSON.parse(await file.text()));
+export const readSettingsFile = async (file: File) =>
+  settingsSchema.parse(JSON.parse(await file.text()));
 
-async function loadDesktopFile<T>(command: 'loadSettings' | 'loadDraft', parse: (text: string) => T, fallback: T) {
+async function loadDesktopFile<T>(
+  command: 'loadSettings' | 'loadDraft',
+  parse: (text: string) => T,
+  fallback: T,
+) {
   try {
     const text = await desktopRequest<string | null>(command);
     return { value: text === null ? fallback : parse(text), missing: text === null, rejected: false };
@@ -54,8 +111,12 @@ export class DesktopPersistence {
   private settingsRevision = 0;
   private savedSettingsRevision = 0;
 
-  constructor(private savedSettings: string | null, private savedDraft: string,
-              private rejectedSettings: boolean, private rejectedDraft: boolean) {}
+  constructor(
+    private savedSettings: string | null,
+    private savedDraft: string,
+    private rejectedSettings: boolean,
+    private rejectedDraft: boolean,
+  ) {}
 
   replaceSettings() { this.settingsRevision++; }
 
@@ -86,7 +147,7 @@ export class DesktopPersistence {
         const snapshot = JSON.stringify(document);
         if (snapshot !== this.savedDraft) {
           result.pending = true;
-          const text = draftText(parseProject(document));
+          const text = draftText(document);
           await desktopRequest('saveDraft', { text, preserveOriginal: this.rejectedDraft });
           this.savedDraft = snapshot;
           this.rejectedDraft = false;
@@ -107,54 +168,81 @@ export async function loadDesktopData() {
   ]);
   const notice = [
     settings.rejected && '配置无法读取，暂用默认值，原文件已保留。',
-    draft.rejected && '草稿无法读取，当前显示样例，可另存原始草稿。',
+    draft.rejected && '自动草稿不是有效的 Article v6，原始草稿已保留。',
   ].filter(Boolean).join(' ');
-  const persistence = new DesktopPersistence(settings.missing ? null : JSON.stringify(settings.value),
-    JSON.stringify(draft.value), settings.rejected, draft.rejected);
+  const persistence = new DesktopPersistence(
+    settings.missing ? null : JSON.stringify(settings.value),
+    JSON.stringify(draft.value),
+    settings.rejected,
+    draft.rejected,
+  );
   return {
     settings: settings.value,
-    draft: { ...sample, project: draft.value, notice: draft.missing ? sample.notice : restoredNotice, desktopRejected: draft.rejected },
-    persistence, notice,
+    draft: {
+      ...sample,
+      project: draft.value,
+      notice: draft.missing ? sample.notice : restoredNotice,
+      desktopRejected: draft.rejected,
+    },
+    persistence,
+    notice,
   };
 }
 
-export async function readProject(file: File) {
-  return parseProject(JSON.parse(await file.text()));
+export async function importProjectFile(file: File): Promise<ImportResult> {
+  return new ArticleImportCoordinator().import({ name: file.name, text: await file.text() });
 }
 
-export async function openProject(file?: File) {
+export async function readProject(file: File): Promise<Project> {
+  return (await importProjectFile(file)).article;
+}
+
+export async function openProject(file?: File): Promise<Project | null> {
   if (file) return readProject(file);
   if (!isDesktop()) return null;
   const selected = await desktopRequest<{ name: string; text: string } | null>('openProject');
-  return selected === null ? null : parseProject(JSON.parse(selected.text));
+  if (selected === null) return null;
+  return new ArticleImportCoordinator().import(selected).article;
 }
 
 export function saveProject(project: Project) {
   const contents = JSON.stringify(parseProject(projectDocument(project)), null, 2);
   if (isDesktop()) return desktopRequest<true | null>('saveProject', contents).then(saved => saved === true ? contents : null);
-  download(new Blob([contents], { type: 'application/json' }), 'reading-project.json');
+  download(new Blob([contents], { type: 'application/json' }), 'article.json');
   return contents;
 }
 
 export function download(data: Blob, filename: string) {
   const url = URL.createObjectURL(data);
-  const anchor = document.createElement('a'); anchor.href = url; anchor.download = filename; anchor.click();
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 export async function requestExport(project: RenderProject, signature: string, pages: number): Promise<boolean | null> {
   if (!isDesktop()) throw new Error('ZIP 导出仅在 Windows 桌面版中可用。');
   return desktopRequest<boolean | null>('exportAllZip', {
-    project, document: projectDocument(project), signature, pages,
+    project,
+    document: projectDocument(project),
+    signature,
+    pages,
   });
 }
 
 export async function loadSettings() {
   const response = await fetch('/api/settings');
   if (!response.ok) throw new Error(await response.text());
-  return response.json() as Promise<{ settings: import('../models/settings').Styles; error?: string }>;
+  return response.json() as Promise<{ settings: Styles; error?: string }>;
 }
-export async function saveSettings(settings: import('../models/settings').Styles) {
-  const response = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings), keepalive: true });
+
+export async function saveSettings(settings: Styles) {
+  const response = await fetch('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+    keepalive: true,
+  });
   if (!response.ok) throw new Error(await response.text());
 }

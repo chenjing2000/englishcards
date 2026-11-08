@@ -11,23 +11,23 @@ test('shared settings persist independently of articles and determine exact expo
   await expect(page.getByRole('table', { name: '其余设置', exact: true })).toHaveCount(1);
   await expect(page.getByLabel('强调色', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('分割线颜色', { exact: true })).toHaveCount(0);
-  for (const [selector, size] of [['.title', 30], ['.article', 34], ['.mainIdea', 32], ['.translation', 32], ['.phrase', 34], ['.meaning', 30], ['.example', 30], ['.exampleTranslation', 30], ['.vocab [data-edit$=":word"]', 34], ['.vocab [data-edit$=":ipa"]', 26], ['.vocab [data-edit$=":meaning"]', 26], ['.section-heading', 24], ['.vocab-heading', 24]] as const) {
+  for (const [selector, size] of [['.title', 30], ['.article', 34], ['.translation', 32], ['.vocab [data-edit$=\":word\"]', 34], ['.vocab [data-edit$=\":ipa\"]', 26], ['.vocab [data-edit*=\"meaning\"]', 26], ['.vocab [data-edit*=\"example\"]', 26], ['.section-heading', 24], ['.vocab-heading', 24]] as const) {
     await expect(page.locator(selector).first()).toHaveCSS('font-size', `${size}px`);
   }
   await page.screenshot({ path: '.build/test-results/settings-fonts.png' });
   await page.getByLabel('页面高度', { exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: '.build/test-results/settings-dimensions.png' });
-  for (const [label, value] of [['页面宽度', '1000'], ['页面高度', '1400'], ['主要内容字号', '38'], ['中文译文字号', '28'], ['页眉字号', '20'], ['页脚字号', '18']]) {
+  for (const [label, value] of [['页面宽度', '1000'], ['页面高度', '1400'], ['英文正文字号', '38'], ['中文译文字号', '28'], ['页眉字号', '20'], ['页脚字号', '18']]) {
     await page.getByLabel(label, { exact: true }).fill(value);
   }
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   await expect.poll(async () => (await (await request.get('/api/settings')).json()).settings).toEqual(await page.evaluate(() => window.editor.project.styles));
   const stored = await (await request.get('/api/settings')).json();
-  expect(stored.settings).toMatchObject({ pageWidth: 1000, pageHeight: 1400, mainIdeaSize: 38, translationSize: 28 });
-  await page.getByLabel('打开项目 JSON').setInputFiles({ name: 'another.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ ...fixture, title: 'Another article' })) });
-  await expect(page.getByLabel('主要内容字号', { exact: true })).toHaveValue('38');
+  expect(stored.settings).toMatchObject({ pageWidth: 1000, pageHeight: 1400, bodySize: 38, translationSize: 28 });
+  await page.getByLabel('导入 Article JSON 或 TXT').setInputFiles({ name: 'another.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ ...fixture, title: 'Another article' })) });
+  await expect(page.getByLabel('英文正文字号', { exact: true })).toHaveValue('38');
   await page.reload(); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await expect(page.locator('.mainIdea').first()).toHaveCSS('font-size', '38px');
+  await expect(page.locator('.article').first()).toHaveCSS('font-size', '38px');
   await expect(page.locator('.translation').first()).toHaveCSS('font-size', '28px');
   await expect(page.locator('.eyebrow').first()).toHaveCSS('font-size', '20px');
   await expect(page.locator('.footer').first()).toHaveCSS('font-size', '18px');
@@ -39,7 +39,7 @@ test('shared settings persist independently of articles and determine exact expo
   for (const [name, value] of Object.entries(files)) if (name.endsWith('.png')) {
     const png = Buffer.from(value); expect(png.readUInt32BE(16)).toBe(1000); expect(png.readUInt32BE(20)).toBe(1400);
   }
-  expect(JSON.parse(Buffer.from(files['project.json']).toString())).not.toHaveProperty('styles');
+  expect(JSON.parse(Buffer.from(files['article.json']).toString())).not.toHaveProperty('styles');
   await page.getByRole('button', { name: '样式', exact: true }).click();
   await page.getByLabel('页面宽度', { exact: true }).fill('400');
   await page.getByLabel('左右边距', { exact: true }).fill('200');

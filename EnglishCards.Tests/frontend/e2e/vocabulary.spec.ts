@@ -5,11 +5,11 @@ test('per-word vocabulary tables edits and moves the selected row, inserts below
   await page.goto('/');
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   const project = { ...fixture, vocabulary: [
-    { id: 'v1', word: 'alpha', ipa: '/a/', senses: [{ pos: 'n.', meaning: '甲', example: '', exampleTranslation: '' }] },
-    { id: 'v2', word: 'beta', ipa: '/b/', senses: [{ pos: 'adj.', meaning: '乙', example: '', exampleTranslation: '' }] },
-    { id: 'v3', word: 'gamma', ipa: '/g/', senses: [{ pos: 'v.', meaning: '丙', example: '', exampleTranslation: '' }] },
+    { id: 'v001', word: 'alpha', ipa: '/a/', highlight: [], senses: [{ pos: 'n.', meaning: '甲', example: '', exampleTranslation: '' }] },
+    { id: 'v002', word: 'beta', ipa: '/b/', highlight: [], senses: [{ pos: 'adj.', meaning: '乙', example: '', exampleTranslation: '' }] },
+    { id: 'v003', word: 'gamma', ipa: '/g/', highlight: [], senses: [{ pos: 'v.', meaning: '丙', example: '', exampleTranslation: '' }] },
   ] };
-  await page.getByLabel('打开项目 JSON').setInputFiles({ name: 'table.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) });
+  await page.getByLabel('导入 Article JSON 或 TXT').setInputFiles({ name: 'table.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) });
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   await page.getByRole('button', { name: '词汇', exact: true }).click();
   const table = page.locator('.vocabulary-editor');

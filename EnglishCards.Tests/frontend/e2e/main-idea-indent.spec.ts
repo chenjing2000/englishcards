@@ -2,34 +2,36 @@ import { test, expect } from './fixtures';
 import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
 import { parseRenderProject } from '@frontend/models/project';
 
-test('main idea indents only its first line and exports with the same pagination', async ({ page, request }) => {
+test('content and translation paragraphs indent only their first line and paginate consistently', async ({ page, request }) => {
   await page.goto('/render');
   await page.waitForFunction(() => typeof window.renderProject === 'function');
-  const project = parseRenderProject({ ...fixture, source: { paragraphs: [] }, translation: { paragraphs: [] }, vocabulary: [], expressions: [],
-    mainIdea: '这是一段用于检查主旨首行缩进和跨页续行的完整文字。'.repeat(70) });
+  const project = parseRenderProject({
+    ...fixture,
+    content: { paragraphs: [{ id: 'p001', text: 'This paragraph checks first-line indentation and continuation line layout. '.repeat(70) }] },
+    vocabulary: [],
+    translation: { paragraphs: [{ id: 'p001', text: '这是一段用于检查译文首行缩进和跨页续行的完整文字。'.repeat(70) }] },
+  });
   const signature = await page.evaluate(project => window.renderProject(project), project);
-  const lines = page.locator('.mainIdea[data-source="mainIdea"]');
-  await expect(lines.first()).toHaveCSS('text-indent', `${project.styles.mainIdeaSize * 2}px`);
-  const indents = await lines.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).textIndent));
-  expect(new Set(indents.slice(1))).toEqual(new Set(['0px']));
-  expect((await lines.allTextContents()).join('')).toBe(project.mainIdea);
-  expect(await lines.evaluateAll(nodes => new Set(nodes.map(node => node.closest('.card')!.getAttribute('data-page'))).size)).toBeGreaterThan(1);
+  const contentLines = page.locator('.article[data-source="p001"]');
+  const translationLines = page.locator('.translation[data-source="p001"]');
+  await expect(contentLines.first()).toHaveCSS('text-indent', `${project.styles.bodySize * 2}px`);
+  await expect(translationLines.first()).toHaveCSS('text-indent', `${project.styles.translationSize * 2}px`);
+  const contentIndents = await contentLines.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).textIndent));
+  const translationIndents = await translationLines.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).textIndent));
+  expect(new Set(contentIndents.slice(1))).toEqual(new Set(['0px']));
+  expect(new Set(translationIndents.slice(1))).toEqual(new Set(['0px']));
+  expect((await contentLines.allTextContents()).join('')).toBe(project.content.paragraphs[0].text);
+  expect((await translationLines.allTextContents()).join('')).toBe(project.translation.paragraphs[0].text);
   const diagnostics = await page.evaluate(() => window.renderDiagnostics);
   const result = await request.post('/api/export', { data: { project, signature, diagnostics, page: 1 } });
   expect(result.ok(), result.ok() ? '' : await result.text()).toBe(true);
 });
 
-test('main idea has an independent font size and no individual PNG buttons appear', async ({ page }) => {
-  await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  const main = page.locator('.mainIdea').first(), translation = page.locator('.translation').first();
-  await expect(main).toHaveCSS('font-size', '32px');
-  await expect(translation).toHaveCSS('font-size', '32px');
-  await page.getByRole('button', { name: '样式', exact: true }).click();
-  await page.getByLabel('中文译文字号', { exact: true }).fill('44');
+test('the old Main Idea section is absent from Article v6 rendering and editing', async ({ page }) => {
+  await page.goto('/');
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await expect(main).toHaveCSS('font-size', '32px');
-  await expect(translation).toHaveCSS('font-size', '44px');
-  await expect(main).toHaveCSS('text-indent', '64px');
-  await expect(page.getByRole('button', { name: /^第 \d+ 页 PNG$/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toBeEnabled();
+  await expect(page.locator('.mainIdea')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '表达', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '主旨与译文', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '译文', exact: true })).toBeVisible();
 });

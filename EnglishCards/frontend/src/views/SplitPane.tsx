@@ -4,7 +4,7 @@ export default function SplitPane({ left, right }: { left: ReactNode; right: Rea
   const workspace = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; width: number } | null>(null);
   const [width, setWidth] = useState(() => window.innerWidth);
-  const [ratio, setRatio] = useState(0.70);
+  const [ratio, setRatio] = useState(0.55);
   const [dragging, setDragging] = useState(false);
   const available = Math.max(0, width - 8);
   const minimum = Math.min(280, Math.floor(available / 2));

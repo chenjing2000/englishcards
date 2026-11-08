@@ -77,7 +77,7 @@ function parseParagraphs(value: unknown, path: string): Paragraph[] {
     const at = `${path}.paragraphs[${index}]`;
     const item = record(entry, at, ['id', 'text']);
     if (item.id !== paragraphId(index + 1)) fail(`${at}.id`, `必须为 ${paragraphId(index + 1)}，段落需按当前顺序连续编号`);
-    const value = nonEmptyString(item.text, `${at}.text`);
+    const value = string(item.text, `${at}.text`);
     return { id: item.id as string, text: value };
   });
 }
@@ -88,10 +88,10 @@ function parseVocabulary(value: unknown): VocabularyItem[] {
     const at = `vocabulary[${index}]`;
     const item = record(entry, at, ['id', 'word', 'highlight', 'senses'], ['ipa']);
     if (item.id !== vocabularyId(index + 1)) fail(`${at}.id`, `必须为 ${vocabularyId(index + 1)}`);
-    const word = nonEmptyString(item.word, `${at}.word`);
+    const word = string(item.word, `${at}.word`);
     const normalized = normalizeVocabulary(word);
-    if (words.has(normalized)) fail(`${at}.word`, `重复词条：${word}`);
-    words.add(normalized);
+    if (normalized && words.has(normalized)) fail(`${at}.word`, `重复词条：${word}`);
+    if (normalized) words.add(normalized);
     const highlight = array(item.highlight, `${at}.highlight`, 2000).map((v, i) => string(v, `${at}.highlight[${i}]`));
     const senses = array(item.senses, `${at}.senses`, 2000).map((sense, i) => {
       const where = `${at}.senses[${i}]`;
@@ -135,12 +135,20 @@ export function addVocabulary(article: Article, selected: string): Article {
   const word = selected.trim().replace(/\s+/gu, ' ');
   if (!word) return article;
   const normalized = normalizeVocabulary(word);
-  if (article.vocabulary.some(item => normalizeVocabulary(item.word) === normalized)) return article;
+  const existing = article.vocabulary.find(item => normalizeVocabulary(item.word) === normalized);
+  if (existing) {
+    if (existing.highlight.some(term => normalizeVocabulary(term) === normalized)) return article;
+    return {
+      ...article,
+      vocabulary: article.vocabulary.map(item => item.id === existing.id
+        ? { ...item, highlight: [...item.highlight, word] }
+        : item),
+    };
+  }
   if (article.vocabulary.length >= MAX_VOCABULARY) throw new ArticleValidationError('vocabulary', '最多允许 999 个词条');
-  const next = { ...article, vocabulary: [...article.vocabulary, {
+  return { ...article, vocabulary: [...article.vocabulary, {
     id: vocabularyId(article.vocabulary.length + 1), word, ipa: '', highlight: [word], senses: [createEmptySense()],
   }] };
-  return parseArticleV6(next);
 }
 
 /** Allows index-based identifiers and rejects attempts to exceed the documented cap. */
@@ -157,15 +165,15 @@ export function paragraphsFromText(text: string): Paragraph[] {
 /** Re-number a paragraph collection after a whole-text edit, with a single validation boundary. */
 export function replaceParagraphText(article: Article, section: 'content' | 'translation', fullText: string): Article {
   const paragraphs = paragraphsFromText(fullText);
-  return parseArticleV6({ ...article, [section]: { paragraphs } });
+  return { ...article, [section]: { paragraphs } };
 }
 
 /** Deleting a vocabulary entry re-numbers the remainder to keep v001..vNNN canonical. */
 export function removeVocabulary(article: Article, id: string): Article {
   if (!article.vocabulary.some(entry => entry.id === id)) return article;
-  return parseArticleV6({ ...article, vocabulary: article.vocabulary
+  return { ...article, vocabulary: article.vocabulary
     .filter(entry => entry.id !== id)
-    .map((entry, index) => ({ ...entry, id: vocabularyId(index + 1) })) });
+    .map((entry, index) => ({ ...entry, id: vocabularyId(index + 1) })) };
 }
 
 /** Plain text export is article body only, with one blank line between natural paragraphs. */

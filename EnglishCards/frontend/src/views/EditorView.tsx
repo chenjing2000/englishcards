@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { senseSourceId, type Styles } from '../models/project';
+import type { Styles } from '../models/project';
 import { useEditorViewModel } from '../viewmodels/useEditorViewModel';
 import VocabularyTable, { VocabularyActions } from './VocabularyTable';
 import CardPreview from './CardPreview';
@@ -7,10 +7,9 @@ import NotificationBar from './NotificationBar';
 import ProjectActions from './ProjectActions';
 import SplitPane from './SplitPane';
 import AutoSizeTextarea from './AutoSizeTextarea';
-import EntryHeadInput from './EntryHeadInput';
 import SettingInput from './SettingInput';
 
-type Tab = '原文' | '词汇' | '表达' | '主旨与译文' | '样式';
+type Tab = '原文' | '词汇' | '译文' | '样式';
 
 export default function EditorView() {
   const vm = useEditorViewModel();
@@ -34,37 +33,25 @@ export default function EditorView() {
     const id = target.closest<HTMLElement>('[data-edit]')?.dataset.edit ?? line?.dataset.source;
     if (!id) return;
     const kind = line!.dataset.kind;
-    if (kind === 'title' || kind === 'article') { setTab('原文'); setFocusId(kind === 'title' ? 'project:title' : `source:${id}`); }
-    else if (kind === 'vocab') {
+    if (kind === 'title' || kind === 'article') {
+      setTab('原文');
+      setFocusId(kind === 'title' ? 'project:title' : `content:${id}`);
+    } else if (kind === 'vocab') {
       vm.selectVocabulary(line!.dataset.source!);
-      setTab('词汇'); setFocusId(`vocabulary:${target.closest<HTMLElement>('[data-edit]')?.dataset.edit ?? `${line!.dataset.source}:word`}`);
+      setTab('词汇');
+      setFocusId(`vocabulary:${target.closest<HTMLElement>('[data-edit]')?.dataset.edit ?? `${line!.dataset.source}:word`}`);
+    } else if (kind === 'translation') {
+      setTab('译文');
+      setFocusId(`translation:${id}`);
     }
-    else if (['phrase', 'meaning', 'example', 'exampleTranslation'].includes(kind!)) { setTab('表达'); setFocusId(`expressions:${id}`); }
-    else if (kind === 'translation' || kind === 'mainIdea') { setTab('主旨与译文'); setFocusId(kind === 'mainIdea' ? 'project:mainIdea' : `translation:${id}`); }
   }
   function field(label: string, value: string, onChange: (value: string) => void, id?: string) {
     return <label className="field" key={label}><span>{label}</span><AutoSizeTextarea label={label} value={value} inputRef={element => { if (id) registerInput(id, element); }} onChange={onChange} /></label>;
   }
-  function expressions() {
-    const key = 'expressions';
-    const name = '表达';
-    const labels = { meaning: '含义', example: '例句', exampleTranslation: '翻译' };
-    return <>{project[key].map((entry, index) => <section className="edit-entry" key={entry.id}>
-      <div className="entry-toolbar"><b>{name} {index + 1}</b><span className="spacer" /><button aria-label={`${name} ${index + 1} 上移`} disabled={index === 0} onClick={() => vm.reorder(key, index, -1)}>↑</button><button aria-label={`${name} ${index + 1} 下移`} disabled={index === project[key].length - 1} onClick={() => vm.reorder(key, index, 1)}>↓</button><button aria-label={`删除${name} ${index + 1}`} onClick={() => vm.removeEntry(key, entry.id)}>删除</button></div>
-      <table className="expression-table" aria-label={`表达 ${index + 1}`}><tbody>
-        <tr><th scope="row">短语</th><td><EntryHeadInput multiline label={`短语 ${index + 1}`} value={entry.phrase} inputRef={input => registerInput(`${key}:${entry.id}:phrase`, input)} commit={value => vm.commitHead(key, entry.id, value)} /></td></tr>
-        {entry.senses.map((sense, senseIndex) => Object.entries(labels).map(([property, label]) =>
-          <tr key={`${senseIndex}:${property}`}><th scope="row">{label}{senseIndex > 0 && <small> {senseIndex + 1}</small>}</th><td>
-            <AutoSizeTextarea label={`${label} ${index + 1}${senseIndex ? ` 义项 ${senseIndex + 1}` : ''}`} value={sense[property as keyof typeof labels]}
-              inputRef={input => registerInput(`${key}:${senseSourceId(entry.id, senseIndex, property)}`, input)}
-              onChange={value => vm.setSenseField(key, entry.id, senseIndex, property as keyof typeof labels, value)} /></td></tr>
-        ))}</tbody></table>
-    </section>)}<button className="add-button" onClick={() => vm.addEntry(key)}>添加{name}</button></>;
-  }
   const fontFields: [keyof Styles, string][] = [
-    ['titleSize', '标题字号'], ['bodySize', '英文正文字号'], ['mainIdeaSize', '主要内容字号'], ['translationSize', '中文译文字号'],
+    ['titleSize', '标题字号'], ['bodySize', '英文正文字号'], ['translationSize', '中文译文字号'],
     ['headerSize', '页眉字号'], ['footerSize', '页脚字号'], ['wordSize', '词汇单词字号'], ['vocabularySize', '词汇其余内容字号'],
-    ['phraseSize', '表达短语字号'], ['expressionSize', '表达其余内容字号'], ['headingSize', '栏目标题字号'],
+    ['headingSize', '栏目标题字号'],
   ];
   const otherFields: typeof fontFields = [
     ['pageWidth', '页面宽度'], ['pageHeight', '页面高度'],
@@ -80,23 +67,22 @@ export default function EditorView() {
   }
   return <div className="app-shell" inert={vm.desktop && (!settingsReady || vm.closing)}>
     <SplitPane right={<aside className="editor-panel" id="editor-panel"><div className="panel-heading"><h1>英语阅读卡片编辑器</h1></div>
-      <nav aria-label="编辑板块">{(['原文', '词汇', '表达', '主旨与译文', '样式'] as Tab[]).map(name => <button key={name} className={name === tab ? 'active' : ''} onClick={() => setTab(name)}>{name}</button>)}</nav>
+      <nav aria-label="编辑板块">{(['原文', '词汇', '译文', '样式'] as Tab[]).map(name => <button key={name} className={name === tab ? 'active' : ''} onClick={() => setTab(name)}>{name}</button>)}</nav>
       <div className="history-toolbar" inert={vm.opening}><button onClick={vm.undo} disabled={!canUndo}>Undo</button><button onClick={vm.redo} disabled={!canRedo}>Redo</button><span>支持最近 10 次修改</span>{rejectedDraft && <button onClick={vm.downloadRejectedDraft}>下载原始草稿</button>}</div>
       <div inert={!settingsReady || vm.opening} className="fields">
         {tab === '原文' && <>
-          <label className="field"><span>个性化页眉</span><input type="text" aria-label="个性化页眉" value={project.personalizedHeader} onChange={event => vm.setProjectText('personalizedHeader', event.target.value)} /></label>
+          <label className="field"><span>IdentityTag</span><input type="text" aria-label="IdentityTag" value={project.identityTag} onChange={event => vm.setProjectText('identityTag', event.target.value)} /></label>
           {field('英文标题', project.title, value => vm.setProjectText('title', value), 'project:title')}
           <p className="hint">在下方英文框选择文字，再点“高亮 / 取消高亮”。高亮字号始终继承正文。</p>
-          {project.source.paragraphs.map((paragraph, index) => <section className="edit-entry" key={paragraph.id}>
-            {field(`英文段落 ${index + 1}`, paragraph.text, value => vm.setParagraphText('source', paragraph.id, value), `source:${paragraph.id}`)}
-            <div className="entry-toolbar"><button aria-label={`高亮 / 取消高亮 ${index + 1}`} onMouseDown={event => event.preventDefault()} onClick={() => { const input = inputs.current.get(`source:${paragraph.id}`) as HTMLTextAreaElement; vm.highlightRange(paragraph.id, input.selectionStart, input.selectionEnd); }}>高亮 / 取消高亮</button></div>
+          {project.content.paragraphs.map((paragraph, index) => <section className="edit-entry" key={paragraph.id}>
+            {field(`英文段落 ${index + 1}`, paragraph.text, value => vm.setParagraphText('content', paragraph.id, value), `content:${paragraph.id}`)}
+            <div className="entry-toolbar"><button aria-label={`高亮 / 取消高亮 ${index + 1}`} onMouseDown={event => event.preventDefault()} onClick={() => { const input = inputs.current.get(`content:${paragraph.id}`) as HTMLTextAreaElement; vm.highlightRange(paragraph.id, input.selectionStart, input.selectionEnd); }}>高亮 / 取消高亮</button></div>
           </section>)}
-          <button className="add-button" onClick={() => vm.addParagraph('source')}>添加英文段落</button>
+          <button className="add-button" onClick={() => vm.addParagraph('content')}>添加正文段落</button>
         </>}
         {tab === '词汇' && <VocabularyTable viewModel={vm} registerInput={registerInput} />}
-        {tab === '表达' && expressions()}
-        {tab === '主旨与译文' && <>
-          {field('Main Idea', project.mainIdea, value => vm.setProjectText('mainIdea', value), 'project:mainIdea')}
+        
+        {tab === '译文' && <>
           {project.translation.paragraphs.map((paragraph, index) => <section className="edit-entry" key={paragraph.id}>
             {field(`中文段落 ${index + 1}`, paragraph.text, value => vm.setParagraphText('translation', paragraph.id, value), `translation:${paragraph.id}`)}
             {!paragraph.text && <p className="hint">空段落将保留，不影响其他段落。</p>}

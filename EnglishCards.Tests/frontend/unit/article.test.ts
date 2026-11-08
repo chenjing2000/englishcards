@@ -51,6 +51,26 @@ test('vocabulary identifiers and deduplication', () => {
   assert.equal(a.vocabulary[0].word, 'artificial intelligence');
   assert.strictEqual(addVocabulary(a, 'ARTIFICIAL   INTELLIGENCE'), a);
 });
+test('content and translation independently reject the 1000th paragraph', () => {
+  const a = baseline();
+  const tooMany = Array.from({ length: 1000 }, (_, i) => ({ id: `p${String(i + 1).padStart(3, '0')}`, text: `p${i}` }));
+  assert.throws(() => parseArticleV6({ ...a, content: { paragraphs: tooMany } }), /最多允许 999/);
+  assert.throws(() => parseArticleV6({ ...a, translation: { paragraphs: tooMany } }), /最多允许 999/);
+});
+
+test('selecting a duplicate vocabulary head reuses the entry without overwriting its senses', () => {
+  const base = baseline();
+  const existing = {
+    id: 'v001', word: 'run', ipa: '/rʌn/', highlight: [],
+    senses: [{ pos: 'v.', meaning: '跑', example: 'Run fast.', exampleTranslation: '快跑。' }],
+  };
+  const article = { ...base, vocabulary: [existing] };
+  const updated = addVocabulary(article, 'RUN');
+  assert.equal(updated.vocabulary.length, 1);
+  assert.deepEqual(updated.vocabulary[0].highlight, ['RUN']);
+  assert.deepEqual(updated.vocabulary[0].senses, existing.senses);
+});
+
 test('blank input, unknown extensions are refused', () => {
   assert.throws(() => importer.import({ name: 'empty.txt', text: '  \r\n \r\n' }), /有效正文/);
   assert.throws(() => importer.import({ name: 'article.md', text: 'hello' }), /只支持/);

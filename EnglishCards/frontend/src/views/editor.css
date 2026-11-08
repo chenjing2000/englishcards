@@ -2,7 +2,7 @@
 .text-line,.eyebrow,.footer{filter:opacity(1)}
 .page-header{position:absolute;display:flex;align-items:baseline;gap:24px;white-space:nowrap}
 .page-header>.eyebrow{position:static;flex-shrink:0}
-.page-header>.personalized-header{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:right;color:#b2bfc3}
+.page-header>.identity-tag{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:right;color:#b2bfc3}
 
 .editor-panel nav{overflow-x:auto;flex-shrink:0}
 .pane-splitter{position:relative;cursor:col-resize;touch-action:none;background:#edf0ef;outline-offset:-2px}

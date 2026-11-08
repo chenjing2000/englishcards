@@ -1,6 +1,6 @@
 # EnglishCards 项目契约
 
-> **当前状态（2026-11-07）：** 用户已批准从 schemaVersion 5 破坏性升级至 Article v6。Article v6 数据模型、独立 JSON/TXT 导入基础及其单元测试已经建立；本轮完成了生产源码、测试、Skills、工具和构建输出目录的重组。桌面应用的实际读写、WPF 桥接、右侧编辑器、左侧预览及 ZIP 导出仍待接入 v6。过渡期间不得把 v5 与 v6 混合写入同一项目，也不得宣称整个应用已经完成 v6。
+> **当前状态（2026-11-07）：** 已批准从 schemaVersion 5 破坏性升级至 Article v6。Article v6 已接入 React 生产数据模型、分页渲染、JSON/TXT 导入、项目保存、自动草稿和 WPF/ZIP schema 边界；前端/桌面端读写均以 Article v6 为准。右侧单页编辑器、左侧新式选区加号、配套图片加载、Settings 齿轮工具栏及 14/16 DIP 编辑器排版仍待后续阶段实施。不得把 v5 与 v6 混合写入同一项目，也不得宣称最终界面重构已完成。
 
 ## 1. 产品定位与技术边界
 
@@ -60,8 +60,9 @@ interface Sense {
 - 段落和词汇 ID 在各自集合内连续编号；正文与译文可以同时存在 `p001`，二者定位时必须带集合/区域上下文。
 - 删除段落或 Vocabulary 项后，相关集合按当前顺序重新编号。ID 表示集合中的顺序位置，不是永久身份。
 - Vocabulary 统一管理单词、词组、习语及用户选择的英文内容，核心字段保持 `word`。保留 `ipa`、`highlight`、`senses` 等已有辅助能力；不再使用独立 `expressions` 集合。
+- Skill 生成规则：`word` 按空白分隔后只有一个单词时，必须提供词性、英式音标、含义、英文例句和例句翻译；同一单词的不同词性分别建立 sense。`word` 有两个或以上单词时，不配置词性和音标，但必须提供含义、例句和例句翻译。连字符和撇号不拆分单词，例如 `well-known`、`don't` 均按单词处理。此规则约束 Skill 生成质量，不作为强制拒绝用户手动导入的应用级校验。
 - 删除 `expressions`、`mainIdea`、`source`、`personalizedHeader`、`readingLevel`、`theme` 和 Article 顶层 `warnings`。运行时警告属于 UI 状态，不属于文章数据。
-- 正文和译文自然段文本不能为空；字段和数组严格校验，未知字段拒绝，不静默丢弃。
+- Skill 生成的正文和译文段落不得为空；应用编辑器允许保留空段落作为编辑状态，TXT 导入不会生成空段落。字段和数组严格校验，未知字段拒绝，不静默丢弃。
 
 ### 2.3 TXT 与 JSON 导入
 
@@ -93,6 +94,11 @@ interface Sense {
 - 点击加号时必须在焦点变化前保存选区文本；执行空白规范化和大小写不敏感去重。重复项不新增、不覆盖现有释义。
 - 新增条目写入 `vocabulary`，使用 `word` 字段，并保留现有义项编辑能力。
 
+### 3.3 Vocabulary 列表与编辑排版
+
+- Vocabulary 列表采用单栏纵向布局，每个条目占据编辑区域完整可用宽度；不再将词条拆成左右两列。
+- 右侧所有 TabPage/编辑内容区域统一采用 14 DIP 正文字号；目录级、分区级标题采用 16 DIP 且加粗。图标和工具栏不受正文排版字号约束。
+
 ## 4. 分页、预览与渲染
 
 - 保留当前分页引擎的字体测量、逐行布局、分页连续性校验等成熟算法；先改数据输入和段落映射，不无故重写测量算法。
@@ -102,7 +108,18 @@ interface Sense {
 - 英文内置 Nunito Sans，仅包含 Latin / Latin Extended 的 400 与 800 字重。
 - 中文使用 Windows 系统字体回退：Microsoft YaHei UI、Microsoft YaHei、DengXian、sans-serif。
 - 默认画布 1200×1600；实际输出尺寸遵循样式设置。
+- 左右栏首次打开默认宽度比例为预览 55% / 编辑 45%；保留用户拖动调整，左右栏最小宽度仍为 280 DIP。当前分隔条比例仅保存在组件运行状态中，应用重启后回到默认 55:45；本阶段不新增跨重启布局持久化。打开文章不得重置当前会话内用户手动调整的比例。
+- JSON 导入时，在 JSON 文件所在目录的顶层（不递归）搜索 `.png` 和 `.jpg` 图片，扩展名大小写不敏感；按文件名不区分大小写排序，取第一张。无匹配图片时正常导入且不显示图片占位区域。
+- 配套图片不是 Article 字段，不在 JSON 中保存图片文件名、路径或 Base64。每次显式导入 JSON 时重新搜索；搜索结果只作为当前导入会话的临时资源，当前会话内预览与导出使用同一份已加载图像，不在导出时再次搜索。关闭/重新导入后重新搜索。自动草稿不持久化图片元数据；单独恢复草稿时若没有当前 JSON 导入会话的图片资源，则不显示插图。
+- 配套图片显示在正文上方，宽度适配预览内容区域并保持原始宽高比；超出可用显示高度时顶部对齐、裁剪下方超出部分，不修改原始图片。PNG/ZIP 页面渲染必须复用本次会话同一图片及相同裁剪边界，不显示预览中已裁掉的部分。
 - 字体未就绪或分页/渲染校验失败时，不得提交错误导出。
+
+### 4.1 工具栏与设置入口
+
+- 原【样式】TabPage 改为独立【设置】入口，使用齿轮图标按钮，不再作为右侧普通 TabPage。
+- 工作区右上角横向排列四个圆形操作按钮，顺序为：设置、打开 JSON、保存 JSON、导出 ZIP。后三项沿用原有三个项目文件操作的实际功能，不改变其行为。
+- 按钮视觉规格：40×40 DIP 圆形按钮、20×20 DIP 图标、背景 `#D3E5EB`、图标 `#27495B`、无边框；Hover 仅做轻微背景加深。Tooltip 使用简短功能名称。
+- 四个 SVG 资源位于 `EnglishCards/frontend/src/assets/icons/toolbar/`：`settings.svg`、`open-json.svg`、`save-json.svg`、`export-zip.svg`。图标文件只定义线条，不把按钮背景烘焙进 SVG。
 
 ## 5. 正式 ZIP 导出
 
@@ -151,7 +168,7 @@ EnglishCards.Tests/
     └── e2e/                  # Playwright
 
 docs/                        # 项目文档、规格、审查记录和历史材料
-skills/                      # 项目专属 Skills
+docs/skills/                 # 项目专属 Skills
 tools/                       # 构建、测试、发布及开发期测试服务
 .build/                      # 测试结果、报告和临时运行数据
 dist/EnglishCards/           # 唯一正式发布目录
@@ -179,6 +196,6 @@ dotnet publish EnglishCards\desktop\EnglishCards.csproj -c Release -r win-x64 --
 
 ## 10. 当前迁移状态
 
-- 已完成：Article v6 独立数据模型、严格校验、JSON/TXT 导入基础、v6 单元测试；目录迁移至 `EnglishCards/`、`EnglishCards.Tests/`、`skills/`、`tools/`；构建输出目标改为 `.build`。
+- 已完成：Article v6 独立数据模型、严格校验、JSON/TXT 导入基础、v6 单元测试；目录迁移至 `EnglishCards/`、`EnglishCards.Tests/`、`docs/skills/`、`tools/`；构建输出目标改为 `.build`。
 - 尚未完成：将 WPF 桥接、自动草稿、项目打开/保存、React 编辑器、预览、高亮和 ZIP 导出全部迁移到 Article v6；删除 v5 生产模型及旧分区 UI；在迁移后的目录结构上完成 Windows .NET 测试与正式发布。
 - 用户最近报告的验证结果：Vitest 46/46、Vite 构建成功、Playwright 61/61、.NET Release 发布成功。该日志对应目录迁移前的测试修复包；目录重组后的新路径尚未在 Windows 上验证。

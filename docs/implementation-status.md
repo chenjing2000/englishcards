@@ -1,6 +1,6 @@
 # EnglishCards 桌面版实施状态与验收记录
 
-> 本文前半部分包含历史阶段记录，旧路径（`desktop/`、`src/`、`tests/`、`dist/wpf/`）仅用于追溯。当前目录与目标数据契约以 `docs/project-contract.md` 为准。
+> 本文包含历史阶段记录。旧路径和已被覆盖的历史产品决策仅用于追溯。当前目录、Article v6 及 Phase 2B-0 新增规则以 `docs/project-contract.md` 和 `docs/specs/PHASE2B_PRODUCT_ADDITIONS.md` 为准。
 
 2026-11-06；当前行为以 `docs/project-contract.md` 为准。本文包含历史执行环境记录及用户补充的 Windows 验收结果。
 
@@ -128,9 +128,70 @@ The owner supplied a fresh PowerShell log after the Vitest test-file fix:
 
 - Production code moved to `EnglishCards/desktop/` and `EnglishCards/frontend/`.
 - Tests moved to `EnglishCards.Tests/dotnet/` and `EnglishCards.Tests/frontend/{unit,e2e}/`.
-- Skills moved from `docs/skills/` to root `skills/`; the Article-to-EnglishCards Skill now describes Article v6.
+- Skills were initially moved from `docs/skills/` to root `skills/` during Phase 2A; the Article-to-EnglishCards Skill now describes Article v6.
 - Development-only Express test server moved to `tools/test-server/`.
 - Vite output target changed from `artifacts/dist/` to `EnglishCards/.build/frontend-dist/`; test outputs use root `.build/`. The permanent `artifacts/` directory has been eliminated from the intended layout.
 - WPF embedded-resource paths, .NET test project reference, Vite, Playwright, TypeScript aliases and publish output target were updated.
 - The runtime editor and desktop bridge still use v5. This phase only reorganizes paths; it does not claim v6 app integration.
 - The new directory layout has not yet been re-run on Windows. Container verification is limited by unavailable npm dependencies and no Windows/.NET runtime in this environment.
+
+
+## 2026-11-07 — Phase 2B-0 product specification freeze
+
+The owner approved the following additions before production v6 integration:
+
+- Default preview/editor pane ratio is 55:45. Existing splitter, 280 DIP minimum pane widths and manual layout persistence remain.
+- Vocabulary generation Skill distinguishes single-word entries from multiword entries. Single words require POS, British IPA, meaning, example and example translation; separate senses are required for different parts of speech. Multiword entries omit POS and IPA but require meaning, example and translation. This is a Skill quality rule, not a strict application import gate.
+- Vocabulary editor/list uses one vertical column.
+- Right-side editor content uses 14 DIP; directory/section headings use 16 DIP bold.
+- Project Skills move to `docs/skills/`.
+- JSON import searches only the selected JSON's immediate directory for PNG/JPG, case-insensitive by extension, sorts filenames case-insensitively and temporarily loads the first match. No image field or filename is added to Article. The loaded image is session-scoped and shared by preview and PNG/ZIP rendering; it is top-aligned and clipped at the agreed available height.
+- Settings becomes a gear-icon entry instead of the old Style tab. Workspace top-right toolbar order: Settings, Open JSON, Save JSON, Export ZIP. Buttons are 40 DIP circular surfaces with 20 DIP icons, `#D3E5EB` background and `#27495B` strokes.
+- Four standalone SVG icon assets are added under `EnglishCards/frontend/src/assets/icons/toolbar/`.
+
+This phase updates specifications, Skill guidance, repository paths and icon assets only. No production UI, importer, persistence or export implementation has yet been changed.
+
+Phase 2B-0 supersedes that intermediate placement: project Skills are now under `docs/skills/`.
+
+
+## 2026-11-07 — Phase 2B-1: Article v6 production data layer
+
+### Implemented
+
+- Replaced the frontend production `Project` shape with an Article v6 facade (`Project` is now an Article v6 alias; runtime-only styles remain separate on `RenderProject`).
+- Removed production data access to v5 `source`, `expressions`, `mainIdea` and `personalizedHeader`; `identityTag`, `content.paragraphs`, unified `vocabulary`, and `translation.paragraphs` are now used.
+- Switched production JSON import and plain-text import to `ArticleImportCoordinator`; desktop Open dialog accepts `.json` and `.txt`; malformed/legacy JSON does not fall back to plaintext.
+- Switched project JSON save, browser/desktop draft wrapper, and `article.json` ZIP snapshot to Article v6.
+- Updated WPF save validation and ZIP export schema checks from version 5 to version 6.
+- Updated the dev export server to write `article.json`.
+- Updated the BrainCo sample fixture to Article v6 (this is a new v6 sample fixture; runtime code does not migrate old JSON).
+- Updated vocabulary list to one vertical collection and removed the separate Expressions and Main Idea editor/preview data paths. The later one-TabPage editor and left-preview selection-plus interaction are still pending.
+- Updated default splitter ratio to 55:45.
+- Added explicit quarantine of the previous localStorage draft key `reading-editor.draft.v2`; it is never parsed or migrated. Desktop v5 draft wrappers are likewise rejected by the v6 reader and preserved by the existing rejected-draft flow.
+- Updated unit/E2E/.NET test sources to Article v6 and canonical `p001..p999` / `v001..v999` IDs.
+
+### Validation performed in the authoring environment
+
+- TypeScript syntax parse: 56 files parsed, zero syntax errors.
+- Article v6 core smoke test: passed.
+- JSON/TXT importer smoke test: passed, including legacy JSON and malformed JSON rejection.
+- Full `npm ci` could not be completed because the authoring environment has no cached npm registry packages and network installation is unavailable. Therefore Vitest, Playwright, TypeScript semantic checking, .NET tests and WPF publish have **not** been run in this environment.
+- The user must run the Windows test/build commands against the delivered source package before Phase 2B-1 is marked fully verified.
+
+### Not included yet
+
+- Companion image discovery and session-scoped image rendering/export.
+- One continuous Vocabulary → Content → Translation editor TabPage.
+- Left-preview selection-plus interaction with same-paragraph/same-card and English-only constraints.
+- Settings gear and four-icon workspace toolbar.
+- 14 DIP editor content / 16 DIP bold section heading typography.
+- Full PNG/ZIP image crop consistency validation.
+
+
+## 2026-11-07 — Phase 2B-1 production data-layer boundary hardening
+
+A direct reinspection corrected the earlier migration audit: the supplied Phase 2B-0 source already uses Article v6 across the frontend model, editor view model, importer, persistence, pagination and WPF schema gates. No wholesale v5-to-v6 rewrite was needed.
+
+This patch adds `ArticleContractValidator` to repeat strict Article v6 validation at the WPF trust boundary. It is invoked for standalone project saves, ZIP export requests, and validation of the exported `article.json`. The .NET test harness now covers invalid schema versions, legacy fields, noncanonical IDs, duplicate vocabulary, paragraph overflow and malformed exported Article structure.
+
+The remaining separate tabs, toolbar, single-column editor, companion image and other approved UI changes remain scheduled for subsequent phases. No UI changes are claimed in this phase.

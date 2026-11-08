@@ -3,60 +3,60 @@ import { readFileSync } from 'node:fs';
 import fixture from '@fixtures/projects/brainco/project.json';
 import { collectHighlights, parseProject, editParagraph, toggleHighlight, defaults } from '@frontend/models/project';
 
-describe('project persistence and entry highlights', () => {
-  it('defaults missing personalized headers and preserves custom or empty values', () => {
-    expect(parseProject(fixture).personalizedHeader).toBe('SOME BIRDS ON TREE');
-    for (const personalizedHeader of ['My reading notes', '']) {
-      const project = parseProject({ ...fixture, personalizedHeader });
-      expect(project.personalizedHeader).toBe(personalizedHeader);
-      expect(parseProject(JSON.parse(JSON.stringify(project)))).toEqual(project);
+describe('Article v6 persistence and vocabulary highlights', () => {
+  it('requires identityTag and preserves custom or empty values', () => {
+    expect(parseProject(fixture).identityTag).toBe('SOME BIRDS ON TREE');
+    for (const identityTag of ['My reading notes', '']) {
+      const article = parseProject({ ...fixture, identityTag });
+      expect(article.identityTag).toBe(identityTag);
+      expect(parseProject(JSON.parse(JSON.stringify(article)))).toEqual(article);
     }
+    expect(() => parseProject({ ...fixture, personalizedHeader: 'legacy' })).toThrow();
   });
-  it('preserves both independent content snapshots', () => {
-    const project = parseProject(fixture);
-    expect(project.schemaVersion).toBe(5);
-    for (const [key, filename] of [['source', 'article'], ['translation', 'translation']] as const) {
+
+  it('preserves independent content and translation paragraph collections', () => {
+    const article = parseProject(fixture);
+    expect(article.schemaVersion).toBe(6);
+    for (const [key, filename] of [['content', 'article'], ['translation', 'translation']] as const) {
       const snapshot = readFileSync(
         new URL(`../../../EnglishCards/frontend/assets/projects/brainco/${filename}.md`, import.meta.url),
         'utf8'
       ).replace(/\r\n/g, '\n').trim();
-      expect(project[key].paragraphs.map(item => item.text).join('\n\n')).toBe(snapshot);
-      expect(project[key].paragraphs).toHaveLength(2);
+      expect(article[key].paragraphs.map(item => item.text).join('\n\n')).toBe(snapshot);
+      expect(article[key].paragraphs).toHaveLength(2);
+      expect(article[key].paragraphs.map(item => item.id)).toEqual(['p001', 'p002']);
     }
-    expect(parseProject(JSON.parse(JSON.stringify(project)))).toEqual(project);
+    expect(parseProject(JSON.parse(JSON.stringify(article)))).toEqual(article);
     expect(defaults.bodySize).toBe(34);
     expect(defaults.translationSize).toBe(32);
   });
-  it('rejects bad versions, fields, IDs, ranges and unsafe styles', () => {
-    expect(() => parseProject({ ...fixture, schemaVersion: 99 })).toThrow();
+
+  it('rejects legacy fields, duplicate vocabulary, bad IDs and invalid styles', () => {
+    expect(() => parseProject({ ...fixture, schemaVersion: 5 })).toThrow();
     expect(() => parseProject({ ...fixture, title: null })).toThrow();
-    expect(() => parseProject({ ...fixture, vocabulary: [fixture.vocabulary[0], fixture.vocabulary[0]] })).toThrow();
-    const project = parseProject(fixture);
-    expect(() => parseProject({ ...project, styles: { ...defaults, bodySize: 10000 } })).toThrow();
-    expect(() => parseProject({ ...project, highlights: [{ id: 'bad', paragraphId: 'en-1', start: 0, end: 3, quote: 'bad' }] })).toThrow();
-  });
-  it('marks and removes all occurrences through an entry rule', () => {
-    let project = parseProject({ ...fixture, source: { paragraphs: [{ id: 'p', text: 'word word' }] } });
-    project = toggleHighlight(project, 'p', 0, 4);
-    expect(collectHighlights(project)).toHaveLength(2);
-    project = toggleHighlight(project, 'p', 5, 9);
-    expect(collectHighlights(project)).toEqual([]);
-    expect(project.vocabulary.find(entry => entry.word === 'word')?.highlight).toEqual([]);
-  });
-  it('derives positions from current text without storing offsets', () => {
-    let project = parseProject({ ...fixture, source: { paragraphs: [{ id: 'p', text: 'word word' }] } });
-    project = toggleHighlight(project, 'p', 5, 9);
-    project = editParagraph(project, 'p', 'new word word');
-    expect(collectHighlights(project)).toMatchObject([{ start: 4, end: 8, quote: 'word' }, { start: 9, end: 13, quote: 'word' }]);
-    project = editParagraph(project, 'p', 'new word changed');
-    expect(collectHighlights(project)).toHaveLength(1);
-    expect(project.vocabulary.find(entry => entry.word === 'word')?.highlight).toEqual(['word']);
-  });
-  it('round-trips maximum-length paragraph IDs including JSON escapes', () => {
-    const paragraphId = '\u0001'.repeat(200);
-    const project = parseProject({ ...fixture, source: { paragraphs: [{ id: paragraphId, text: 'Article' }] } });
-    expect(parseProject(JSON.parse(JSON.stringify(project)))).toEqual(project);
-
+    expect(() => parseProject({ ...fixture, vocabulary: [fixture.vocabulary[0], { ...fixture.vocabulary[0], id: 'v002' }] })).toThrow();
+    expect(() => parseProject({ ...fixture, mainIdea: '' })).toThrow();
+    expect(() => parseProject({ ...fixture, content: { paragraphs: [{ id: 'p01', text: 'bad id' }] } })).toThrow();
+    expect(() => parseProject({ ...fixture, styles: { ...defaults, bodySize: 10000 } })).toThrow();
+    expect(() => parseProject({ ...fixture, highlights: [{ id: 'bad', paragraphId: 'p001', start: 0, end: 3, quote: 'bad' }] })).toThrow();
   });
 
+  it('adds and removes a vocabulary highlight rule immutably', () => {
+    let article = parseProject({ ...fixture, content: { paragraphs: [{ id: 'p001', text: 'word word' }] }, vocabulary: [] });
+    article = toggleHighlight(article, 'p001', 0, 4);
+    expect(collectHighlights(article)).toHaveLength(2);
+    article = toggleHighlight(article, 'p001', 5, 9);
+    expect(collectHighlights(article)).toEqual([]);
+    expect(article.vocabulary[0].highlight).toEqual([]);
+  });
+
+  it('derives highlight positions from current content without storing offsets', () => {
+    let article = parseProject({ ...fixture, content: { paragraphs: [{ id: 'p001', text: 'word word' }] }, vocabulary: [] });
+    article = toggleHighlight(article, 'p001', 5, 9);
+    article = editParagraph(article, 'p001', 'new word word');
+    expect(collectHighlights(article)).toMatchObject([{ start: 4, end: 8, quote: 'word' }, { start: 9, end: 13, quote: 'word' }]);
+    article = editParagraph(article, 'p001', 'new word changed');
+    expect(collectHighlights(article)).toHaveLength(1);
+    expect(article.vocabulary.find(entry => entry.word === 'word')?.highlight).toEqual(['word']);
+  });
 });

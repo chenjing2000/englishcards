@@ -5,7 +5,7 @@ test('workspace has compact sense controls and edge-aligned floating actions', a
   await expect(page.getByRole('heading', { name: '英语阅读卡片编辑器', exact: true })).toBeVisible();
   await expect(page.locator('.app-header,.status-bar,.preview-toolbar')).toHaveCount(0);
   await expect(page.locator('.zoom-toolbar')).toHaveCount(0);
-  for (const tab of ['原文', '词汇', '表达', '主旨与译文']) {
+  for (const tab of ['原文', '词汇', '译文']) {
     await page.getByRole('button', { name: tab, exact: true }).click();
     await expect(page.getByRole('checkbox')).toHaveCount(0);
   }
@@ -32,9 +32,9 @@ test('workspace has compact sense controls and edge-aligned floating actions', a
   const panel = (await page.locator('#editor-panel').boundingBox())!, box = (await actions.boundingBox())!;
   expect(Math.abs(box.x + box.width - panel.x - panel.width)).toBeLessThanOrEqual(1);
   expect(Math.abs(box.y + box.height - panel.y - panel.height)).toBeLessThanOrEqual(1);
-  await page.getByLabel('打开项目 JSON').setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from('{') });
+  await page.getByLabel('导入 Article JSON 或 TXT').setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from('{') });
   const notice = page.getByLabel('信息提示栏');
-  await expect(notice.getByRole('alert')).toContainText('Error:');
+  await expect(notice.getByRole('alert')).toContainText('JSON 语法错误');
   await expect.poll(() => notice.evaluate(node => node.getBoundingClientRect().height)).toBeGreaterThan(0);
   await expect.poll(async () => {
     const a = (await actions.boundingBox())!, b = (await notice.boundingBox())!;
@@ -66,7 +66,7 @@ test('preview scrolls normally and Ctrl plus wheel alone changes the stored zoom
   await expect(preview).toHaveCSS('overflow-x', 'hidden');
   const actions = page.getByRole('group', { name: '项目文件操作' });
   await expect(actions.getByRole('button')).toHaveCount(3);
-  await expect(actions.getByRole('button').nth(0)).toHaveAttribute('title', '打开 JSON');
+  await expect(actions.getByRole('button').nth(0)).toHaveAttribute('title', '打开文章');
   await expect(actions.getByRole('button').nth(1)).toHaveAttribute('title', '保存 JSON');
   await expect(actions.getByRole('button').nth(2)).toHaveAttribute('title', '导出全部 ZIP');
   expect(await page.locator('.card button').count()).toBe(0);
@@ -126,6 +126,9 @@ test('manual zoom clamps to 20%–100% and does not impose a preview-height limi
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
   const preview = page.locator('.preview-scroll');
   const card = page.locator('.card').first();
+  // Give the preview enough horizontal room for the card's true 100% width.
+  await page.getByRole('separator', { name: '调整编辑与预览宽度' }).focus();
+  await page.getByRole('separator', { name: '调整编辑与预览宽度' }).press('End');
   await preview.click({ position: { x: 20, y: 20 } });
   await page.keyboard.down('Control'); await page.mouse.wheel(0, 5000); await page.keyboard.up('Control');
   await expect.poll(() => page.locator('.preview').evaluate(node => getComputedStyle(node).getPropertyValue('--zoom').trim())).toBe('0.2');
@@ -136,14 +139,14 @@ test('manual zoom clamps to 20%–100% and does not impose a preview-height limi
   expect(await preview.evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
 });
 
-test('desktop target layout places preview on the left at 70%, editor on the right', async ({ page }) => {
+test('desktop target layout places preview on the left at 55%, editor on the right', async ({ page }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
   const preview = await page.locator('#preview-panel').boundingBox();
   const editor = await page.locator('#editor-panel').boundingBox();
   const workspace = await page.locator('.workspace').boundingBox();
   expect(preview && editor && workspace).toBeTruthy();
   expect(preview!.x + preview!.width).toBeLessThan(editor!.x);
-  expect(Math.abs(preview!.width / (workspace!.width - 8) - 0.70)).toBeLessThan(0.02);
+  expect(Math.abs(preview!.width / (workspace!.width - 8) - 0.55)).toBeLessThan(0.02);
   await expect(page.getByRole('button', { name: '导出全部 ZIP' })).toHaveCount(1);
 });
 

@@ -53,7 +53,7 @@ test('desktop waits for both files before enabling editing and initializes missi
       if (command === 'loadSettings') host.reply(id, null);
       if (command === 'loadDraft') host.reply(id, text);
     }
-  }, JSON.stringify({ project: { ...fixture, title: 'Restored from desktop disk' } }));
+  }, JSON.stringify({ article: { ...fixture, title: 'Restored from desktop disk' }, modifiedAt: '2026-11-07T00:00:00.000Z' }));
   await ready(page);
   await expect(title(page)).toHaveValue('Restored from desktop disk');
   await expect.poll(async () => (await requests(page, 'saveSettings')).length).toBe(1);
@@ -105,7 +105,7 @@ test('close waits for in-flight writes and saves both final snapshots after undo
   });
   expect(await result).toMatchObject({ pending: true, errors: [] });
   expect((await requests(page, 'saveSettings')).map(request => JSON.parse(request.payload!.text).bodySize)).toEqual([40, 34]);
-  expect(JSON.parse((await requests(page, 'saveDraft')).at(-1)!.payload!.text).project.title).toBe('Last draft before closing');
+  expect(JSON.parse((await requests(page, 'saveDraft')).at(-1)!.payload!.text).article.title).toBe('Last draft before closing');
 });
 
 test('failed close keeps the current edit available for retry', async ({ page }) => {
@@ -124,5 +124,5 @@ test('failed close keeps the current edit available for retry', async ({ page })
   await expect(title(page)).toHaveValue('Recoverable edit');
   await page.evaluate(() => { (window as unknown as TestPage).holdWrite = false; });
   expect(await close(page)).toMatchObject({ pending: true, errors: [] });
-  expect(JSON.parse((await requests(page, 'saveDraft')).at(-1)!.payload!.text).project.title).toBe('Recoverable edit');
+  expect(JSON.parse((await requests(page, 'saveDraft')).at(-1)!.payload!.text).article.title).toBe('Recoverable edit');
 });
