@@ -135,10 +135,18 @@ export default function CardPreview({ layout, ready, content, onAddSelection, ac
   useEffect(() => {
     const element = scroll.current;
     if (!element) return;
-    const observer = new ResizeObserver(() => clampZoomToAvailableWidth());
+    const updateWidth = () => {
+      if (element.closest('.workspace')?.dataset.resizing === 'true') return;
+      clampZoomToAvailableWidth();
+    };
+    const observer = new ResizeObserver(updateWidth);
     observer.observe(element);
-    clampZoomToAvailableWidth();
-    return () => observer.disconnect();
+    window.addEventListener('editor-pane-resize-end', updateWidth);
+    updateWidth();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('editor-pane-resize-end', updateWidth);
+    };
   }, []);
 
   useEffect(() => {
