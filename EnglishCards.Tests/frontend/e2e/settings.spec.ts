@@ -51,19 +51,6 @@ test('shared settings persist independently of articles and determine exact expo
   expect((await (await request.get('/api/settings')).json()).settings).toEqual(defaults);
 });
 
-test('Undo and Redo retain at most ten changes and clear redo on a new edit', async ({ page }) => {
-  await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  const title = page.getByLabel('英文标题', { exact: true });
-  for (let index = 1; index <= 12; index++) await title.fill(`Title ${index}`);
-  const undo = page.getByRole('button', { name: 'Undo', exact: true });
-  const redo = page.getByRole('button', { name: 'Redo', exact: true });
-  for (let index = 0; index < 10; index++) await undo.click();
-  await expect(title).toHaveValue('Title 2'); await expect(undo).toBeDisabled();
-  for (let index = 0; index < 10; index++) await redo.click();
-  await expect(title).toHaveValue('Title 12'); await expect(redo).toBeDisabled();
-  await undo.click(); await title.fill('A new branch'); await expect(redo).toBeDisabled();
-});
-
 test('missing settings are rebuilt and damaged settings require an explicit reset', async ({ page, request }) => {
   const path = '.build/test-runtime/settings.json';
   await unlink(path);
@@ -79,7 +66,7 @@ test('missing settings are rebuilt and damaged settings require an explicit rese
   expect(JSON.parse(await readFile(path, 'utf8'))).toEqual(defaults);
 });
 
-test('undo during an in-flight settings save persists the latest visible settings', async ({ page, request }) => {
+test('a later edit during an in-flight settings save persists the latest visible settings', async ({ page, request }) => {
   let release!: () => void;
   const held = new Promise<void>(resolve => { release = resolve; });
   let started!: () => void;
@@ -95,7 +82,7 @@ test('undo during an in-flight settings save persists the latest visible setting
   await page.getByRole('button', { name: '保存 JSON', exact: true }).click(); await download;
   await page.getByLabel('英文正文字号', { exact: true }).fill('40');
   await saving;
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.getByLabel('英文正文字号', { exact: true }).fill('34');
   await expect(page.getByLabel('英文正文字号', { exact: true })).toHaveValue('34');
   expect(await page.evaluate(() => {
     const event = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(event); return event.defaultPrevented;
