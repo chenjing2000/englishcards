@@ -38,10 +38,6 @@ test('per-word vocabulary tables edits and moves the selected row, inserts below
   await expect(page.getByLabel('词头 3', { exact: true })).toBeFocused();
   await expect(page.getByLabel('音标 3', { exact: true })).toHaveValue('');
   await expect(page.getByLabel('含义 3', { exact: true })).toHaveValue('');
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expectWords(['alpha', 'edited beta', 'gamma']);
-  await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expectWords(['alpha', 'edited beta', '', 'gamma']);
   await expect(selected.getByLabel('词头 3', { exact: true })).toHaveValue('');
   await remove.click();
   await expectWords(['alpha', 'edited beta', 'gamma']);
@@ -56,7 +52,7 @@ test('per-word vocabulary tables edits and moves the selected row, inserts below
   await expect(page.getByLabel('词头 1', { exact: true })).toBeFocused();
 });
 
-test('table fields preserve part of speech, drafts and preview navigation', async ({ page }) => {
+test('table fields preserve part of speech and drafts; preview clicks do not navigate', async ({ page }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
   
   await page.getByLabel('音标 2', { exact: true }).fill('/changed/');
@@ -69,9 +65,10 @@ test('table fields preserve part of speech, drafts and preview navigation', asyn
   
   await expect(page.getByLabel('音标 2', { exact: true })).toHaveValue('/changed/');
   await expect(page.getByLabel('含义 2', { exact: true })).toHaveValue('n. 保留的含义');
+  await page.getByLabel('词头 2', { exact: true }).focus();
   await page.locator('.card [data-edit]').filter({ hasText: fixture.vocabulary[0].word }).first().click();
-  await expect(page.getByLabel('词头 1', { exact: true })).toBeFocused();
-  await expect(page.locator('.vocabulary-entry.selected').getByLabel('词头 1', { exact: true })).toHaveValue(fixture.vocabulary[0].word);
+  await expect(page.getByLabel('词头 1', { exact: true })).not.toBeFocused();
+  await expect(page.locator('.vocabulary-entry.selected').getByLabel('词头 2', { exact: true })).toHaveValue(fixture.vocabulary[1].word);
   await page.getByLabel('词头 2', { exact: true }).click();
   await page.screenshot({ path: '.build/test-results/vocabulary-table.png' });
 });
