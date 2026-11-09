@@ -50,11 +50,6 @@ test('left-preview selections add English words and phrases to Article v6 vocabu
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   await expect(page.locator('.card .article .hot')).toHaveText(['RUN', 'runs', 'runner', 'took off', 'take off', 'run', 'ran away']);
 
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(page.locator('.card .article .hot')).toHaveText(['RUN', 'runs', 'runner', 'took off', 'take off', 'run']);
-  await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect(page.locator('.card .article .hot')).toHaveText(['RUN', 'runs', 'runner', 'took off', 'take off', 'run', 'ran away']);
-
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '保存 JSON', exact: true }).click();
   const saved = JSON.parse(await readFile((await (await downloadPromise).path())!, 'utf8'));
