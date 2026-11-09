@@ -21,7 +21,7 @@ test('unified vocabulary entries retain variants, paired senses and automatic hi
     name: 'senses.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(input)),
   });
   const marks = page.locator('.article .hot');
-  await expect(marks).toHaveText(['ran', 'took off', 'take off']);
+  await expect(marks).toHaveText(['ran', 'run', 'took off', 'take off']);
   
   const add = page.getByRole('button', { name: '在选中词汇下方添加空白行', exact: true });
   await expect(page.getByRole('button', { name: '刷新词汇高亮', exact: true })).toHaveCount(0);
@@ -37,7 +37,7 @@ test('unified vocabulary entries retain variants, paired senses and automatic hi
   await page.getByLabel('词汇例句 2 义项 2', { exact: true }).fill('They recorded it.');
   await page.getByLabel('词汇翻译 2 义项 2', { exact: true }).fill('他们录制了它。');
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await expect(marks).toHaveText(['ran', 'record', 'took off', 'take off']);
+  await expect(marks).toHaveText(['ran', 'run', 'record', 'took off', 'take off']);
   await expect(page.getByLabel('信息提示栏')).toHaveText('');
 
   const pending = page.waitForEvent('download');
@@ -45,7 +45,7 @@ test('unified vocabulary entries retain variants, paired senses and automatic hi
   const saved = JSON.parse(await readFile((await (await pending).path())!, 'utf8'));
   expect(saved.schemaVersion).toBe(6);
   expect(saved.vocabulary[1].id).toBe('v002');
-  expect(saved.vocabulary[1].highlight).toEqual(['record']);
+  expect(saved.vocabulary[1].highlight).toEqual([]);
   expect(saved.vocabulary[1].senses).toEqual([
     { pos: 'n.', meaning: '记录', example: 'Keep a record.', exampleTranslation: '保留记录。' },
     { pos: 'v.', meaning: '录制', example: 'They recorded it.', exampleTranslation: '他们录制了它。' },
@@ -90,7 +90,7 @@ test('renaming a vocabulary head removes its obsolete phrase highlight automatic
   await expect(marks).toHaveText(['only', 'only']);
   expect(await page.evaluate(() => window.editor.project.vocabulary[0])).toMatchObject({
     word: 'only',
-    highlight: ['only'],
+    highlight: [],
   });
   await expect(page.getByRole('button', { name: '刷新词汇高亮', exact: true })).toHaveCount(0);
 
