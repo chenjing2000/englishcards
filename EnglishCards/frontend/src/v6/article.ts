@@ -135,21 +135,15 @@ export function addVocabulary(article: Article, selected: string): Article {
   const word = selected.trim().replace(/\s+/gu, ' ');
   if (!word) return article;
   const normalized = normalizeVocabulary(word);
-  // A selected surface form may already be attached to another dictionary headword.
-  // Treat it as existing vocabulary rather than creating a duplicate entry.
-  if (article.vocabulary.some(item => item.highlight.some(term => normalizeVocabulary(term) === normalized))) return article;
-  const existing = article.vocabulary.find(item => normalizeVocabulary(item.word) === normalized);
-  if (existing) {
-    return {
-      ...article,
-      vocabulary: article.vocabulary.map(item => item.id === existing.id
-        ? { ...item, highlight: [...item.highlight, word] }
-        : item),
-    };
-  }
+  // Both dictionary headwords and explicit highlight variants are match rules.
+  // A selected term already represented by either rule must not create a duplicate.
+  if (article.vocabulary.some(item =>
+    normalizeVocabulary(item.word) === normalized
+    || item.highlight.some(term => normalizeVocabulary(term) === normalized)
+  )) return article;
   if (article.vocabulary.length >= MAX_VOCABULARY) throw new ArticleValidationError('vocabulary', '最多允许 999 个词条');
   return { ...article, vocabulary: [...article.vocabulary, {
-    id: vocabularyId(article.vocabulary.length + 1), word, ipa: '', highlight: [word], senses: [createEmptySense()],
+    id: vocabularyId(article.vocabulary.length + 1), word, ipa: '', highlight: [], senses: [createEmptySense()],
   }] };
 }
 
