@@ -10,6 +10,31 @@ import { paginate } from './services/pagination';
 import { parseRenderProject, type RenderProject } from './models/project';
 import type { LayoutDiagnostics } from './services/layoutVerification';
 
+function installGlobalInputPolicy() {
+  document.addEventListener('contextmenu', event => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+
+  const blockRightButton = (event: PointerEvent | MouseEvent) => {
+    if (event.button !== 2) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+  document.addEventListener('pointerdown', blockRightButton, true);
+  document.addEventListener('mousedown', blockRightButton, true);
+
+  document.addEventListener('keydown', event => {
+    if (!(event.ctrlKey || event.metaKey)) return;
+    const key = event.key.toLowerCase();
+    if (key !== 'z' && key !== 'y') return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+}
+
+installGlobalInputPolicy();
+
 declare global {
   interface Window {
     renderProject: (project: unknown) => Promise<string>;
