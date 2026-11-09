@@ -20,10 +20,7 @@ const stringify = (project: Project) => JSON.stringify(projectDocument(project),
 export function useEditorViewModel() {
   const desktop = isDesktop();
   const [boot, setBoot] = useState(desktop ? sampleDraft : restoreDraft);
-  const [history, setHistory] = useState<{ past: RenderProject[]; present: RenderProject; future: RenderProject[] }>({
-    past: [], present: { ...boot.project, styles: { ...defaults } }, future: [],
-  });
-  const project = history.present;
+  const [project, setProject] = useState<RenderProject>({ ...boot.project, styles: { ...defaults } });
   const [vocabularySelection, setVocabularySelection] = useState<string | null>(null);
   const vocabularyIndex = project.vocabulary.findIndex(entry => entry.id === vocabularySelection);
   const selectedVocabularyIndex = vocabularyIndex >= 0 ? vocabularyIndex : project.vocabulary.length ? 0 : -1;
@@ -72,25 +69,11 @@ export function useEditorViewModel() {
   const hasFileChanges = lastFile !== stringify(project);
 
   function update(next: Project | ((current: RenderProject) => Project)) {
-    setHistory(current => {
-      const result = typeof next === 'function' ? next(current.present) : next;
-      if (result === current.present) return current;
-      return {
-        past: [...current.past.slice(-9), current.present],
-        present: { ...result, styles: 'styles' in result ? (result as RenderProject).styles : current.present.styles },
-        future: [],
-      };
+    setProject(current => {
+      const result = typeof next === 'function' ? next(current) : next;
+      if (result === current) return current;
+      return { ...result, styles: 'styles' in result ? (result as RenderProject).styles : current.styles };
     });
-  }
-  function undo() {
-    setHistory(current => current.past.length
-      ? { past: current.past.slice(0, -1), present: current.past.at(-1)!, future: [current.present, ...current.future] }
-      : current);
-  }
-  function redo() {
-    setHistory(current => current.future.length
-      ? { past: [...current.past, current.present], present: current.future[0], future: current.future.slice(1) }
-      : current);
   }
 
   useEffect(() => {
@@ -100,7 +83,7 @@ export function useEditorViewModel() {
         if (cancelled) return;
         desktopStore.current = result.persistence;
         setBoot(result.draft);
-        setHistory({ past: [], present: { ...result.draft.project, styles: result.settings }, future: [] });
+        setProject({ ...result.draft.project, styles: result.settings });
         savedSettings.current = JSON.stringify(result.settings);
         if (result.notice) showWarning(result.notice);
         setSettingsReady(true);
@@ -113,7 +96,7 @@ export function useEditorViewModel() {
       if (cancelled) return;
       const styles = styleSchema.parse(result.settings);
       savedSettings.current = JSON.stringify(styles);
-      setHistory(current => ({ past: [], present: { ...current.present, styles }, future: [] }));
+      setProject(current => ({ ...current, styles }));
       if (result.error) showWarning(result.error);
       setSettingsReady(true);
     }).catch(reason => {
@@ -474,9 +457,8 @@ export function useEditorViewModel() {
 
   return {
     project, warning, error, settingsReady, ready, exporting, opening, desktop, closing,
-    canUndo: history.past.length > 0, canRedo: history.future.length > 0,
     layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
-    undo, redo, open, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
+    open, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
     highlightRange, addVocabularyFromSelection, refreshHighlights, commitHead, setSenseField, setVocabularyMeaning,
     addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,
     selectedVocabulary, selectedVocabularyIndex, selectVocabulary, moveSelectedVocabulary,
