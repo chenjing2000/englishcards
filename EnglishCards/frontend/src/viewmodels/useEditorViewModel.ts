@@ -328,10 +328,10 @@ export function useEditorViewModel() {
         return;
       }
       update(next);
-      const normalized = selected.trim().replace(/\\s+/gu, ' ').toLocaleLowerCase('en');
+      const normalized = selected.trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en');
       const entry = next.vocabulary.find(item =>
-        item.word.trim().replace(/\\s+/gu, ' ').toLocaleLowerCase('en') === normalized
-        || item.highlight.some(term => term.trim().replace(/\\s+/gu, ' ').toLocaleLowerCase('en') === normalized));
+        item.word.trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en') === normalized
+        || item.highlight.some(term => term.trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en') === normalized));
       if (entry) setVocabularySelection(entry.id);
       reportError('vocabulary', '');
     } catch (reason) {
