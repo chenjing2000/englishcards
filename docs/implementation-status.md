@@ -206,3 +206,17 @@ The remaining separate tabs, toolbar, single-column editor, companion image and 
 - Preview-to-editor click navigation, vocabulary editing, undo/redo, JSON saving, drafts and ZIP data model remain wired to Article v6.
 - Added Phase C E2E coverage for section order, continuous paragraphs, IDs, Undo/Redo and settings access. Three obsolete tests dependent on selection-to-highlight buttons are marked skipped until the left-preview interaction replaces them in Phase D. They must be re-enabled or replaced with equivalent coverage at that time.
 - Windows CI run 42607275999: Vitest 48 passed, Vite build passed, Playwright 57 passed / 3 skipped, .NET test step passed. Real WPF/WebView2 visual verification and Windows publish smoke test are still pending.
+
+### Phase C — Windows desktop acceptance (2026-11-09)
+
+The user completed the Windows WPF/WebView2 acceptance checklist successfully:
+
+- Vocabulary → Content → Translation ordering and right-pane scrolling behave as expected.
+- Continuous paragraph creation/deletion, blank-line parsing and preview synchronization work.
+- Undo/Redo works for article body, translation and vocabulary edits.
+- Preview clicks on title, body, vocabulary and translation focus the correct editor.
+- JSON save, draft restoration after restart, article data and settings persist correctly.
+- ZIP export preserves paragraph structure, image content and Chinese rendering.
+- Cursor placement, scrolling and long-article editing showed no visible jumping.
+
+**Phase C is accepted on the user's Windows desktop.** No outstanding Phase C defects were reported. The three E2E tests skipped in CI remain intentionally deferred because they exercise the superseded right-editor selection/highlight controls; equivalent left-preview selection-plus coverage is required in Phase D.
