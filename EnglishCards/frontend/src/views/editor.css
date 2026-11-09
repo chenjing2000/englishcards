@@ -5,8 +5,9 @@
 .page-header>.identity-tag{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:right;color:#b2bfc3}
 
 .editor-panel nav{overflow-x:auto;flex-shrink:0}
-.pane-splitter{position:relative;cursor:col-resize;touch-action:none;background:#edf0ef;outline-offset:-2px}
-.pane-splitter:before{content:"";position:absolute;top:0;bottom:0;left:3px;width:2px;background:#c5d1ca}
+.pane-splitter{position:relative;z-index:2;cursor:col-resize;touch-action:none;background:#edf0ef;outline-offset:-2px}
+.pane-splitter:before{content:"";position:absolute;z-index:1;top:0;bottom:0;left:3px;width:2px;background:#c5d1ca;pointer-events:none}
+.pane-splitter:after{content:"";position:absolute;top:0;bottom:0;left:-6px;right:-6px;cursor:col-resize}
 .pane-splitter:hover:before,.pane-splitter:focus:before,.workspace[data-resizing="true"] .pane-splitter:before{background:#4f8a67}
 .workspace[data-resizing="true"],.workspace[data-resizing="true"] *{cursor:col-resize;user-select:none}
 
