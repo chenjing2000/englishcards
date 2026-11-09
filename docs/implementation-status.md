@@ -257,3 +257,32 @@ This update supersedes the earlier Phase D interaction description where it conf
 - WPF host disables WebView2 default context menus and handles ContextMenuRequested. The WPF main-window hook also suppresses the native title-bar/window-chrome context menu.
 - Windows native shell file-picker dialogs remain OS-owned; this change does not attempt to modify Explorer context menus inside those system dialogs.
 - Automated CI is green. Real WPF/WebView2 desktop acceptance is still pending; the user should verify the visible editor, right-click behavior (including the main window title bar), selection-plus, clipboard shortcuts, persistence and ZIP export before Phase D is accepted.
+
+## 2026-11-09 — Phase D.1: highlight synchronization and editor interaction refinement
+
+### User Windows acceptance feedback
+
+The owner confirmed the Phase D baseline behavior on Windows:
+
+- Preview clicks do not navigate to the right editor.
+- Selection-plus adds a word or phrase; duplicate vocabulary is reported without creating a duplicate.
+- Partial-word selections, Han-containing selections, and selections crossing paragraph/card boundaries do not show the add action.
+- Undo/Redo and right-click are disabled as intended; clipboard shortcuts remain usable.
+- Draft persistence, JSON save and ZIP export preserve data.
+
+New refinements requested:
+
+- Match the left-preview selection-plus icon to ReadArticles `SelectionAddAdorner`: a 14×14 white circular button with a 1.3 px DodgerBlue outline and rounded blue plus strokes.
+- When a vocabulary head is renamed, remove its previous primary headword from the entry's highlight rules, add the new headword, and preserve other independently selected surface variants. This prevents an obsolete phrase such as `only for` remaining highlighted after the headword becomes `only`.
+- Remove the manual highlight refresh control. It previously only invalidated/re-ran pagination and did not change Article highlight rules; ordinary project updates already trigger pagination.
+- Redraw the remaining four vocabulary row actions (move up/down, add, delete) as SVG icons. Increase each control from 20×20 to 25×25 px, use larger rounded corners, opaque backgrounds and distinct blue/teal/coral icon treatments.
+- Update default `vocabularySize` from 26 to 30 and `headingSize` from 24 to 32.
+- Improve splitter responsiveness by applying drag widths directly to the workspace once per animation frame, avoiding React state updates for every pointer movement, and defer preview zoom clamping until drag completion. Keyboard resizing remains supported.
+
+### Implementation and verification
+
+- The old headword highlight rule is removed on commit; independent variants remain. A unit test covers rename, preservation and clearing behavior.
+- E2E coverage verifies the obsolete phrase disappears automatically after a headword rename and persists correctly after reload.
+- The obsolete refresh button is removed and tests now verify automatic preview updates.
+- Splitter E2E now checks that pane width changes before pointer release.
+- Windows build, unit/E2E/.NET CI and WPF visual acceptance are pending for this Phase D.1 update.
