@@ -28,10 +28,6 @@ export default function SplitPane({ left, right }: { left: ReactNode; right: Rea
     return Math.min(maximum, Math.max(minimum, next));
   }
 
-  function resize(next: number) {
-    setRatio(clamp(next) / available);
-  }
-
   function finish() {
     const current = drag.current;
     if (!current) return;
