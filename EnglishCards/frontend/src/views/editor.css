@@ -46,3 +46,5 @@
 .phase-c-fields .entry-toolbar>b{font-size:16px}
 .phase-c-fields .settings-heading{font-size:16px;font-weight:800}
 .continuous-paragraph-input{display:block;width:100%;min-height:120px;resize:none;overflow-y:hidden;white-space:pre-wrap;line-height:1.7}
+
+.phase-c-fields .hint,.phase-c-fields .settings-table{font-size:14px}
