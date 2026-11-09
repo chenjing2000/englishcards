@@ -48,3 +48,7 @@
 .continuous-paragraph-input{display:block;width:100%;min-height:120px;resize:none;overflow-y:hidden;white-space:pre-wrap;line-height:1.7}
 
 .phase-c-fields .hint,.phase-c-fields .settings-table{font-size:14px}
+
+/* Phase D: contextual add action anchored to a valid English selection in the left preview. */
+.selection-add-button{position:fixed;z-index:30;display:flex;align-items:center;justify-content:center;width:30px;height:30px;min-width:30px;padding:0;border:1px solid #fff;border-radius:50%;background:#b81a35;color:#fff;font-size:22px;font-weight:500;line-height:1;box-shadow:0 2px 8px #17251f45}
+.selection-add-button:hover{background:#95142b;border-color:#fff;color:#fff}
