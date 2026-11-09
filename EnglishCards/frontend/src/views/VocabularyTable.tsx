@@ -1,8 +1,9 @@
 import { Fragment } from 'react';
-import { senseSourceId, type Project } from '../models/project';
+import { formatHighlightInput, senseSourceId, type Project } from '../models/project';
 import type { useEditorViewModel } from '../viewmodels/useEditorViewModel';
 import EntryHeadInput from './EntryHeadInput';
 import AutoSizeTextarea from './AutoSizeTextarea';
+import HighlightInput from './HighlightInput';
 
 type Props = {
   viewModel: ReturnType<typeof useEditorViewModel>;
@@ -53,6 +54,19 @@ export default function VocabularyTable({ viewModel: vm, registerInput }: Props)
           <tr>
             <th scope="row">音标</th>
             <td>{editor(entry, index, 'ipa', '音标')}</td>
+          </tr>
+          <tr>
+            <th scope="row">高亮词汇</th>
+            <td>
+              <HighlightInput
+                key={entry.id}
+                label={`高亮词汇 ${index + 1}`}
+                word={entry.word}
+                value={formatHighlightInput(entry.highlight, entry.word)}
+                onChange={value => vm.setEntryHighlights(entry.id, value)}
+                inputRef={input => registerInput(`vocabulary:${entry.id}:highlight`, input)}
+              />
+            </td>
           </tr>
           {entry.senses.map((sense, senseIndex) => <Fragment key={senseIndex}>
             <tr>
