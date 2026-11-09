@@ -15,7 +15,7 @@ it('stores manually selected surface forms in the unified vocabulary list', () =
   });
   expect(collectHighlights(result).map(mark => mark.quote)).toEqual(['ran', 'ran']);
   result = toggleHighlight(result, 'p001', 23, 31);
-  expect(result.vocabulary[1]).toMatchObject({ id: 'v002', word: 'took off', highlight: ['took off'] });
+  expect(result.vocabulary[1]).toMatchObject({ id: 'v002', word: 'took off', highlight: [] });
   expect(result).not.toHaveProperty('expressions');
   expect(result).not.toHaveProperty('highlights');
   expect(parseProject(JSON.parse(JSON.stringify(result)))).toEqual(result);
@@ -48,10 +48,10 @@ it('uses matching dictionary entries and cancels duplicate or overlapping rules 
   expect(removed.vocabulary[2].highlight).toEqual([]);
 });
 
-it('keeps explicit variants when article text changes', () => {
+it('keeps dictionary headwords when article text changes', () => {
   const marked = toggleHighlight(article(), 'p001', 23, 31);
   const edited = editParagraph(marked, 'p001', 'They will take off.');
-  expect(edited.vocabulary[0].highlight).toEqual(['took off']);
+  expect(edited.vocabulary[0].highlight).toEqual([]);
   expect(collectHighlights(edited)).toEqual([]);
 });
 
