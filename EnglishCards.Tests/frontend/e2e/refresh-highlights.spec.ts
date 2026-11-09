@@ -21,7 +21,7 @@ test('unified vocabulary entries retain variants, paired senses and refresh beha
   });
   const marks = page.locator('.article .hot');
   await expect(marks).toHaveText(['ran', 'took off', 'take off']);
-  await page.getByRole('button', { name: '词汇', exact: true }).click();
+  
   const refresh = page.getByRole('button', { name: '刷新词汇高亮', exact: true });
   const add = page.getByRole('button', { name: '在选中词汇下方添加空白行', exact: true });
   const before = await page.evaluate(() => window.editor.project);
@@ -86,8 +86,8 @@ test('import waits for file reading and refreshing unchanged rules does not add 
   });
   await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toBeDisabled();
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await expect(page.getByLabel('英文段落 1', { exact: true })).toHaveValue('No active rules.');
-  await page.getByRole('button', { name: '词汇', exact: true }).click();
+  await expect(page.getByLabel('英文正文', { exact: true })).toHaveValue('No active rules.');
+  
   for (let i = 0; i < 2; i++) {
     await page.getByRole('button', { name: '刷新词汇高亮', exact: true }).click();
     await expect(page.locator('[data-ready="true"]')).toBeVisible();
