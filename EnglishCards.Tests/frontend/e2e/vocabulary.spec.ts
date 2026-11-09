@@ -13,7 +13,7 @@ test('per-word vocabulary tables edits and moves the selected row, inserts below
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   
   const table = page.locator('.vocabulary-editor');
-  await expect(page.getByRole('table', { name: '词汇 1', exact: true }).getByRole('rowheader')).toHaveText(['词汇', '音标', '含义', '例句', '翻译']);
+  await expect(page.getByRole('table', { name: '词汇 1', exact: true }).getByRole('rowheader')).toHaveText(['词汇', '音标', '高亮词汇', '含义', '例句', '翻译']);
   const actions = page.getByRole('group', { name: '词汇行操作', exact: true });
   await expect(actions.getByRole('button')).toHaveCount(4);
   await expect(page.getByRole('button', { name: '刷新词汇高亮', exact: true })).toHaveCount(0);
