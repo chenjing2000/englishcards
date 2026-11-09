@@ -33,5 +33,5 @@ test('the old Main Idea section is absent from Article v6 rendering and editing'
   await expect(page.locator('.mainIdea')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '表达', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '主旨与译文', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '译文', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Translation', exact: true })).toBeVisible();
 });
