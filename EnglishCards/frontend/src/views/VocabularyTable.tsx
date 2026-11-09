@@ -98,21 +98,39 @@ export default function VocabularyTable({ viewModel: vm, registerInput }: Props)
   </section>;
 }
 
+type VocabularyActionIconName = 'up' | 'down' | 'add' | 'delete';
+
+function VocabularyActionIcon({ name }: { name: VocabularyActionIconName }) {
+  return <svg aria-hidden="true" viewBox="0 0 24 24">
+    {name === 'up' && <path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" />}
+    {name === 'down' && <path d="M12 5v14m-6.5-6.5L12 19l6.5-6.5" />}
+    {name === 'add' && <><circle cx="12" cy="12" r="8.5" /><path d="M12 8v8m-4-4h8" /></>}
+    {name === 'delete' && <><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" /><path d="M10 11v5m4-5v5" /></>}
+  </svg>;
+}
+
 export function VocabularyActions({ viewModel: vm, focusField }: {
   viewModel: Props['viewModel'];
   focusField: (id: string) => void;
 }) {
   const { project, selectedVocabulary, selectedVocabularyIndex } = vm;
   return <div className="vocabulary-actions" role="group" aria-label="词汇行操作">
-    <button aria-label="上移选中词汇" title="上移选中词汇"
-      disabled={selectedVocabularyIndex <= 0} onClick={() => vm.moveSelectedVocabulary(-1)}>↑</button>
-    <button aria-label="下移选中词汇" title="下移选中词汇"
+    <button className="action-move" aria-label="上移选中词汇" title="上移选中词汇"
+      disabled={selectedVocabularyIndex <= 0} onClick={() => vm.moveSelectedVocabulary(-1)}>
+      <VocabularyActionIcon name="up" />
+    </button>
+    <button className="action-move" aria-label="下移选中词汇" title="下移选中词汇"
       disabled={selectedVocabularyIndex < 0 || selectedVocabularyIndex === project.vocabulary.length - 1}
-      onClick={() => vm.moveSelectedVocabulary(1)}>↓</button>
-    <button aria-label="在选中词汇下方添加空白行" title="添加新空白词汇"
-      onClick={() => focusField(`vocabulary:${vm.insertVocabularyBelow()}:word`)}>+</button>
-    <button aria-label="删除选中词汇" title="删除选中词汇"
-      disabled={!selectedVocabulary} onClick={vm.deleteSelectedVocabulary}>×</button>
-    <button aria-label="刷新词汇高亮" title="更新正文高亮内容" onClick={vm.refreshHighlights}>↻</button>
+      onClick={() => vm.moveSelectedVocabulary(1)}>
+      <VocabularyActionIcon name="down" />
+    </button>
+    <button className="action-add" aria-label="在选中词汇下方添加空白行" title="添加新空白词汇"
+      onClick={() => focusField(`vocabulary:${vm.insertVocabularyBelow()}:word`)}>
+      <VocabularyActionIcon name="add" />
+    </button>
+    <button className="action-delete" aria-label="删除选中词汇" title="删除选中词汇"
+      disabled={!selectedVocabulary} onClick={vm.deleteSelectedVocabulary}>
+      <VocabularyActionIcon name="delete" />
+    </button>
   </div>;
 }
