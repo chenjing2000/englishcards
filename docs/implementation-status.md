@@ -286,3 +286,36 @@ New refinements requested:
 - The obsolete refresh button is removed and tests now verify automatic preview updates.
 - Splitter E2E now checks that pane width changes before pointer release.
 - Windows build, unit/E2E/.NET CI and WPF visual acceptance are pending for this Phase D.1 update.
+
+## 2026-11-09 — Phase D.2: unified vocabulary matching and live highlight editing
+
+### Confirmed behavior
+
+- Every vocabulary entry's `word` is a primary full-text match rule, even when `highlight` is empty.
+- Each item in `highlight` is an additional independent full-text match rule.
+- Highlight editor text is separated by English semicolons. Rules are trimmed, internal whitespace is normalized, empty entries are ignored, and case-insensitive duplicates (including the primary `word`) are omitted.
+- Highlight rules update on every input event. The editor preserves the user's in-progress semicolon/spacing text while the project model receives parsed rules.
+- Matching is case-insensitive and requires a complete English word or complete continuous phrase. Punctuation between phrase words is not treated as whitespace.
+- Overlap resolution is leftmost-first; matches sharing a start position prefer the longest range. Distinct matches are never merged into an invented larger phrase.
+- Renaming a dictionary headword removes redundant copies of the old and new headword from `highlight`; other variants remain unchanged.
+- Selecting a term already represented by either `word` or `highlight` does not create a duplicate vocabulary entry. New selected entries store the selected text in `word` and start with an empty `highlight` array.
+- The splitter is mouse-only. Keyboard Arrow/Home/End adjustment is removed.
+- Vocabulary action buttons are 21×21 px, with 15×15 px SVG icons, 7 px rounded corners, 4 px gaps and opaque, operation-specific backgrounds. The manual refresh action is removed.
+
+### Implementation
+
+- Updated the Article model's vocabulary insertion and highlight collection logic.
+- Added `parseHighlightInput` and `formatHighlightInput`, plus a local-draft Highlight textarea component.
+- Added a Highlight row between IPA and Meaning in each vocabulary editor.
+- Updated the view model to commit parsed highlight rules on every input event.
+- Updated the splitter and vocabulary action styling.
+- Updated unit/E2E coverage for word-only matching, semicolon parsing, case-insensitive de-duplication, phrase boundaries, overlap priority, JSON persistence, mouse-only resizing and the final button dimensions.
+- Added conditional WPF executable icon/resource configuration and window/taskbar icon loading for `EnglishCards/desktop/Assets/clover_icon.ico`.
+
+### Verification status
+
+- Frontend unit tests: passed.
+- TypeScript and Vite production build: passed.
+- The first updated Playwright run passed 61 tests; two remaining assertions were stale and have now been corrected (source capitalization and the final 21 px button size). A full rerun is pending.
+- Windows .NET tests and final WPF publish are pending the successful Playwright run.
+- The ICO source file is not yet committed in this branch. Copy the supplied `clover_icon(1).ico` to `EnglishCards/desktop/Assets/clover_icon.ico`; the csproj embeds it into the EXE and the WPF window loads the same resource for the taskbar/window icon. Until that file is present, the application retains the Windows fallback icon.
