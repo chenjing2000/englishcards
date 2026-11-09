@@ -231,3 +231,16 @@ The user completed the Windows WPF/WebView2 acceptance checklist successfully:
 - Replaced the skipped legacy right-editor highlight E2E cases with left-preview plus interaction coverage. Restored the notification timing test using the duplicate-selection warning. No E2E tests are skipped in the current CI run.
 - Windows CI run 42612499165: Vitest 50 passed; Vite build passed; Playwright 61 passed; .NET 17 checks passed; overall workflow succeeded.
 - Windows desktop interaction acceptance is pending. The user should verify actual selection/plus positioning, word/phrase insertion, duplicate warning, invalid selection suppression, Undo/Redo, and persistence/export in WPF/WebView2.
+
+## 2026-11-09 — Phase D interaction simplification
+
+This update supersedes the earlier Phase D interaction description where it conflicts:
+
+- Left preview is now a reading and vocabulary-extraction surface. Ordinary single-click and double-click do not navigate to or focus the right editor. Text selection and the contextual plus action remain available.
+- Right editor is independent; users enter fields by directly interacting with the right-side controls. Both sides stay synchronized through the shared Article v6 project state.
+- Undo/Redo controls, keyboard commands, and the ViewModel history stack have been removed. Automatic draft persistence, settings persistence, JSON save/import, and ZIP export remain.
+- Right-click is disabled across the React application: contextmenu, right-button pointerdown, and right-button mousedown are canceled in the capture phase. Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z are blocked; standard Ctrl+C/Ctrl+V/Ctrl+A shortcuts remain available.
+- WPF/WebView2 disables native default context menus and handles ContextMenuRequested at the host boundary.
+- E2E coverage is being migrated from preview-to-editor navigation and undo/redo to independent preview behavior, global input policy, and data persistence without history.
+- Companion images and the finalized four-button toolbar remain outside this change. No Article v6 schema or pagination changes are included.
+- Windows desktop acceptance must verify the WPF/WebView2 context menu is suppressed, right-click is inert in all editor surfaces, clipboard shortcuts still work, and preview selection-plus behavior remains unaffected.
