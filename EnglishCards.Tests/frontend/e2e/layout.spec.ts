@@ -12,6 +12,7 @@ test('splitter resizes both panes by dragging and keyboard without changing pagi
   await page.mouse.move(handle.x + handle.width / 2, handle.y + 100);
   await page.mouse.down();
   await page.mouse.move(handle.x + handle.width / 2 + 80, handle.y + 100, { steps: 6 });
+  await expect.poll(async () => (await editor.boundingBox())!.width).toBeCloseTo(before - 80, 0);
   await page.mouse.up();
   await expect.poll(async () => (await editor.boundingBox())!.width).toBeCloseTo(before - 80, 0);
   expect((await page.locator('.preview-panel').boundingBox())!.width).toBeCloseTo(previewBefore + 80, 0);
