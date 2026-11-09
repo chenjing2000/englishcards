@@ -92,7 +92,7 @@ function isWholeTermSelection(source: string, start: number, end: number): boole
 export function isValidVocabularySelection(source: string, start: number, end: number): boolean {
   if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > source.length) return false;
   const selected = source.slice(start, end);
-  return /[A-Za-z]/u.test(selected) && !/\\p{Script=Han}/u.test(selected)
+  return /[A-Za-z]/u.test(selected) && !/\p{Script=Han}/u.test(selected)
     && isWholeTermSelection(source, start, end);
 }
 
