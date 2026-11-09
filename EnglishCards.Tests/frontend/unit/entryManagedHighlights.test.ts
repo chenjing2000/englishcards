@@ -65,7 +65,7 @@ it('accepts only complete English selections without Han characters', () => {
   expect(isValidVocabularySelection(text, 7, 16)).toBe(true);
   expect(isValidVocabularySelection(text, 2, 5)).toBe(false);
   expect(isValidVocabularySelection(text, 17, 19)).toBe(false);
-  expect(isValidVocabularySelection(text, 0, 12)).toBe(false);
+  expect(isValidVocabularySelection(text, 0, 19)).toBe(false);
   expect(isValidVocabularySelection(text, 20, 25)).toBe(true);
 });
 
