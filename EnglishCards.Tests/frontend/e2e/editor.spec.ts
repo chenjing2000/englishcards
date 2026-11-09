@@ -1,6 +1,7 @@
 import { test, expect, type Page } from './fixtures';
 import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
 import { unzipSync } from 'fflate';
+import { selectPreviewText } from './preview-selection';
 
 async function ready(page: Page) { await expect(page.locator('[data-ready="true"]')).toBeVisible(); }
 async function load(page: Page, data: unknown) {
@@ -66,18 +67,19 @@ test('Article v6 continuous editing, portable JSON, history, draft recovery and 
   }
 });
 
-test.skip('vocabulary highlight rules apply to all occurrences and preview navigation', async ({ page }) => {
-  // Deferred to Phase D: adding a vocabulary highlight by selection now belongs to the left preview.\n  await page.goto('/'); await ready(page);
-  await load(page, { ...fixture, content: { paragraphs: [{ id: 'p001', text: 'word word' }] } });
-  const input = page.getByLabel('英文段落 1', { exact: true });
-  await input.evaluate((node: HTMLTextAreaElement) => { node.focus(); node.setSelectionRange(5, 9); });
-  await page.getByRole('button', { name: '高亮 / 取消高亮 1', exact: true }).click(); await ready(page);
-  await expect(page.locator('.card .hot')).toHaveText(['word', 'word']);
-  await input.evaluate((node: HTMLTextAreaElement) => { node.focus(); node.setSelectionRange(5, 9); });
-  await page.getByRole('button', { name: '高亮 / 取消高亮 1', exact: true }).click(); await ready(page);
-  await expect(page.locator('.card .hot')).toHaveCount(0);
-  await page.getByRole('button', { name: '词汇', exact: true }).click();
-  await expect(page.getByLabel('词头 1', { exact: true })).toHaveValue(fixture.vocabulary[0].word);
+test('preview selection plus adds a word and preview navigation still focuses the editor', async ({ page }) => {
+  await page.goto('/'); await ready(page);
+  const text = 'A runner crossed the field.';
+  await load(page, { ...fixture, content: { paragraphs: [{ id: 'p001', text }] }, vocabulary: [] });
+  expect(await selectPreviewText(page, 'p001', text, 'runner')).toBe(true);
+  const add = page.getByRole('button', { name: '将选中文字加入词汇' });
+  await expect(add).toBeVisible();
+  await add.click(); await ready(page);
+  expect(await page.evaluate(() => window.editor.project.vocabulary[0])).toMatchObject({
+    id: 'v001', word: 'runner', highlight: ['runner'],
+  });
+  await page.locator('.card .text-line.title').first().click();
+  await expect(page.getByLabel('英文标题', { exact: true })).toBeFocused();
 });
 
 test('failed import cannot re-enable export after pagination fails', async ({ page }) => {
