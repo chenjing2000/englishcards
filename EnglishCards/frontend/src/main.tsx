@@ -22,7 +22,10 @@ function installGlobalInputPolicy() {
     event.stopImmediatePropagation();
   };
   document.addEventListener('pointerdown', blockRightButton, true);
+  document.addEventListener('pointerup', blockRightButton, true);
   document.addEventListener('mousedown', blockRightButton, true);
+  document.addEventListener('mouseup', blockRightButton, true);
+  document.addEventListener('auxclick', blockRightButton, true);
 
   document.addEventListener('keydown', event => {
     if (!(event.ctrlKey || event.metaKey)) return;
