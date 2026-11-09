@@ -2,7 +2,7 @@ import { flushSync } from 'react-dom';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   appendParagraph, commitEntryHead, defaults, editParagraph, emptySense,
-  newId, removeEntrySense, removeVocabulary, renumberVocabulary, replaceArticleParagraphs, setArticleText,
+  addVocabulary, isValidVocabularySelection, newId, removeEntrySense, removeVocabulary, renumberVocabulary, replaceArticleParagraphs, setArticleText,
   splitSenseMeaning, toggleHighlight, vocabularyId, type EntryCollection,
   projectDocument, styleSchema, type RenderProject, type Project, type Sense, type Styles,
 } from '../models/project';
@@ -314,6 +314,30 @@ export function useEditorViewModel() {
       update(next);
     } catch (reason) { reportError('vocabulary', `加入词汇失败：${String(reason)}`); }
   }
+  function addVocabularyFromSelection(paragraphIdValue: string, start: number, end: number) {
+    const paragraph = project.content.paragraphs.find(item => item.id === paragraphIdValue);
+    if (!paragraph || !isValidVocabularySelection(paragraph.text, start, end)) {
+      showWarning('请选择同一自然段内完整的英文单词或词组。');
+      return;
+    }
+    const selected = paragraph.text.slice(start, end);
+    try {
+      const next = addVocabulary(project, selected);
+      if (next === project) {
+        showWarning('该词汇或词组已经存在于 Vocabulary 中，无需重复添加。');
+        return;
+      }
+      update(next);
+      const normalized = selected.trim().replace(/\\s+/gu, ' ').toLocaleLowerCase('en');
+      const entry = next.vocabulary.find(item =>
+        item.word.trim().replace(/\\s+/gu, ' ').toLocaleLowerCase('en') === normalized
+        || item.highlight.some(term => term.trim().replace(/\\s+/gu, ' ').toLocaleLowerCase('en') === normalized));
+      if (entry) setVocabularySelection(entry.id);
+      reportError('vocabulary', '');
+    } catch (reason) {
+      reportError('vocabulary', `加入词汇失败：${String(reason)}`);
+    }
+  }
   function refreshHighlights() {
     setRendered(null);
     setHighlightRefresh(current => current + 1);
@@ -453,7 +477,7 @@ export function useEditorViewModel() {
     canUndo: history.past.length > 0, canRedo: history.future.length > 0,
     layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
     undo, redo, open, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
-    highlightRange, refreshHighlights, commitHead, setSenseField, setVocabularyMeaning,
+    highlightRange, addVocabularyFromSelection, refreshHighlights, commitHead, setSenseField, setVocabularyMeaning,
     addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,
     selectedVocabulary, selectedVocabularyIndex, selectVocabulary, moveSelectedVocabulary,
     deleteSelectedVocabulary, insertVocabularyBelow,
