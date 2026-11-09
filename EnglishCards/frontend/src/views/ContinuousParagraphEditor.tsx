@@ -24,8 +24,8 @@ export default function ContinuousParagraphEditor({ label, paragraphs, onChange,
   const lastPublished = useRef(canonical);
   const textarea = useRef<HTMLTextAreaElement | null>(null);
 
-  // Keep blank lines while the user types. Only external changes (Undo/Redo
-  // or opening another article) replace the local editing buffer.
+  // Keep blank lines while the user types. Only external changes (opening or replacing
+  // an article) replace the local editing buffer.
   useEffect(() => {
     if (canonical !== lastPublished.current) {
       lastPublished.current = canonical;
