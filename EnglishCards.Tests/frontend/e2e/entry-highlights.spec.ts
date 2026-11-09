@@ -103,7 +103,7 @@ test('highlight editor updates independent rules live and preserves dictionary-w
   await page.reload();
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   await expect(page.getByLabel('高亮词汇 1', { exact: true })).toHaveValue('studies; studied; only that');
-  await expect(marks).toHaveText(['Study', 'studies', 'studied', 'only that']);
+  await expect(marks).toHaveText(['Study', 'studies', 'studied', 'Only that']);
 });
 
 test('preview plus rejects partial words, Chinese text, and selections crossing paragraph or card boundaries', async ({ page }) => {
