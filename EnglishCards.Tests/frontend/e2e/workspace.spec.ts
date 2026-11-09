@@ -9,7 +9,7 @@ test('workspace has compact sense controls and edge-aligned floating actions', a
     await page.getByRole('button', { name: tab, exact: true }).click();
     await expect(page.getByRole('checkbox')).toHaveCount(0);
   }
-  await page.getByRole('button', { name: '词汇', exact: true }).click();
+  
   const table = page.getByRole('table', { name: '词汇 1', exact: true });
   await expect(table.getByRole('rowheader')).toHaveText(['词汇', '音标', '含义', '例句', '翻译']);
   const add = page.getByRole('button', { name: '为词汇 1 添加义项', exact: true });
@@ -43,7 +43,7 @@ test('workspace has compact sense controls and edge-aligned floating actions', a
   expect(await notice.evaluate(node => node.getBoundingClientRect().height)).toBeLessThanOrEqual(120);
   await notice.getByRole('button', { name: '关闭', exact: true }).click();
   await expect.poll(() => notice.evaluate(node => node.getBoundingClientRect().height)).toBe(0);
-  await page.getByRole('button', { name: '样式', exact: true }).click();
+  await page.getByRole('button', { name: '打开设置', exact: true }).click();
   for (const input of await page.locator('.settings-table input').all()) await expect(input).toHaveCSS('text-align', 'center');
 });
 
@@ -153,7 +153,7 @@ test('desktop target layout places preview on the left at 55%, editor on the rig
 
 test('desktop style tables center values and place configuration actions below both tables', async ({ page }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await page.getByRole('button', { name: '样式', exact: true }).click();
+  await page.getByRole('button', { name: '打开设置', exact: true }).click();
   const tables = page.locator('.style-settings .settings-table');
   await expect(tables).toHaveCount(2);
   expect(await tables.evaluateAll(nodes => nodes.every(table => Array.from(table.querySelectorAll('tr')).every(row => {
