@@ -1,6 +1,6 @@
 # EnglishCards
 
-**EnglishCards** 是面向 Windows x64 的本地英语精读卡片编辑器，采用 **WPF (.NET 10) + WebView2 + React/TypeScript**。本仓库正在进行 Article v6 破坏性重构：v6 数据模型和 JSON/TXT 导入基础已经建立，当前桌面编辑器、WPF 桥接及 ZIP 导出仍处于从 v5 迁移到 v6 的阶段。不能将 v6 基础模块的存在理解为整个应用已经完成 v6 集成。
+**EnglishCards** 是面向 Windows x64 的本地英语精读卡片编辑器，采用 **WPF (.NET 10) + WebView2 + React/TypeScript**。本仓库正在进行 Article v6 破坏性重构：v6 数据模型、JSON/TXT 导入、WPF 严格校验及 ZIP 数据快照已接入生产代码。Phase C 已将右侧编辑界面整合为单页 Vocabulary → Content → Translation，并提供连续的正文/译文编辑框；左侧选区加号、配套图片和四按钮工具栏仍属于后续阶段。Phase C 的浏览器和单元自动化测试不等于真实 Windows 桌面视觉验收。
 
 ## 已确认的目标产品规则
 
