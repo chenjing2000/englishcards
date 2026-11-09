@@ -55,7 +55,6 @@ test('multiword vocabulary example editors resize with content and pane width', 
   await expect.poll(async () => (await example.boundingBox())!.height).toBeCloseTo(shortHeight, 0);
   await example.fill('A wrapping example with several words. '.repeat(15));
   const wideHeight = (await example.boundingBox())!.height;
-  const separator = page.getByRole('separator', { name: '调整编辑与预览宽度' });
   await dragSplitterToMax(page);
   await expect.poll(async () => (await example.boundingBox())!.height).toBeGreaterThan(wideHeight);
   await page.screenshot({ path: '.build/test-results/auto-height-vocabulary.png' });
