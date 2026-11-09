@@ -41,9 +41,17 @@ export default function ContinuousParagraphEditor({ label, paragraphs, onChange,
       node.style.height = `${Math.max(120, node.scrollHeight + 2)}px`;
     };
     fit();
-    const observer = new ResizeObserver(fit);
+    const workspace = node.closest<HTMLElement>('.workspace');
+    const observer = new ResizeObserver(() => {
+      if (workspace?.dataset.resizing !== 'true') fit();
+    });
+    const finishPaneResize = () => requestAnimationFrame(fit);
     observer.observe(node);
-    return () => observer.disconnect();
+    window.addEventListener('editor-pane-resize-end', finishPaneResize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('editor-pane-resize-end', finishPaneResize);
+    };
   }, [draft]);
 
   return <textarea
