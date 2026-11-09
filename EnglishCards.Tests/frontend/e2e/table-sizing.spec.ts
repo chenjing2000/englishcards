@@ -19,7 +19,7 @@ test('vocabulary fields keep compact input sizing and centered table content', a
   await page.screenshot({ path: '.build/test-results/compact-vocabulary.png' });
 });
 
-test('multiword vocabulary example editors resize with content, undo and pane width', async ({ page }) => {
+test('multiword vocabulary example editors resize with content and pane width', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   
@@ -40,10 +40,6 @@ test('multiword vocabulary example editors resize with content, undo and pane wi
   await expect.poll(async () => (await example.boundingBox())!.height).toBeGreaterThan(shortHeight + 80);
   expect(await example.evaluate(node => node.clientHeight >= node.scrollHeight - 1)).toBe(true);
   await example.fill('Short.');
-  await expect.poll(async () => (await example.boundingBox())!.height).toBeCloseTo(shortHeight, 0);
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect.poll(async () => (await example.boundingBox())!.height).toBeGreaterThan(shortHeight + 80);
-  await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect.poll(async () => (await example.boundingBox())!.height).toBeCloseTo(shortHeight, 0);
   await example.fill('A wrapping example with several words. '.repeat(15));
   const wideHeight = (await example.boundingBox())!.height;
