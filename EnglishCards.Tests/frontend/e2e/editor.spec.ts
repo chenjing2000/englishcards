@@ -11,17 +11,13 @@ async function load(page: Page, data: unknown) {
   await ready(page);
 }
 
-test('Article v6 continuous editing, portable JSON, history, draft recovery and strict imports', async ({ page }) => {
+test('Article v6 continuous editing, portable JSON, draft recovery and strict imports', async ({ page }) => {
   await page.goto('/'); await ready(page);
   const text = fixture.content.paragraphs.map(paragraph => paragraph.text).join('\n\n');
   const changed = text.replace('supposedly', 'reportedly and supposedly');
   const body = page.getByLabel('英文正文', { exact: true });
   await expect(body).toHaveValue(text);
   await body.fill(changed); await ready(page);
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(body).toHaveValue(text);
-  await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect(body).toHaveValue(changed);
 
   await page.getByLabel('词头 1', { exact: true }).fill('edited word');
   await page.getByLabel('词头 23', { exact: true }).click();
@@ -67,7 +63,7 @@ test('Article v6 continuous editing, portable JSON, history, draft recovery and 
   }
 });
 
-test('preview selection plus adds a word and preview navigation still focuses the editor', async ({ page }) => {
+test('preview selection plus adds vocabulary while ordinary preview clicks never focus editors', async ({ page }) => {
   await page.goto('/'); await ready(page);
   const text = 'A runner crossed the field.';
   await load(page, { ...fixture, content: { paragraphs: [{ id: 'p001', text }] }, vocabulary: [] });
@@ -78,8 +74,16 @@ test('preview selection plus adds a word and preview navigation still focuses th
   expect(await page.evaluate(() => window.editor.project.vocabulary[0])).toMatchObject({
     id: 'v001', word: 'runner', highlight: ['runner'],
   });
-  await page.locator('.card .text-line.title').first().click();
-  await expect(page.getByLabel('英文标题', { exact: true })).toBeFocused();
+
+  const title = page.getByLabel('英文标题', { exact: true });
+  const body = page.getByLabel('英文正文', { exact: true });
+  const translation = page.getByLabel('中文译文', { exact: true });
+  await page.locator('.card [data-kind="title"]').first().click();
+  await expect(title).not.toBeFocused();
+  await page.locator('.card [data-kind="article"]').first().click();
+  await expect(body).not.toBeFocused();
+  await page.locator('.card [data-kind="translation"]').first().click();
+  await expect(translation).not.toBeFocused();
 });
 
 test('failed import cannot re-enable export after pagination fails', async ({ page }) => {
