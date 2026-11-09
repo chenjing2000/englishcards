@@ -12,7 +12,7 @@ import SettingInput from './SettingInput';
 
 export default function EditorView() {
   const vm = useEditorViewModel();
-  const { project, warning, error, settingsReady, ready, exporting, layout, canUndo, canRedo, rejectedDraft } = vm;
+  const { project, warning, error, settingsReady, ready, exporting, layout, rejectedDraft } = vm;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsFile = useRef<HTMLInputElement>(null);
   const inputs = useRef(new Map<string, HTMLInputElement | HTMLTextAreaElement>());
@@ -27,40 +27,6 @@ export default function EditorView() {
     input?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     setFocusId('');
   }, [focusId, settingsOpen]);
-
-  function jump(event: React.MouseEvent) {
-    const selection = window.getSelection();
-    if (selection && !selection.isCollapsed && selection.toString()) return;
-    const target = event.target as HTMLElement;
-    const line = target.closest<HTMLElement>('[data-source]');
-    if (!line) return;
-    const source = line.dataset.source;
-    const kind = line.dataset.kind;
-    if (kind === 'title') {
-      setSettingsOpen(false);
-      setFocusId('project:title');
-    } else if (kind === 'article' || kind === 'translation') {
-      const section = kind === 'article' ? 'content' : 'translation';
-      const paragraphs = project[section].paragraphs;
-      const paragraphIndex = paragraphs.findIndex(item => item.id === source);
-      setSettingsOpen(false);
-      const id = `${section}:all`;
-      setFocusId(id);
-      if (paragraphIndex >= 0) {
-        // Focus the single editor without selecting or changing the article text.
-        requestAnimationFrame(() => {
-          const input = inputs.current.get(id) as HTMLTextAreaElement | undefined;
-          if (!input) return;
-          const position = paragraphs.slice(0, paragraphIndex).reduce((sum, item) => sum + item.text.length + 2, 0);
-          input.setSelectionRange(position, position);
-        });
-      }
-    } else if (kind === 'vocab' && source) {
-      vm.selectVocabulary(source);
-      setSettingsOpen(false);
-      setFocusId(`vocabulary:${target.closest<HTMLElement>('[data-edit]')?.dataset.edit ?? `${source}:word`}`);
-    }
-  }
 
   function field(label: string, value: string, onChange: (value: string) => void, id?: string) {
     return <label className="field" key={label}><span>{label}</span><AutoSizeTextarea label={label} value={value} inputRef={element => { if (id) registerInput(id, element); }} onChange={onChange} /></label>;
@@ -91,12 +57,7 @@ export default function EditorView() {
           {settingsOpen ? '返回编辑' : '设置'}
         </button>
       </div>
-      <div className="history-toolbar" inert={vm.opening}>
-        <button onClick={vm.undo} disabled={!canUndo}>Undo</button>
-        <button onClick={vm.redo} disabled={!canRedo}>Redo</button>
-        <span>支持最近 10 次修改</span>
-        {rejectedDraft && <button onClick={vm.downloadRejectedDraft}>下载原始草稿</button>}
-      </div>
+      {rejectedDraft && <div className="draft-recovery"><button type="button" onClick={vm.downloadRejectedDraft}>下载原始草稿</button></div>}
       <div inert={!settingsReady || vm.opening} className="fields phase-c-fields">
         {settingsOpen ? <div className="style-settings" aria-label="设置面板">
           {settingsTable('字号设置', fontFields)}{settingsTable('其余设置', otherFields)}
@@ -139,7 +100,7 @@ export default function EditorView() {
         {!settingsOpen && <VocabularyActions viewModel={vm} focusField={setFocusId} />}
         <NotificationBar error={error} warning={warning} closeError={vm.clearError} />
       </div>
-    </aside>} left={<CardPreview layout={layout} ready={ready} content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection} jump={jump}
+    </aside>} left={<CardPreview layout={layout} ready={ready} content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection}
       actions={<ProjectActions open={vm.open} save={vm.save} exportImages={vm.exportImages} ready={ready} exporting={exporting} />} />} />
   </div>;
 }
