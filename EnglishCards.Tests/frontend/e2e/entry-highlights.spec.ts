@@ -65,6 +65,47 @@ test('left-preview selections add English words and phrases to Article v6 vocabu
   expect(Object.keys(files).filter(name => name.endsWith('.png')).length).toBeGreaterThan(0);
 });
 
+
+test('highlight editor updates independent rules live and preserves dictionary-word matching', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  const text = 'Study studies studied. Only for today. Only that matters.';
+  const input = {
+    ...fixture,
+    content: { paragraphs: [{ id: 'p001', text }] },
+    vocabulary: [{
+      id: 'v001', word: 'study', ipa: '', highlight: [],
+      senses: [{ pos: 'n.', meaning: '学习', example: '', exampleTranslation: '' }],
+    }],
+  };
+  await loadArticle(page, input);
+  const marks = page.locator('.card .article .hot');
+  await expect(marks).toHaveText(['Study']);
+
+  const editor = page.getByLabel('高亮词汇 1', { exact: true });
+  await editor.fill('studies; studied; only fo; only that; STUDIES;;');
+  await expect(marks).toHaveText(['Study', 'studies', 'studied', 'only that']);
+  expect(await page.evaluate(() => window.editor.project.vocabulary[0].highlight))
+    .toEqual(['studies', 'studied', 'only fo', 'only that']);
+
+  await editor.fill('studies; studied; only for; only that');
+  await expect(marks).toHaveText(['Study', 'studies', 'studied', 'only for', 'only that']);
+  await editor.fill('studies; studied; only that');
+  await expect(marks).toHaveText(['Study', 'studies', 'studied', 'only that']);
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '保存 JSON', exact: true }).click();
+  const saved = JSON.parse(await readFile((await (await downloadPromise).path())!, 'utf8'));
+  expect(saved.vocabulary[0]).toMatchObject({
+    word: 'study',
+    highlight: ['studies', 'studied', 'only that'],
+  });
+  await page.reload();
+  await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  await expect(page.getByLabel('高亮词汇 1', { exact: true })).toHaveValue('studies; studied; only that');
+  await expect(marks).toHaveText(['Study', 'studies', 'studied', 'only that']);
+});
+
 test('preview plus rejects partial words, Chinese text, and selections crossing paragraph or card boundaries', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
