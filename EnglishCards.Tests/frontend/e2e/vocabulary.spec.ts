@@ -15,10 +15,15 @@ test('per-word vocabulary tables edits and moves the selected row, inserts below
   const table = page.locator('.vocabulary-editor');
   await expect(page.getByRole('table', { name: '词汇 1', exact: true }).getByRole('rowheader')).toHaveText(['词汇', '音标', '含义', '例句', '翻译']);
   const actions = page.getByRole('group', { name: '词汇行操作', exact: true });
-  await expect(actions.getByRole('button')).toHaveCount(5);
+  await expect(actions.getByRole('button')).toHaveCount(4);
+  await expect(page.getByRole('button', { name: '刷新词汇高亮', exact: true })).toHaveCount(0);
   const up = actions.getByRole('button', { name: '上移选中词汇', exact: true });
   const down = actions.getByRole('button', { name: '下移选中词汇', exact: true });
   const remove = actions.getByRole('button', { name: '删除选中词汇', exact: true });
+  await expect(up.locator('svg')).toBeVisible();
+  const actionSize = await up.boundingBox();
+  expect(actionSize?.width).toBe(25);
+  expect(actionSize?.height).toBe(25);
   const add = actions.getByRole('button', { name: '在选中词汇下方添加空白行', exact: true });
   const words = table.locator('input[aria-label^="词头 "]');
   const selected = page.locator('.vocabulary-entry.selected');
