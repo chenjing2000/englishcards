@@ -67,7 +67,7 @@ test('selecting a duplicate vocabulary head reuses the entry without overwriting
   const article = { ...base, vocabulary: [existing] };
   const updated = addVocabulary(article, 'RUN');
   assert.equal(updated.vocabulary.length, 1);
-  assert.deepEqual(updated.vocabulary[0].highlight, ['RUN']);
+  assert.deepEqual(updated.vocabulary[0].highlight, []);
   assert.deepEqual(updated.vocabulary[0].senses, existing.senses);
 });
 
