@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 type DragState = {
   pointerId: number;
@@ -43,22 +43,9 @@ export default function SplitPane({ left, right }: { left: ReactNode; right: Rea
     window.dispatchEvent(new Event('editor-pane-resize-end'));
   }
 
-  function keyResize(event: KeyboardEvent<HTMLDivElement>) {
-    switch (event.key) {
-      case 'ArrowLeft': resize(leftWidth - 24); break;
-      case 'ArrowRight': resize(leftWidth + 24); break;
-      case 'Home': resize(minimum); break;
-      case 'End': resize(maximum); break;
-      default: return;
-    }
-    event.preventDefault();
-  }
-
   return <div className="workspace" ref={workspace} style={{ gridTemplateColumns: `${leftWidth}px 8px minmax(0, 1fr)` }}>
     {left}
-    <div className="pane-splitter" role="separator" aria-label="调整编辑与预览宽度" aria-orientation="vertical" tabIndex={0}
-      aria-controls="editor-panel preview-panel" aria-valuemin={Math.round(minimum)} aria-valuemax={Math.round(maximum)} aria-valuenow={Math.round(leftWidth)}
-      onKeyDown={keyResize}
+    <div className="pane-splitter" role="separator" aria-label="调整编辑与预览宽度" aria-orientation="vertical"
       onPointerDown={event => {
         if (event.button !== 0) return;
         event.preventDefault();
