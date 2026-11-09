@@ -2,7 +2,7 @@ import { test, expect } from './fixtures';
 
 test('vocabulary fields keep compact input sizing and centered table content', async ({ page }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await page.getByRole('button', { name: '词汇', exact: true }).click();
+  
   const table = page.getByRole('table', { name: '词汇 1', exact: true });
   await expect(table.locator('textarea')).toHaveCount(3);
   const word = page.getByLabel('词头 1', { exact: true });
@@ -22,7 +22,7 @@ test('vocabulary fields keep compact input sizing and centered table content', a
 test('multiword vocabulary example editors resize with content, undo and pane width', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await page.getByRole('button', { name: '词汇', exact: true }).click();
+  
   await page.getByRole('button', { name: '在选中词汇下方添加空白行', exact: true }).click();
   const word = page.getByLabel('词头 2', { exact: true });
   await word.fill('take into account');
