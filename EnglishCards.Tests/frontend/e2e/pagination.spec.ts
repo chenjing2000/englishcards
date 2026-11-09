@@ -94,13 +94,13 @@ test('Article v6 draft survives a real Chromium process restart', async () => {
     let page = await context.newPage();
     await page.goto(test.info().project.use.baseURL!);
     await expect(page.locator('[data-ready="true"]')).toBeVisible();
-    await page.getByLabel('英文段落 2', { exact: true }).fill('Preserved across a browser restart.');
+    await page.getByLabel('英文正文', { exact: true }).fill('Preserved across a browser restart.');
     await expect(page.locator('[data-ready="true"]')).toBeVisible();
     await context.close();
     context = await chromium.launchPersistentContext(directory, { headless: true });
     page = await context.newPage();
     await page.goto(test.info().project.use.baseURL!);
-    await expect(page.getByLabel('英文段落 2', { exact: true })).toHaveValue('Preserved across a browser restart.');
+    await expect(page.getByLabel('英文正文', { exact: true })).toHaveValue('Preserved across a browser restart.');
     await expect(page.getByLabel('信息提示栏')).toHaveText('');
   } finally { await context.close(); }
 });
