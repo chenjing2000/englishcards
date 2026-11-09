@@ -1,6 +1,6 @@
 # EnglishCards
 
-**EnglishCards** 是面向 Windows x64 的本地英语精读卡片编辑器，采用 **WPF (.NET 10) + WebView2 + React/TypeScript**。本仓库正在进行 Article v6 破坏性重构：v6 数据模型、JSON/TXT 导入、WPF 严格校验及 ZIP 数据快照已接入生产代码。Phase C 已将右侧编辑界面整合为单页 Vocabulary → Content → Translation，并提供连续的正文/译文编辑框；左侧选区加号、配套图片和四按钮工具栏仍属于后续阶段。Phase C 的浏览器和单元自动化测试不等于真实 Windows 桌面视觉验收。
+**EnglishCards** 是面向 Windows x64 的本地英语精读卡片编辑器，采用 **WPF (.NET 10) + WebView2 + React/TypeScript**。Article v6 数据模型、JSON/TXT 导入、WPF 严格校验、连续编辑器和 ZIP 导出已接入生产代码。Phase D 已实现左侧预览选区加号；左侧普通点击不再导航到右侧编辑区，右侧只在用户主动操作编辑控件时获得焦点。Undo/Redo 已移除，整个应用界面禁用鼠标右键菜单；配套图片和最终四按钮工具栏仍属于后续阶段。
 
 ## 已确认的目标产品规则
 
@@ -12,6 +12,8 @@
 - JSON 优先识别；损坏、旧版本或结构不合法的 JSON 不得静默回退为 TXT。
 - 右侧编辑器最终采用单一 TabPage，顺序为 Vocabulary → Content → Translation；正文和译文各使用连续多段落编辑区域。
 - 生词只从左侧卡片预览选择；加号位于选区右下角。只允许同一自然段、同一张卡片内的选择；选区必须含英文字母且不得包含中文字符。
+- 左侧预览用于阅读与提取：普通单击、双击不触发右侧编辑器导航；右侧编辑区独立工作，两侧通过 Article 数据模型同步。
+- 不提供 Undo/Redo；Ctrl+Z、Ctrl+Y、Ctrl+Shift+Z 不执行撤销/重做。鼠标右键在 React 页面与 WPF/WebView2 宿主中均无操作；Ctrl+C、Ctrl+V、Ctrl+A 等正常键盘编辑操作保留。
 - 唯一正式用户导出为完整 ZIP，包含 `article.json` 和全部页面 PNG。
 - 保留 WPF + WebView2 + React 技术栈及 EXE 同级 `userdata/` 用户数据契约。
 
