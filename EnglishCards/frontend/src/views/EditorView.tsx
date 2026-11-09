@@ -29,6 +29,8 @@ export default function EditorView() {
   }, [focusId, settingsOpen]);
 
   function jump(event: React.MouseEvent) {
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed && selection.toString()) return;
     const target = event.target as HTMLElement;
     const line = target.closest<HTMLElement>('[data-source]');
     if (!line) return;
@@ -137,7 +139,7 @@ export default function EditorView() {
         {!settingsOpen && <VocabularyActions viewModel={vm} focusField={setFocusId} />}
         <NotificationBar error={error} warning={warning} closeError={vm.clearError} />
       </div>
-    </aside>} left={<CardPreview layout={layout} ready={ready} jump={jump}
+    </aside>} left={<CardPreview layout={layout} ready={ready} content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection} jump={jump}
       actions={<ProjectActions open={vm.open} save={vm.save} exportImages={vm.exportImages} ready={ready} exporting={exporting} />} />} />
   </div>;
 }
