@@ -131,7 +131,6 @@ test('Ctrl wheel preserves the pointed reading position and cards remain centere
 test('card width is constrained by the preview pane and a narrower pane permanently reduces zoom', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  const separator = page.getByRole('separator', { name: '调整编辑与预览宽度' });
   const preview = page.locator('.preview-scroll');
   const card = page.locator('.card').first();
   await dragSplitterToEdge(page, 'min');
