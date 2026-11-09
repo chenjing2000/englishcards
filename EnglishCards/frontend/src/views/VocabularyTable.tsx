@@ -18,6 +18,7 @@ export default function VocabularyTable({ viewModel: vm, registerInput }: Props)
         label={`${label} ${index + 1}`}
         value={entry.word}
         commit={value => vm.commitHead('vocabulary', entry.id, value)}
+        onDraftChange={value => vm.setWordPreview(entry.id, value)}
         inputRef={input => registerInput(`vocabulary:${entry.id}:word`, input)}
       />;
     }
