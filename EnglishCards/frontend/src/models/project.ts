@@ -88,6 +88,14 @@ function isWholeTermSelection(source: string, start: number, end: number): boole
   return termMatches(source, selected).some(match => match.start === first && match.end === last);
 }
 
+/** A preview selection must be a complete English word/phrase with no Han characters. */
+export function isValidVocabularySelection(source: string, start: number, end: number): boolean {
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > source.length) return false;
+  const selected = source.slice(start, end);
+  return /[A-Za-z]/u.test(selected) && !/\\p{Script=Han}/u.test(selected)
+    && isWholeTermSelection(source, start, end);
+}
+
 export function renumberVocabulary(entries: VocabularyItem[]): VocabularyItem[] {
   if (entries.length > MAX_VOCABULARY) {
     throw new ArticleValidationError('vocabulary', '最多允许 999 个词条');
@@ -167,7 +175,7 @@ export function toggleHighlight(article: Article, paragraphIdValue: string, star
   });
   if (removed) return { ...article, vocabulary };
 
-  if (!isWholeTermSelection(paragraph.text, start, end)) return article;
+  if (!isValidVocabularySelection(paragraph.text, start, end)) return article;
   return addVocabulary(article, paragraph.text.slice(start, end));
 }
 
