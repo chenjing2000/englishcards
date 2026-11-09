@@ -11,7 +11,7 @@ test('per-word vocabulary tables edits and moves the selected row, inserts below
   ] };
   await page.getByLabel('导入 Article JSON 或 TXT').setInputFiles({ name: 'table.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(project)) });
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await page.getByRole('button', { name: '词汇', exact: true }).click();
+  
   const table = page.locator('.vocabulary-editor');
   await expect(page.getByRole('table', { name: '词汇 1', exact: true }).getByRole('rowheader')).toHaveText(['词汇', '音标', '含义', '例句', '翻译']);
   const actions = page.getByRole('group', { name: '词汇行操作', exact: true });
@@ -58,7 +58,7 @@ test('per-word vocabulary tables edits and moves the selected row, inserts below
 
 test('table fields preserve part of speech, drafts and preview navigation', async ({ page }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await page.getByRole('button', { name: '词汇', exact: true }).click();
+  
   await page.getByLabel('音标 2', { exact: true }).fill('/changed/');
   await page.getByLabel('含义 2', { exact: true }).fill('n. 保留的含义');
   await page.getByLabel('含义 2', { exact: true }).press('Tab');
@@ -66,7 +66,7 @@ test('table fields preserve part of speech, drafts and preview navigation', asyn
   const snapshot = await page.evaluate(() => window.editor.project);
   expect(snapshot.vocabulary[1]).toMatchObject({ ipa: '/changed/', senses: [{ pos: 'n.', meaning: '保留的含义' }] });
   await page.reload(); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await page.getByRole('button', { name: '词汇', exact: true }).click();
+  
   await expect(page.getByLabel('音标 2', { exact: true })).toHaveValue('/changed/');
   await expect(page.getByLabel('含义 2', { exact: true })).toHaveValue('n. 保留的含义');
   await page.locator('.card [data-edit]').filter({ hasText: fixture.vocabulary[0].word }).first().click();
