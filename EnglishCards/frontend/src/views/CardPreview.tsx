@@ -168,6 +168,7 @@ export default function CardPreview({ layout, ready, content, onAddSelection, ju
   return <section className="preview-panel" id="preview-panel" aria-label="分页预览">
     <div className="preview-scroll" ref={scroll} tabIndex={0} aria-label="卡片浏览区域"
       onPointerDown={event => { if (event.button === 0) event.currentTarget.focus({ preventScroll: true }); }}
+      onPointerUp={() => requestAnimationFrame(updateSelection)}
       onMouseUp={() => requestAnimationFrame(updateSelection)}
       onKeyUp={() => requestAnimationFrame(updateSelection)}
       onScroll={() => setActiveSelection(null)}>
