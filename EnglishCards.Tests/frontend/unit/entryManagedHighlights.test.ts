@@ -11,7 +11,7 @@ it('stores manually selected surface forms in the unified vocabulary list', () =
   expect(result.vocabulary[0]).toMatchObject({
     id: 'v001', word: 'ran', ipa: '',
     senses: [{ pos: '', meaning: '', example: '', exampleTranslation: '' }],
-    highlight: ['ran'],
+    highlight: [],
   });
   expect(collectHighlights(result).map(mark => mark.quote)).toEqual(['ran', 'ran']);
   result = toggleHighlight(result, 'p001', 23, 31);
@@ -21,13 +21,17 @@ it('stores manually selected surface forms in the unified vocabulary list', () =
   expect(parseProject(JSON.parse(JSON.stringify(result)))).toEqual(result);
 });
 
-it('cancels a variant everywhere while retaining the vocabulary entry and immutable history', () => {
-  const added = toggleHighlight(article(), 'p001', 5, 8);
-  const removed = toggleHighlight(added, 'p001', 13, 16);
-  expect(removed.vocabulary[0].word).toBe('ran');
+it('cancels an explicit variant everywhere while retaining the dictionary headword', () => {
+  const input = article('They ran and ran.');
+  input.vocabulary = [{
+    id: 'v001', word: 'run', ipa: '', highlight: ['ran'],
+    senses: [{ pos: 'v.', meaning: '跑', example: '', exampleTranslation: '' }],
+  }];
+  const removed = toggleHighlight(input, 'p001', 5, 8);
+  expect(removed.vocabulary[0].word).toBe('run');
   expect(removed.vocabulary[0].highlight).toEqual([]);
   expect(collectHighlights(removed)).toEqual([]);
-  expect(added.vocabulary[0].highlight).toEqual(['ran']);
+  expect(input.vocabulary[0].highlight).toEqual(['ran']);
 });
 
 it('uses matching dictionary entries and cancels duplicate or overlapping rules in one collection', () => {
@@ -35,7 +39,8 @@ it('uses matching dictionary entries and cancels duplicate or overlapping rules 
   input.vocabulary = [{ id: 'v001', word: 'run', ipa: '', senses: [{ pos: 'v.', meaning: '跑', example: '', exampleTranslation: '' }], highlight: [] }];
   const added = toggleHighlight(input, 'p001', 0, 3);
   expect(added.vocabulary).toHaveLength(1);
-  expect(added.vocabulary[0].highlight).toEqual(['RUN']);
+  expect(added).toBe(input);
+  expect(added.vocabulary[0].highlight).toEqual([]);
   added.vocabulary.push({ id: 'v002', word: 'take off', senses: [{ pos: '', meaning: '', example: '', exampleTranslation: '' }], highlight: ['take off'] });
   added.vocabulary.push({ id: 'v003', word: 'off', ipa: '', senses: [{ pos: '', meaning: '', example: '', exampleTranslation: '' }], highlight: ['off'] });
   const removed = toggleHighlight(added, 'p001', 13, 16);
@@ -57,7 +62,7 @@ it('replaces the old head highlight on rename while preserving independent varia
     senses: [{ pos: '', meaning: '', example: '', exampleTranslation: '' }],
   }];
   const renamed = commitEntryHead(input, 'vocabulary', 'v001', 'only');
-  expect(renamed.vocabulary[0]).toMatchObject({ word: 'only', highlight: ['solely for', 'only'] });
+  expect(renamed.vocabulary[0]).toMatchObject({ word: 'only', highlight: ['solely for'] });
   expect(collectHighlights(renamed).map(mark => mark.quote)).toEqual(['only', 'solely for']);
   expect(collectHighlights(input).map(mark => mark.quote)).toEqual(['only for', 'solely for']);
   const cleared = commitEntryHead(renamed, 'vocabulary', 'v001', '');
@@ -68,7 +73,7 @@ it('rejects partial-word selections', () => {
   const input = article('runner run');
   expect(toggleHighlight(input, 'p001', 0, 3)).toBe(input);
   const added = toggleHighlight(input, 'p001', 0, 7);
-  expect(added.vocabulary[0].highlight).toEqual(['runner']);
+  expect(added.vocabulary[0].highlight).toEqual([]);
   expect(collectHighlights(added).map(mark => mark.quote)).toEqual(['runner']);
 });
 
@@ -92,5 +97,5 @@ it('does not create a second vocabulary entry for an existing highlighted varian
   expect(addVocabulary(input, 'runs')).toBe(input);
   const added = addVocabulary(input, 'running');
   expect(added.vocabulary).toHaveLength(2);
-  expect(added.vocabulary[1]).toMatchObject({ id: 'v002', word: 'running', highlight: ['running'] });
+  expect(added.vocabulary[1]).toMatchObject({ id: 'v002', word: 'running', highlight: [] });
 });
