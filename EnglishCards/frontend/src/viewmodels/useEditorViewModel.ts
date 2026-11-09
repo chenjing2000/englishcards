@@ -47,7 +47,6 @@ export function useEditorViewModel() {
   }, []);
   const [lastFile, setLastFile] = useState('');
   const [rendered, setRendered] = useState<{ project: RenderProject; layout: Layout } | null>(null);
-  const [highlightRefresh, setHighlightRefresh] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [opening, setOpening] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -207,7 +206,7 @@ export function useEditorViewModel() {
       });
     }, 120);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [project, highlightRefresh, settingsReady]);
+  }, [project, settingsReady]);
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
@@ -321,11 +320,6 @@ export function useEditorViewModel() {
       reportError('vocabulary', `加入词汇失败：${String(reason)}`);
     }
   }
-  function refreshHighlights() {
-    setRendered(null);
-    setHighlightRefresh(current => current + 1);
-  }
-
   function reorder(_key: EntryCollection, index: number, direction: number) {
     update(current => {
       const list = [...current.vocabulary];
@@ -459,7 +453,7 @@ export function useEditorViewModel() {
     project, warning, error, settingsReady, ready, exporting, opening, desktop, closing,
     layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
     open, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
-    highlightRange, addVocabularyFromSelection, refreshHighlights, commitHead, setSenseField, setVocabularyMeaning,
+    highlightRange, addVocabularyFromSelection, commitHead, setSenseField, setVocabularyMeaning,
     addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,
     selectedVocabulary, selectedVocabularyIndex, selectVocabulary, moveSelectedVocabulary,
     deleteSelectedVocabulary, insertVocabularyBelow,
