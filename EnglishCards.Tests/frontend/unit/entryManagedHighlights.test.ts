@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import fixture from '@fixtures/projects/brainco/project.json';
-import { collectHighlights, parseProject, toggleHighlight, editParagraph } from '@frontend/models/project';
+import { addVocabulary, collectHighlights, isValidVocabularySelection, parseProject, toggleHighlight, editParagraph } from '@frontend/models/project';
 
 function article(text = 'They ran and ran. They took off.') {
   return parseProject({ ...fixture, content: { paragraphs: [{ id: 'p001', text }] }, vocabulary: [] });
@@ -56,4 +56,27 @@ it('rejects partial-word selections', () => {
   const added = toggleHighlight(input, 'p001', 0, 7);
   expect(added.vocabulary[0].highlight).toEqual(['runner']);
   expect(collectHighlights(added).map(mark => mark.quote)).toEqual(['runner']);
+});
+
+
+it('accepts only complete English selections without Han characters', () => {
+  const text = 'runner takes off 中文 words';
+  expect(isValidVocabularySelection(text, 0, 6)).toBe(true);
+  expect(isValidVocabularySelection(text, 7, 16)).toBe(true);
+  expect(isValidVocabularySelection(text, 2, 5)).toBe(false);
+  expect(isValidVocabularySelection(text, 17, 19)).toBe(false);
+  expect(isValidVocabularySelection(text, 0, 12)).toBe(false);
+  expect(isValidVocabularySelection(text, 20, 25)).toBe(true);
+});
+
+it('does not create a second vocabulary entry for an existing highlighted variant', () => {
+  const input = article('run runs');
+  input.vocabulary = [{
+    id: 'v001', word: 'run', ipa: '', highlight: ['run', 'runs'],
+    senses: [{ pos: 'v.', meaning: '跑', example: '', exampleTranslation: '' }],
+  }];
+  expect(addVocabulary(input, 'runs')).toBe(input);
+  const added = addVocabulary(input, 'running');
+  expect(added.vocabulary).toHaveLength(2);
+  expect(added.vocabulary[1]).toMatchObject({ id: 'v002', word: 'running', highlight: ['running'] });
 });
