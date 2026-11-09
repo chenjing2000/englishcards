@@ -52,7 +52,7 @@ test('Article v6 continuous editing, portable JSON, history, draft recovery and 
   await expect(page.getByLabel('英文正文')).toHaveValue(changed);
 
   const alert = page.getByRole('alert');
-  for (const invalid of ['{', JSON.stringify({ ...fixture, schemaVersion: 5 }), JSON.stringify({ ...fixture, title: null }), JSON.stringify({ ...fixture, title: '\\uFFFD' })]) {
+  for (const invalid of ['{', JSON.stringify({ ...fixture, schemaVersion: 5 }), JSON.stringify({ ...fixture, title: null }), JSON.stringify({ ...fixture, title: '\uFFFD' })]) {
     if (await alert.count()) {
       await alert.getByRole('button', { name: '关闭', exact: true }).click();
       await expect(alert).toHaveCount(0);
