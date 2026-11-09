@@ -41,7 +41,12 @@ public partial class MainWindow : Window
             exporter = new ZipExportService(this, content, userData);
             try
             {
-                await content.LoadAsync(Editor, "index.html", ct, web => new EditorBridge(this, web, userData, exporter).Attach());
+                await content.LoadAsync(Editor, "index.html", ct, web =>
+                {
+                    web.Settings.AreDefaultContextMenusEnabled = false;
+                    web.ContextMenuRequested += (_, args) => args.Handled = true;
+                    new EditorBridge(this, web, userData, exporter).Attach();
+                });
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {
