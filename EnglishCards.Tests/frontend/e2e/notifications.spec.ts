@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures';
 import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
+import { defaults } from '@frontend/models/settings';
 import { selectPreviewText } from './preview-selection';
 
 test('settings use keyboard text entry while mouse wheels and arrow keys do not change values', async ({ page, request }) => {
@@ -20,12 +21,10 @@ test('settings use keyboard text entry while mouse wheels and arrow keys do not 
   await gap.fill('0');
   await gap.fill('');
   await expect(page.getByRole('alert')).toContainText('Error:');
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(gap).toHaveValue('0');
+  await page.getByRole('button', { name: '默认配置', exact: true }).click();
+  await expect.poll(async () => (await (await request.get('/api/settings')).json()).settings).toEqual(defaults);
   await expect(page.getByRole('alert')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect(gap).toHaveValue('');
-  await expect(page.getByRole('alert')).toContainText('Error:');
+  await expect(gap).toHaveValue(String(defaults.paragraphGap));
 });
 
 test('duplicate preview selections show timed warnings while import errors remain until closed', async ({ page }) => {
