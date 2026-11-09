@@ -89,9 +89,9 @@ test('highlight editor updates independent rules live and preserves dictionary-w
     .toEqual(['studies', 'studied', 'only fo', 'only that']);
 
   await editor.fill('studies; studied; only for; only that');
-  await expect(marks).toHaveText(['Study', 'studies', 'studied', 'only for', 'only that']);
+  await expect(marks).toHaveText(['Study', 'studies', 'studied', 'Only for', 'Only that']);
   await editor.fill('studies; studied; only that');
-  await expect(marks).toHaveText(['Study', 'studies', 'studied', 'only that']);
+  await expect(marks).toHaveText(['Study', 'studies', 'studied', 'Only that']);
 
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '保存 JSON', exact: true }).click();
