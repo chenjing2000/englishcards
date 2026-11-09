@@ -47,6 +47,27 @@ test('splitter resizes both panes by mouse without changing pagination or respon
   await page.screenshot({ path: '.build/test-results/resizable-layout.png' });
 });
 
+test('splitter remains draggable beside an active vocabulary editor field', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  const word = page.getByLabel('词头 1', { exact: true });
+  await word.focus();
+
+  const editor = page.locator('.editor-panel');
+  const separator = page.getByRole('separator', { name: '调整编辑与预览宽度' });
+  const before = (await editor.boundingBox())!.width;
+  const handle = (await separator.boundingBox())!;
+  const startX = handle.x + handle.width + 4; // Exercise the expanded hit target on the editor side.
+  const y = handle.y + handle.height / 2;
+  await page.mouse.move(startX, y);
+  await page.mouse.down();
+  await page.mouse.move(startX + 80, y, { steps: 12 });
+  await page.mouse.up();
+
+  await expect.poll(async () => (await editor.boundingBox())!.width).toBeCloseTo(before - 80, 0);
+  await expect(word).toHaveValue('study');
+});
+
 test('vocabulary preview is rendered as one full-width vertical list', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
