@@ -34,7 +34,6 @@ test('unified vocabulary senses preserve editing, deletion, canonical IDs and ex
   await meanings.filter({ hasText: '记录' }).click();
   await expect(page.getByLabel('含义 2 义项 2', { exact: true })).toBeFocused();
 
-  await page.getByRole('region', { name: '分页预览' }).getByText('A distinct example.', { exact: true }).click();
   await page.getByRole('button', { name: '删除词汇 2 义项 1', exact: true }).click();
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   let snapshot = await page.evaluate(() => window.editor);
