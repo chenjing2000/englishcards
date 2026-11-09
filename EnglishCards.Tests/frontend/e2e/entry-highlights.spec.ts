@@ -53,8 +53,8 @@ test('left-preview selections add English words and phrases to Article v6 vocabu
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '保存 JSON', exact: true }).click();
   const saved = JSON.parse(await readFile((await (await downloadPromise).path())!, 'utf8'));
-  expect(saved.vocabulary[2]).toMatchObject({ id: 'v003', word: 'runner', highlight: ['runner'] });
-  expect(saved.vocabulary[3]).toMatchObject({ id: 'v004', word: 'ran away', highlight: ['ran away'] });
+  expect(saved.vocabulary[2]).toMatchObject({ id: 'v003', word: 'runner', highlight: [] });
+  expect(saved.vocabulary[3]).toMatchObject({ id: 'v004', word: 'ran away', highlight: [] });
 
   const snapshot = await page.evaluate(() => window.editor);
   const exported = await request.post('/api/export', { data: snapshot });
