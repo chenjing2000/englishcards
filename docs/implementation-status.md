@@ -195,3 +195,14 @@ A direct reinspection corrected the earlier migration audit: the supplied Phase 
 This patch adds `ArticleContractValidator` to repeat strict Article v6 validation at the WPF trust boundary. It is invoked for standalone project saves, ZIP export requests, and validation of the exported `article.json`. The .NET test harness now covers invalid schema versions, legacy fields, noncanonical IDs, duplicate vocabulary, paragraph overflow and malformed exported Article structure.
 
 The remaining separate tabs, toolbar, single-column editor, companion image and other approved UI changes remain scheduled for subsequent phases. No UI changes are claimed in this phase.
+
+## 2026-11-09 — Phase C: unified Article editor
+
+- Replaced the old 原文/词汇/译文/样式 tabs with a single scrolling editor: Vocabulary → Content → Translation.
+- Content and Translation each use one continuous textarea, separated into natural paragraphs by blank lines. The input buffer retains unfinished line breaks while editing; successful changes are parsed into canonical Article v6 paragraphs and IDs.
+- Title and IdentityTag remain separate editable fields immediately before Content.
+- Settings remain accessible via a temporary standalone Settings button; the finalized upper-right gear plus four-button toolbar are deferred to the approved later toolbar phase.
+- Removed the right-side paragraph-by-paragraph editor and highlight buttons. Preview selection-plus interaction is explicitly deferred to Phase D; it has not been implemented in Phase C.
+- Preview-to-editor click navigation, vocabulary editing, undo/redo, JSON saving, drafts and ZIP data model remain wired to Article v6.
+- Added Phase C E2E coverage for section order, continuous paragraphs, IDs, Undo/Redo and settings access. Three obsolete tests dependent on selection-to-highlight buttons are marked skipped until the left-preview interaction replaces them in Phase D. They must be re-enabled or replaced with equivalent coverage at that time.
+- Windows CI run 42607275999: Vitest 48 passed, Vite build passed, Playwright 57 passed / 3 skipped, .NET test step passed. Real WPF/WebView2 visual verification and Windows publish smoke test are still pending.
