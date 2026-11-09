@@ -2,7 +2,7 @@ import { flushSync } from 'react-dom';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   appendParagraph, commitEntryHead, defaults, editParagraph, emptySense,
-  newId, removeEntrySense, removeVocabulary, renumberVocabulary, setArticleText,
+  newId, removeEntrySense, removeVocabulary, renumberVocabulary, replaceArticleParagraphs, setArticleText,
   splitSenseMeaning, toggleHighlight, vocabularyId, type EntryCollection,
   projectDocument, styleSchema, type RenderProject, type Project, type Sense, type Styles,
 } from '../models/project';
@@ -287,6 +287,17 @@ export function useEditorViewModel() {
   function setParagraphText(key: ParagraphCollection, id: string, text: string) {
     update(current => editParagraph(current, id, text, key));
   }
+  function setContinuousParagraphText(key: ParagraphCollection, value: string): boolean {
+    try {
+      const next = replaceArticleParagraphs(project, key, value);
+      update(next);
+      reportError('paragraph', '');
+      return true;
+    } catch (reason) {
+      reportError('paragraph', `无法更新段落：${String(reason)}`);
+      return false;
+    }
+  }
   function addParagraph(key: ParagraphCollection) {
     try {
       update(current => appendParagraph(current, key));
@@ -441,7 +452,7 @@ export function useEditorViewModel() {
     project, warning, error, settingsReady, ready, exporting, opening, desktop, closing,
     canUndo: history.past.length > 0, canRedo: history.future.length > 0,
     layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
-    undo, redo, open, save, exportImages, setProjectText, setParagraphText, addParagraph,
+    undo, redo, open, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
     highlightRange, refreshHighlights, commitHead, setSenseField, setVocabularyMeaning,
     addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,
     selectedVocabulary, selectedVocabularyIndex, selectVocabulary, moveSelectedVocabulary,
