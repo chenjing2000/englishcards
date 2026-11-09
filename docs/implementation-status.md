@@ -244,3 +244,16 @@ This update supersedes the earlier Phase D interaction description where it conf
 - E2E coverage is being migrated from preview-to-editor navigation and undo/redo to independent preview behavior, global input policy, and data persistence without history.
 - Companion images and the finalized four-button toolbar remain outside this change. No Article v6 schema or pagination changes are included.
 - Windows desktop acceptance must verify the WPF/WebView2 context menu is suppressed, right-click is inert in all editor surfaces, clipboard shortcuts still work, and preview selection-plus behavior remains unaffected.
+
+### Phase D interaction cleanup — CI verification (2026-11-09)
+
+- The first regression run identified two stale E2E expectations: the removed history toolbar was still asserted in desktop-project-io, and senses-navigation still expected preview clicks to focus the editor. Both tests were corrected to assert the new product behavior; no production workaround was added.
+- Final Windows GitHub Actions run 42620924667 succeeded on commit f801d8670b49dacb775af0984fcd03b6a674a4d3:
+  - Vitest: 50 passed across 10 test files.
+  - React/Vite production build: passed.
+  - Playwright: 61 passed, 0 skipped.
+  - Windows .NET desktop tests: 17 passed.
+- Added global capture-phase suppression for contextmenu, right-button pointerdown/pointerup, mousedown/mouseup and auxclick. Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z are canceled; standard clipboard shortcuts remain untouched.
+- WPF host disables WebView2 default context menus and handles ContextMenuRequested. The WPF main-window hook also suppresses the native title-bar/window-chrome context menu.
+- Windows native shell file-picker dialogs remain OS-owned; this change does not attempt to modify Explorer context menus inside those system dialogs.
+- Automated CI is green. Real WPF/WebView2 desktop acceptance is still pending; the user should verify the visible editor, right-click behavior (including the main window title bar), selection-plus, clipboard shortcuts, persistence and ZIP export before Phase D is accepted.
