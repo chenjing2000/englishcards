@@ -1,7 +1,7 @@
 import { flushSync } from 'react-dom';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
-  appendParagraph, commitEntryHead, defaults, editParagraph, emptySense,
+  appendParagraph, commitEntryHead, defaults, editParagraph, emptySense, parseHighlightInput,
   addVocabulary, isValidVocabularySelection, newId, removeEntrySense, removeVocabulary, renumberVocabulary, replaceArticleParagraphs, setArticleText,
   splitSenseMeaning, toggleHighlight, vocabularyId, type EntryCollection,
   projectDocument, styleSchema, type RenderProject, type Project, type Sense, type Styles,
@@ -339,6 +339,15 @@ export function useEditorViewModel() {
       vocabulary: current.vocabulary.map(item => item.id === id ? { ...item, [property]: value } : item),
     }));
   }
+
+  function setEntryHighlights(id: string, value: string) {
+    update(current => ({
+      ...current,
+      vocabulary: current.vocabulary.map(item => item.id === id
+        ? { ...item, highlight: parseHighlightInput(value, item.word) }
+        : item),
+    }));
+  }
   function commitHead(_key: EntryCollection, id: string, value: string) {
     try {
       const next = commitEntryHead(project, 'vocabulary', id, value);
@@ -453,7 +462,7 @@ export function useEditorViewModel() {
     project, warning, error, settingsReady, ready, exporting, opening, desktop, closing,
     layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
     open, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
-    highlightRange, addVocabularyFromSelection, commitHead, setSenseField, setVocabularyMeaning,
+    highlightRange, addVocabularyFromSelection, commitHead, setEntryHighlights, setSenseField, setVocabularyMeaning,
     addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,
     selectedVocabulary, selectedVocabularyIndex, selectVocabulary, moveSelectedVocabulary,
     deleteSelectedVocabulary, insertVocabularyBelow,
