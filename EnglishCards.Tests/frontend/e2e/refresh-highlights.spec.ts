@@ -2,8 +2,9 @@ import { test, expect } from './fixtures';
 import { readFile } from 'node:fs/promises';
 import { unzipSync, strFromU8 } from 'fflate';
 import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
+import { selectPreviewText } from './preview-selection';
 
-test('unified vocabulary entries retain variants, paired senses and refresh behavior', async ({ page, request }) => {
+test('unified vocabulary entries retain variants, paired senses and automatic highlight updates', async ({ page, request }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
   const input = {
     ...fixture,
@@ -22,11 +23,8 @@ test('unified vocabulary entries retain variants, paired senses and refresh beha
   const marks = page.locator('.article .hot');
   await expect(marks).toHaveText(['ran', 'took off', 'take off']);
   
-  const refresh = page.getByRole('button', { name: '刷新词汇高亮', exact: true });
   const add = page.getByRole('button', { name: '在选中词汇下方添加空白行', exact: true });
-  const before = await page.evaluate(() => window.editor.project);
-  await refresh.click(); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  expect(await page.evaluate(() => window.editor.project)).toEqual(before);
+  await expect(page.getByRole('button', { name: '刷新词汇高亮', exact: true })).toHaveCount(0);
   await expect(marks).toHaveText(['ran', 'took off', 'take off']);
 
   await add.click();
@@ -38,7 +36,7 @@ test('unified vocabulary entries retain variants, paired senses and refresh beha
   await page.getByLabel('含义 2 义项 2', { exact: true }).fill('v. 录制');
   await page.getByLabel('词汇例句 2 义项 2', { exact: true }).fill('They recorded it.');
   await page.getByLabel('词汇翻译 2 义项 2', { exact: true }).fill('他们录制了它。');
-  await refresh.click(); await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  await expect(page.locator('[data-ready="true"]')).toBeVisible();
   await expect(marks).toHaveText(['ran', 'record', 'took off', 'take off']);
   await expect(page.getByLabel('信息提示栏')).toHaveText('');
 
@@ -70,28 +68,33 @@ test('unified vocabulary entries retain variants, paired senses and refresh beha
   await page.screenshot({ path: '.build/test-results/multiple-senses.png' });
 });
 
-test('import waits for file reading and refreshing unchanged rules does not mutate Article data', async ({ page }) => {
-  await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await page.evaluate(() => {
-    const read = File.prototype.text;
-    File.prototype.text = async function () {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return read.call(this);
-    };
-  });
-  const input = { ...fixture, content: { paragraphs: [{ id: 'p001', text: 'No active rules.' }] }, vocabulary: [] };
-  await page.getByLabel('导入 Article JSON 或 TXT').setInputFiles({
-    name: 'slow.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(input)),
-  });
-  await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toBeDisabled();
+test('renaming a vocabulary head removes its obsolete phrase highlight automatically', async ({ page }) => {
+  await page.goto('/');
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await expect(page.getByLabel('英文正文', { exact: true })).toHaveValue('No active rules.');
-  const imported = await page.evaluate(() => window.editor.project);
-  
-  for (let i = 0; i < 2; i++) {
-    await page.getByRole('button', { name: '刷新词汇高亮', exact: true }).click();
-    await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  }
-  await expect(page.getByLabel('信息提示栏')).toHaveText('');
-  expect(await page.evaluate(() => window.editor.project)).toEqual(imported);
+  const text = 'This is only for testing. It is only for demonstration.';
+  const input = { ...fixture, content: { paragraphs: [{ id: 'p001', text }] }, vocabulary: [] };
+  await page.getByLabel('导入 Article JSON 或 TXT').setInputFiles({
+    name: 'head-rename.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(input)),
+  });
+  await expect(page.locator('[data-ready="true"]')).toBeVisible();
+
+  expect(await selectPreviewText(page, 'p001', text, 'only for')).toBe(true);
+  await page.getByRole('button', { name: '将选中文字加入词汇', exact: true }).click();
+  const marks = page.locator('.card .article .hot');
+  await expect(marks).toHaveText(['only for', 'only for']);
+  await expect(page.getByLabel('词头 1', { exact: true })).toHaveValue('only for');
+
+  await page.getByLabel('词头 1', { exact: true }).fill('only');
+  await page.getByLabel('词头 1', { exact: true }).press('Enter');
+  await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  await expect(marks).toHaveText(['only', 'only']);
+  expect(await page.evaluate(() => window.editor.project.vocabulary[0])).toMatchObject({
+    word: 'only',
+    highlight: ['only'],
+  });
+  await expect(page.getByRole('button', { name: '刷新词汇高亮', exact: true })).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  await expect(marks).toHaveText(['only', 'only']);
 });
