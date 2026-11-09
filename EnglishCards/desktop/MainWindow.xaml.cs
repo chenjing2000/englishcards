@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 
@@ -18,7 +19,28 @@ public partial class MainWindow : Window
     private bool preparingClose;
     private bool allowClose;
     private HwndSource? windowSource;
-    public MainWindow() => InitializeComponent();
+    public MainWindow()
+    {
+        InitializeComponent();
+        ApplyWindowIcon();
+    }
+
+    private void ApplyWindowIcon()
+    {
+        try
+        {
+            var resource = Application.GetResourceStream(new Uri(
+                "pack://application:,,,/EnglishCards;component/Assets/clover_icon.ico", UriKind.Absolute));
+            if (resource is null) return;
+            using (resource.Stream)
+                Icon = BitmapFrame.Create(resource.Stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
+        }
+        catch (IOException error)
+        {
+            // The source icon is supplied as a separate project asset; retain the Windows fallback until it is present.
+            Trace.TraceWarning("EnglishCards application icon could not be loaded: {0}", error);
+        }
+    }
 
     protected override void OnSourceInitialized(EventArgs e)
     {
