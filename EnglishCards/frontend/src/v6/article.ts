@@ -135,9 +135,11 @@ export function addVocabulary(article: Article, selected: string): Article {
   const word = selected.trim().replace(/\s+/gu, ' ');
   if (!word) return article;
   const normalized = normalizeVocabulary(word);
+  // A selected surface form may already be attached to another dictionary headword.
+  // Treat it as existing vocabulary rather than creating a duplicate entry.
+  if (article.vocabulary.some(item => item.highlight.some(term => normalizeVocabulary(term) === normalized))) return article;
   const existing = article.vocabulary.find(item => normalizeVocabulary(item.word) === normalized);
   if (existing) {
-    if (existing.highlight.some(term => normalizeVocabulary(term) === normalized)) return article;
     return {
       ...article,
       vocabulary: article.vocabulary.map(item => item.id === existing.id
