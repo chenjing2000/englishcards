@@ -1,5 +1,5 @@
 import { flushSync } from 'react-dom';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   appendParagraph, commitEntryHead, defaults, editParagraph, emptySense, parseHighlightInput,
   addVocabulary, isValidVocabularySelection, newId, removeEntrySense, removeVocabulary, renumberVocabulary, replaceArticleParagraphs, setArticleText,
@@ -21,6 +21,18 @@ export function useEditorViewModel() {
   const desktop = isDesktop();
   const [boot, setBoot] = useState(desktop ? sampleDraft : restoreDraft);
   const [project, setProject] = useState<RenderProject>({ ...boot.project, styles: { ...defaults } });
+  const [wordDrafts, setWordDrafts] = useState<Record<string, string>>({});
+  const previewProject = useMemo<RenderProject>(() => {
+    let changed = false;
+    const vocabulary = project.vocabulary.map(entry => {
+      if (!Object.prototype.hasOwnProperty.call(wordDrafts, entry.id)) return entry;
+      const word = wordDrafts[entry.id];
+      if (word === entry.word) return entry;
+      changed = true;
+      return { ...entry, word };
+    });
+    return changed ? { ...project, vocabulary } : project;
+  }, [project, wordDrafts]);
   const [vocabularySelection, setVocabularySelection] = useState<string | null>(null);
   const vocabularyIndex = project.vocabulary.findIndex(entry => entry.id === vocabularySelection);
   const selectedVocabularyIndex = vocabularyIndex >= 0 ? vocabularyIndex : project.vocabulary.length ? 0 : -1;
@@ -64,7 +76,7 @@ export function useEditorViewModel() {
   const settingsQueue = useRef(Promise.resolve());
   const pendingSettingsSaves = useRef(0);
   const settingsRevision = useRef(0);
-  const ready = settingsReady && !opening && rendered?.project === project;
+  const ready = settingsReady && !opening && rendered?.project === previewProject;
   const hasFileChanges = lastFile !== stringify(project);
 
   function update(next: Project | ((current: RenderProject) => Project)) {
@@ -195,10 +207,10 @@ export function useEditorViewModel() {
     if (!valid.success) { setRendered(null); return; }
     let cancelled = false;
     const timer = setTimeout(() => {
-      paginate(project).then(layout => {
+      paginate(previewProject).then(layout => {
         if (cancelled) return;
-        setRendered({ project, layout });
-        window.editor = { project, signature: layout.signature, diagnostics: layout.diagnostics };
+        setRendered({ project: previewProject, layout });
+        window.editor = { project: previewProject, signature: layout.signature, diagnostics: layout.diagnostics };
         reportError('pagination', '');
         if (layout.warnings.length) showWarning(layout.warnings.join(' '));
       }).catch(reason => {
@@ -206,7 +218,7 @@ export function useEditorViewModel() {
       });
     }, 120);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [project, settingsReady]);
+  }, [previewProject, settingsReady]);
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
@@ -225,6 +237,7 @@ export function useEditorViewModel() {
       const next = await openProject(file);
       if (request !== openRequest.current || next === null) return;
       openedFile.current = request;
+      setWordDrafts({});
       update(next);
       setLastFile(stringify(next));
       setVocabularySelection(null);
@@ -333,6 +346,18 @@ export function useEditorViewModel() {
       setVocabularySelection(vocabularyId(destination + 1));
     }
   }
+  function setWordPreview(id: string, value: string | null) {
+    setWordDrafts(current => {
+      if (value === null) {
+        if (!Object.prototype.hasOwnProperty.call(current, id)) return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
+      }
+      return current[id] === value ? current : { ...current, [id]: value };
+    });
+  }
+
   function setEntryField(_key: EntryCollection, id: string, property: 'word' | 'ipa', value: string) {
     update(current => ({
       ...current,
@@ -462,7 +487,7 @@ export function useEditorViewModel() {
     project, warning, error, settingsReady, ready, exporting, opening, desktop, closing,
     layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
     open, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
-    highlightRange, addVocabularyFromSelection, commitHead, setEntryHighlights, setSenseField, setVocabularyMeaning,
+    highlightRange, addVocabularyFromSelection, commitHead, setWordPreview, setEntryHighlights, setSenseField, setVocabularyMeaning,
     addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,
     selectedVocabulary, selectedVocabularyIndex, selectVocabulary, moveSelectedVocabulary,
     deleteSelectedVocabulary, insertVocabularyBelow,
