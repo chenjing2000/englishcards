@@ -1,4 +1,6 @@
 import { test, expect } from './fixtures';
+import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
+import { selectPreviewText } from './preview-selection';
 
 test('settings use keyboard text entry while mouse wheels and arrow keys do not change values', async ({ page, request }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
@@ -26,12 +28,30 @@ test('settings use keyboard text entry while mouse wheels and arrow keys do not 
   await expect(page.getByRole('alert')).toContainText('Error:');
 });
 
-test.skip('warnings slide from the bottom for ten seconds and errors remain until closed', async ({ page }) => {
-  await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
+test('duplicate preview selections show timed warnings while import errors remain until closed', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  const text = 'run';
+  const input = {
+    ...fixture,
+    content: { paragraphs: [{ id: 'p001', text }] },
+    vocabulary: [{ id: 'v001', word: 'run', highlight: ['run'], senses: [{ pos: 'v.', meaning: '跑', example: '', exampleTranslation: '' }] }],
+  };
+  await page.getByLabel('导入 Article JSON 或 TXT').setInputFiles({
+    name: 'duplicate.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(input)),
+  });
+  await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  await page.clock.install();
   const bar = page.getByLabel('信息提示栏');
   await expect.poll(() => bar.evaluate(node => node.getBoundingClientRect().height)).toBe(0);
-  await page.clock.install();
-  await page.getByRole('button', { name: '高亮 / 取消高亮 1', exact: true }).click();
+
+  async function addDuplicate() {
+    expect(await selectPreviewText(page, 'p001', text, 'run')).toBe(true);
+    await expect(page.getByRole('button', { name: '将选中文字加入词汇' })).toBeVisible();
+    await page.getByRole('button', { name: '将选中文字加入词汇' }).click();
+  }
+
+  await addDuplicate();
   await expect(bar).toContainText('Warning:');
   await expect(bar.locator('.notice')).toHaveCSS('font-size', '14px');
   await expect.poll(() => bar.evaluate(node => node.getBoundingClientRect().height)).toBeGreaterThan(0);
@@ -39,18 +59,22 @@ test.skip('warnings slide from the bottom for ten seconds and errors remain unti
   await expect(bar.locator('.notice')).toHaveCSS('line-height', '21px');
   await page.clock.runFor(9000); await expect(bar).toContainText('Warning:');
   await page.clock.runFor(1000); await expect(bar).toHaveText('');
-  await expect.poll(() => bar.evaluate(node => node.getBoundingClientRect().height)).toBe(0);
-  await page.getByRole('button', { name: '高亮 / 取消高亮 1', exact: true }).click();
+
+  await addDuplicate();
   await page.clock.runFor(9000);
-  await page.getByRole('button', { name: '高亮 / 取消高亮 1', exact: true }).click();
-  await page.clock.runFor(1000); await expect(bar).toContainText('Warning:');
-  await page.clock.runFor(9000); await expect(bar).toHaveText('');
-  await page.getByLabel('导入 Article JSON 或 TXT').setInputFiles({ name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('{') });
+  await addDuplicate();
+  await page.clock.runFor(1000);
+  await expect(bar).toContainText('Warning:');
+  await page.clock.runFor(9000);
+  await expect(bar).toHaveText('');
+
+  await page.getByLabel('导入 Article JSON 或 TXT').setInputFiles({
+    name: 'invalid.json', mimeType: 'application/json', buffer: Buffer.from('{'),
+  });
   await expect(bar.getByRole('alert')).toContainText('Error:');
   await expect(bar.getByRole('button', { name: '关闭', exact: true })).toHaveCSS('font-size', '12px');
-  await page.getByRole('button', { name: '高亮 / 取消高亮 1', exact: true }).click();
+  await page.clock.runFor(10001);
   await expect(bar.getByRole('alert')).toContainText('无法打开文章');
-  await page.clock.runFor(10001); await expect(bar.getByRole('alert')).toContainText('Error:');
   await bar.getByRole('button', { name: '关闭', exact: true }).click();
   await expect(bar).toHaveText('');
 });
