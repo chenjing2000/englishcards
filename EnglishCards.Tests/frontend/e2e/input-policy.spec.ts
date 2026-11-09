@@ -8,15 +8,27 @@ async function expectRightClickBlocked(locator: import('@playwright/test').Locat
     const contextMenuAllowed = element.dispatchEvent(contextMenu);
     const pointerDown = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 2 });
     const pointerDownAllowed = element.dispatchEvent(pointerDown);
+    const pointerUp = new PointerEvent('pointerup', { bubbles: true, cancelable: true, button: 2 });
+    const pointerUpAllowed = element.dispatchEvent(pointerUp);
     const mouseDown = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 2 });
     const mouseDownAllowed = element.dispatchEvent(mouseDown);
+    const mouseUp = new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 2 });
+    const mouseUpAllowed = element.dispatchEvent(mouseUp);
+    const auxClick = new MouseEvent('auxclick', { bubbles: true, cancelable: true, button: 2 });
+    const auxClickAllowed = element.dispatchEvent(auxClick);
     return {
       contextMenuPrevented: contextMenu.defaultPrevented,
       contextMenuAllowed,
       pointerDownPrevented: pointerDown.defaultPrevented,
       pointerDownAllowed,
+      pointerUpPrevented: pointerUp.defaultPrevented,
+      pointerUpAllowed,
       mouseDownPrevented: mouseDown.defaultPrevented,
       mouseDownAllowed,
+      mouseUpPrevented: mouseUp.defaultPrevented,
+      mouseUpAllowed,
+      auxClickPrevented: auxClick.defaultPrevented,
+      auxClickAllowed,
     };
   });
   expect(result).toEqual({
@@ -24,8 +36,14 @@ async function expectRightClickBlocked(locator: import('@playwright/test').Locat
     contextMenuAllowed: false,
     pointerDownPrevented: true,
     pointerDownAllowed: false,
+    pointerUpPrevented: true,
+    pointerUpAllowed: false,
     mouseDownPrevented: true,
     mouseDownAllowed: false,
+    mouseUpPrevented: true,
+    mouseUpAllowed: false,
+    auxClickPrevented: true,
+    auxClickAllowed: false,
   });
 }
 
