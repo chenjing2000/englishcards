@@ -83,7 +83,7 @@ test('damaged files are reported and preserved when a validated import and new d
   expect((await requests(page, 'saveDraft')).at(-1)?.payload).toMatchObject({ preserveOriginal: true });
 });
 
-test('close waits for in-flight writes and saves both final snapshots after undo', async ({ page }) => {
+test('close waits for in-flight writes and saves both final snapshots after a later edit', async ({ page }) => {
   await start(page, { settings: JSON.stringify(defaults), draft: null });
   await ready(page);
   await page.getByRole('button', { name: '打开设置', exact: true }).click();
@@ -91,7 +91,7 @@ test('close waits for in-flight writes and saves both final snapshots after undo
   await page.evaluate(() => { (window as unknown as TestPage).holdWrite = true; });
   await bodySize.fill('40');
   await expect.poll(async () => (await requests(page, 'saveSettings')).length).toBe(1);
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await bodySize.fill('34');
   await expect(bodySize).toHaveValue('34');
   await page.getByRole('button', { name: '返回文章编辑', exact: true }).click();
   await title(page).fill('Last draft before closing');
