@@ -319,3 +319,10 @@ New refinements requested:
 - The first updated Playwright run passed 61 tests; two remaining assertions were stale and have now been corrected (source capitalization and the final 21 px button size). A full rerun is pending.
 - Windows .NET tests and final WPF publish are pending the successful Playwright run.
 - The ICO source file is not yet committed in this branch. Copy the supplied `clover_icon(1).ico` to `EnglishCards/desktop/Assets/clover_icon.ico`; the csproj embeds it into the EXE and the WPF window loads the same resource for the taskbar/window icon. Until that file is present, the application retains the Windows fallback icon.
+
+### Final CI result for the Phase D.2 code
+
+- GitHub Actions run `42643691101` completed successfully on 2026-11-09.
+- Frontend unit tests, TypeScript checks, Vite production build, all 63 Playwright E2E tests, and Windows .NET tests passed.
+- The .NET compile issue caused by the missing `System.IO` import in the optional icon loader was corrected before this successful run.
+- Final WPF publish and visual shell verification remain part of local Windows acceptance. The original ICO still needs to be copied into `EnglishCards/desktop/Assets/clover_icon.ico` and committed so the executable embeds it; without that binary, the project intentionally uses the Windows fallback icon.
