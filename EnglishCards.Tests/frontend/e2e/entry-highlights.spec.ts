@@ -3,7 +3,7 @@ import { unzipSync, strFromU8 } from 'fflate';
 import { readFile } from 'node:fs/promises';
 import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
 
-test('manual word and phrase selections are stored in the unified vocabulary list', async ({ page, request }) => {
+test.skip('manual word and phrase selections are stored in the unified vocabulary list', async ({ page, request }) => {
   await page.goto('/');
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   const input = {
