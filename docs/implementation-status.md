@@ -220,3 +220,14 @@ The user completed the Windows WPF/WebView2 acceptance checklist successfully:
 - Cursor placement, scrolling and long-article editing showed no visible jumping.
 
 **Phase C is accepted on the user's Windows desktop.** No outstanding Phase C defects were reported. The three E2E tests skipped in CI remain intentionally deferred because they exercise the superseded right-editor selection/highlight controls; equivalent left-preview selection-plus coverage is required in Phase D.
+
+## 2026-11-09 — Phase D: left-preview vocabulary selection
+
+- Added a contextual plus action to the left paginated preview. It appears at the lower-right edge of a valid text selection; the right-hand continuous editor does not expose this action.
+- Selection offsets are mapped from rendered .text-line fragments back to Article v6 UTF-16 paragraph offsets, including nested highlight spans and wrapped lines.
+- Eligibility is restricted to complete English words/phrases containing Latin letters and no Han characters. Both endpoints must belong to the same source paragraph and the same rendered card.
+- Added addVocabularyFromSelection as a dedicated add-only action. Existing headwords and existing highlighted variants are not duplicated; selecting an already-present term displays a warning. The previous toggle/cancel model helper remains covered independently.
+- Newly added entries receive canonical vNNN IDs, an initial empty sense, and a highlight variant. Existing history and preview pagination continue to drive Undo/Redo and rendering.
+- Replaced the skipped legacy right-editor highlight E2E cases with left-preview plus interaction coverage. Restored the notification timing test using the duplicate-selection warning. No E2E tests are skipped in the current CI run.
+- Windows CI run 42612499165: Vitest 50 passed; Vite build passed; Playwright 61 passed; .NET 17 checks passed; overall workflow succeeded.
+- Windows desktop interaction acceptance is pending. The user should verify actual selection/plus positioning, word/phrase insertion, duplicate warning, invalid selection suppression, Undo/Redo, and persistence/export in WPF/WebView2.
