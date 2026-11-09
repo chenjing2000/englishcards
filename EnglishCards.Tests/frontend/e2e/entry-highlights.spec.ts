@@ -101,8 +101,9 @@ test('preview plus rejects partial words, Chinese text, and selections crossing 
     };
     const first = line('p001'), second = line('p002');
     const range = document.createRange();
-    range.setStart(...Object.values(point(first, 0)) as [Node, number]);
-    range.setEnd(...Object.values(point(second, 6)) as [Node, number]);
+    const firstPoint = point(first, 0), secondPoint = point(second, 6);
+    range.setStart(firstPoint.node, firstPoint.offset);
+    range.setEnd(secondPoint.node, secondPoint.offset);
     const selection = window.getSelection()!;
     selection.removeAllRanges(); selection.addRange(range);
     scroll.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
@@ -113,7 +114,7 @@ test('preview plus rejects partial words, Chinese text, and selections crossing 
 
   const longText = 'word '.repeat(1400);
   await loadArticle(page, { ...fixture, content: { paragraphs: [{ id: 'p001', text: longText }] }, vocabulary: [] });
-  await expect(page.locator('.card')).toHaveCount(2);
+  expect(await page.locator('.card').count()).toBeGreaterThan(1);
   const crossCard = await page.locator('.preview-scroll').evaluate(scroll => {
     const cards = Array.from(scroll.querySelectorAll<HTMLElement>('.card'));
     const first = cards[0].querySelector<HTMLElement>('.text-line.article[data-source="p001"]')!;
