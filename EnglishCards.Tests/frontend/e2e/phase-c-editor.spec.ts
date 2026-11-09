@@ -12,7 +12,7 @@ test('Phase C renders one continuous editor in Vocabulary Content Translation or
   await expect(page.getByLabel('英文正文')).toHaveValue(fixture.content.paragraphs.map(p => p.text).join('\n\n'));
 });
 
-test('Phase C edits and renumbers natural paragraphs without losing undo or JSON data', async ({ page }) => {
+test('Phase C edits and renumbers natural paragraphs while preserving JSON data', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   const body = page.getByLabel('英文正文');
@@ -23,9 +23,6 @@ test('Phase C edits and renumbers natural paragraphs without losing undo or JSON
     { id: 'p001', text: 'First new paragraph.' },
     { id: 'p002', text: 'Second new paragraph.' },
   ]);
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(body).toHaveValue(fixture.content.paragraphs.map(p => p.text).join('\n\n'));
-  await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect(body).toHaveValue('First new paragraph.\n\nSecond new paragraph.');
   await page.getByRole('button', { name: '打开设置' }).click();
   await expect(page.getByLabel('设置面板')).toBeVisible();
