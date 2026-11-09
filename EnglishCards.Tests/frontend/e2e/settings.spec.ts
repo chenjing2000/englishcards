@@ -6,7 +6,7 @@ import { readFile, writeFile, unlink } from 'node:fs/promises';
 
 test('shared settings persist independently of articles and determine exact export dimensions', async ({ page, request }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await page.getByRole('button', { name: '样式', exact: true }).click();
+  await page.getByRole('button', { name: '打开设置', exact: true }).click();
   await expect(page.getByRole('table', { name: '字号设置', exact: true })).toHaveCount(1);
   await expect(page.getByRole('table', { name: '其余设置', exact: true })).toHaveCount(1);
   await expect(page.getByLabel('强调色', { exact: true })).toHaveCount(0);
@@ -40,7 +40,7 @@ test('shared settings persist independently of articles and determine exact expo
     const png = Buffer.from(value); expect(png.readUInt32BE(16)).toBe(1000); expect(png.readUInt32BE(20)).toBe(1400);
   }
   expect(JSON.parse(Buffer.from(files['article.json']).toString())).not.toHaveProperty('styles');
-  await page.getByRole('button', { name: '样式', exact: true }).click();
+  await page.getByRole('button', { name: '打开设置', exact: true }).click();
   await page.getByLabel('页面宽度', { exact: true }).fill('400');
   await page.getByLabel('左右边距', { exact: true }).fill('200');
   await expect(page.getByText(/配置无效，未保存/)).toBeVisible();
@@ -71,7 +71,7 @@ test('missing settings are rebuilt and damaged settings require an explicit rese
   expect(JSON.parse(await readFile(path, 'utf8'))).toEqual(defaults);
   await writeFile(path, '{broken');
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await page.getByRole('button', { name: '样式', exact: true }).click();
+  await page.getByRole('button', { name: '打开设置', exact: true }).click();
   await expect(page.getByText(/配置无法读取，暂用默认值/)).toBeVisible();
   expect(await readFile(path, 'utf8')).toBe('{broken');
   await page.getByRole('button', { name: '默认配置', exact: true }).click();
@@ -90,7 +90,7 @@ test('undo during an in-flight settings save persists the latest visible setting
     await route.continue();
   });
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await page.getByRole('button', { name: '样式', exact: true }).click();
+  await page.getByRole('button', { name: '打开设置', exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '保存 JSON', exact: true }).click(); await download;
   await page.getByLabel('英文正文字号', { exact: true }).fill('40');
