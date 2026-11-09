@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import fixture from '@fixtures/projects/brainco/project.json';
-import { addVocabulary, collectHighlights, isValidVocabularySelection, parseProject, toggleHighlight, editParagraph } from '@frontend/models/project';
+import { addVocabulary, collectHighlights, isValidVocabularySelection, parseProject, toggleHighlight, editParagraph, commitEntryHead } from '@frontend/models/project';
 
 function article(text = 'They ran and ran. They took off.') {
   return parseProject({ ...fixture, content: { paragraphs: [{ id: 'p001', text }] }, vocabulary: [] });
@@ -48,6 +48,20 @@ it('keeps explicit variants when article text changes', () => {
   const edited = editParagraph(marked, 'p001', 'They will take off.');
   expect(edited.vocabulary[0].highlight).toEqual(['took off']);
   expect(collectHighlights(edited)).toEqual([]);
+});
+
+it('replaces the old head highlight on rename while preserving independent variants', () => {
+  const input = article('only for; solely for.');
+  input.vocabulary = [{
+    id: 'v001', word: 'only for', ipa: '', highlight: ['only for', 'solely for'],
+    senses: [{ pos: '', meaning: '', example: '', exampleTranslation: '' }],
+  }];
+  const renamed = commitEntryHead(input, 'vocabulary', 'v001', 'only');
+  expect(renamed.vocabulary[0]).toMatchObject({ word: 'only', highlight: ['solely for', 'only'] });
+  expect(collectHighlights(renamed).map(mark => mark.quote)).toEqual(['only', 'solely for']);
+  expect(collectHighlights(input).map(mark => mark.quote)).toEqual(['only for', 'solely for']);
+  const cleared = commitEntryHead(renamed, 'vocabulary', 'v001', '');
+  expect(cleared.vocabulary[0].highlight).toEqual(['solely for']);
 });
 
 it('rejects partial-word selections', () => {
