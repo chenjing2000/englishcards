@@ -136,7 +136,7 @@ export default function CardPreview({ layout, ready, content, onAddSelection, ac
     const element = scroll.current;
     if (!element) return;
     const updateWidth = () => {
-      if (element.closest('.workspace')?.dataset.resizing === 'true') return;
+      if (element.closest<HTMLElement>('.workspace')?.dataset.resizing === 'true') return;
       clampZoomToAvailableWidth();
     };
     const observer = new ResizeObserver(updateWidth);
