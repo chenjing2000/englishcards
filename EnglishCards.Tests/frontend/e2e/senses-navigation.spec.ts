@@ -28,6 +28,7 @@ test('unified vocabulary senses preserve editing, deletion, canonical IDs and ex
   const meanings = page.locator('.vocab [data-edit*="meaning"]');
   await expect(meanings).toHaveText(['录制', '记录', 'meaning-one', 'meaning-two', 'meaning-three']);
   await page.getByLabel('词头 2', { exact: true }).focus();
+  await page.getByRole('region', { name: '分页预览' }).getByText('A distinct example.', { exact: true }).click();
   await expect(page.getByLabel('词汇例句 2 义项 1', { exact: true })).not.toBeFocused();
   await expect(page.getByLabel('词头 2', { exact: true })).not.toBeFocused();
   await expect(page.getByLabel('词头 2', { exact: true })).toHaveValue('record');
