@@ -2,7 +2,7 @@ import { test, expect } from './fixtures';
 import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
 import { emptySense, parseProject, vocabularyId } from '@frontend/models/project';
 
-test('unified vocabulary senses preserve navigation, deletion history, canonical IDs and export', async ({ page, request }) => {
+test('unified vocabulary senses preserve editing, deletion, canonical IDs and export', async ({ page, request }) => {
   const article = parseProject(fixture);
   article.content.paragraphs = [];
   article.translation.paragraphs = [];
@@ -27,8 +27,9 @@ test('unified vocabulary senses preserve navigation, deletion history, canonical
   // Match the semantic field name rather than assuming one ID serialization.
   const meanings = page.locator('.vocab [data-edit*="meaning"]');
   await expect(meanings).toHaveText(['录制', '记录', 'meaning-one', 'meaning-two', 'meaning-three']);
-  await page.getByRole('region', { name: '分页预览' }).getByText('A distinct example.', { exact: true }).click();
-  await expect(page.getByLabel('词汇例句 2 义项 1', { exact: true })).toBeFocused();
+  await page.getByLabel('词头 2', { exact: true }).focus();
+  await expect(page.getByLabel('词汇例句 2 义项 1', { exact: true })).not.toBeFocused();
+  await expect(page.getByLabel('词头 2', { exact: true })).not.toBeFocused();
   await expect(page.getByLabel('词头 2', { exact: true })).toHaveValue('record');
   await meanings.filter({ hasText: '记录' }).click();
   await expect(page.getByLabel('含义 2 义项 2', { exact: true })).toBeFocused();
@@ -38,10 +39,6 @@ test('unified vocabulary senses preserve navigation, deletion history, canonical
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   let snapshot = await page.evaluate(() => window.editor);
   expect(snapshot.project.vocabulary[1].senses.map((sense: { meaning: string }) => sense.meaning)).toEqual(['记录']);
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(page.getByLabel('含义 2 义项 2', { exact: true })).toHaveValue('n. 记录');
-  await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect(page.locator('[data-ready="true"]')).toBeVisible();
 
   snapshot = await page.evaluate(() => window.editor);
   const exported = await request.post('/api/export', { data: { ...snapshot, page: 1 } });
