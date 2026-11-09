@@ -84,7 +84,7 @@ test('highlight editor updates independent rules live and preserves dictionary-w
 
   const editor = page.getByLabel('高亮词汇 1', { exact: true });
   await editor.fill('studies; studied; only fo; only that; STUDIES;;');
-  await expect(marks).toHaveText(['Study', 'studies', 'studied', 'only that']);
+  await expect(marks).toHaveText(['Study', 'studies', 'studied', 'Only that']);
   expect(await page.evaluate(() => window.editor.project.vocabulary[0].highlight))
     .toEqual(['studies', 'studied', 'only fo', 'only that']);
 
