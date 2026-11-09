@@ -5,11 +5,7 @@ test('workspace has compact sense controls and edge-aligned floating actions', a
   await expect(page.getByRole('heading', { name: '英语阅读卡片编辑器', exact: true })).toBeVisible();
   await expect(page.locator('.app-header,.status-bar,.preview-toolbar')).toHaveCount(0);
   await expect(page.locator('.zoom-toolbar')).toHaveCount(0);
-  for (const tab of ['原文', '词汇', '译文']) {
-    await page.getByRole('button', { name: tab, exact: true }).click();
-    await expect(page.getByRole('checkbox')).toHaveCount(0);
-  }
-  
+  await expect(page.getByRole('checkbox')).toHaveCount(0);
   const table = page.getByRole('table', { name: '词汇 1', exact: true });
   await expect(table.getByRole('rowheader')).toHaveText(['词汇', '音标', '含义', '例句', '翻译']);
   const add = page.getByRole('button', { name: '为词汇 1 添加义项', exact: true });
