@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import type { Layout } from '../services/pagination';
 import { isValidVocabularySelection, type Paragraph } from '../models/project';
 
-type Props = { layout?: Layout; ready: boolean; content: Paragraph[]; onAddSelection: (paragraphId: string, start: number, end: number) => void; jump: React.MouseEventHandler<HTMLDivElement>; actions: ReactNode };
+type Props = { layout?: Layout; ready: boolean; content: Paragraph[]; onAddSelection: (paragraphId: string, start: number, end: number) => void; actions: ReactNode };
 type ActiveSelection = { paragraphId: string; start: number; end: number; left: number; top: number };
 type ZoomAnchor = { card: HTMLElement; y: number; clientY: number };
 
@@ -46,7 +46,7 @@ function selectionCandidate(selection: Selection | null, content: Paragraph[]): 
   };
 }
 
-export default function CardPreview({ layout, ready, content, onAddSelection, jump, actions }: Props) {
+export default function CardPreview({ layout, ready, content, onAddSelection, actions }: Props) {
   const scroll = useRef<HTMLDivElement>(null), preview = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const [activeSelection, setActiveSelection] = useState<ActiveSelection | null>(null);
@@ -172,12 +172,7 @@ export default function CardPreview({ layout, ready, content, onAddSelection, ju
       onMouseUp={() => requestAnimationFrame(updateSelection)}
       onKeyUp={() => requestAnimationFrame(updateSelection)}
       onScroll={() => setActiveSelection(null)}>
-      <div className="preview" style={{ '--zoom': zoom } as React.CSSProperties} data-ready={ready} ref={preview}
-        onClick={event => {
-          const selection = window.getSelection();
-          if (selection && !selection.isCollapsed && selection.toString()) return;
-          jump(event);
-        }} />
+      <div className="preview" style={{ '--zoom': zoom } as React.CSSProperties} data-ready={ready} ref={preview} />
     </div>
     {activeSelection && <button type="button" className="selection-add-button" aria-label="将选中文字加入词汇" title="将选中文字加入词汇"
       style={{ left: activeSelection.left, top: activeSelection.top }}
