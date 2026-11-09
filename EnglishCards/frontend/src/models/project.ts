@@ -66,6 +66,27 @@ export function splitSenseMeaning(value: string, previousPos = ''): Pick<Sense, 
 export type HighlightRange = { paragraphId: string; start: number; end: number; quote: string };
 
 const normalizeTerm = (term: string) => term.normalize('NFC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en');
+/** Parse the semicolon-separated editor value into independent, de-duplicated rules. */
+export function parseHighlightInput(value: string, word = ''): string[] {
+  const seen = new Set<string>();
+  const primary = normalizeTerm(word);
+  if (primary) seen.add(primary);
+  const result: string[] = [];
+  for (const part of value.split(';')) {
+    const term = part.normalize('NFC').trim().replace(/\s+/gu, ' ');
+    const key = normalizeTerm(term);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(term);
+  }
+  return result;
+}
+
+/** Format stored rules for editing, omitting rules already represented by the word field. */
+export function formatHighlightInput(highlight: string[], word = ''): string {
+  return parseHighlightInput(highlight.join(';'), word).join('; ');
+}
+
 
 function termMatches(source: string, term: string): { start: number; end: number }[] {
   const value = term.trim().replace(/\s+/gu, ' ');
