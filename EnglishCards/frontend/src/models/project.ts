@@ -65,7 +65,7 @@ export function splitSenseMeaning(value: string, previousPos = ''): Pick<Sense, 
 
 export type HighlightRange = { paragraphId: string; start: number; end: number; quote: string };
 
-const normalizeTerm = (term: string) => term.trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en');
+const normalizeTerm = (term: string) => term.normalize('NFC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en');
 
 function termMatches(source: string, term: string): { start: number; end: number }[] {
   const value = term.trim().replace(/\s+/gu, ' ');
@@ -117,12 +117,12 @@ export function commitEntryHead(article: Article, _key: EntryCollection, entryId
   const previousHead = normalizeTerm(entry.word);
   const next = article.vocabulary.map(item => {
     if (item.id !== entryId) return item;
-    // The old head is the entry's primary surface form. Remove only that rule;
-    // independently collected variants remain attached to the vocabulary entry.
-    const highlight = item.highlight.filter(term => normalizeTerm(term) !== previousHead);
-    if (normalized && !highlight.some(term => normalizeTerm(term) === normalized)) {
-      highlight.push(value);
-    }
+    // Word is a primary rule by itself; remove redundant copies of the old or new head.
+    // All other explicitly managed variants remain independent.
+    const highlight = item.highlight.filter(term => {
+      const key = normalizeTerm(term);
+      return key !== previousHead && key !== normalized;
+    });
     return { ...item, word: value, highlight };
   });
   return { ...article, vocabulary: renumberVocabulary(next) };
@@ -184,20 +184,29 @@ export function toggleHighlight(article: Article, paragraphIdValue: string, star
 }
 
 export function collectHighlights(article: Article): HighlightRange[] {
-  const terms = new Set(article.vocabulary.flatMap(entry => entry.highlight).filter(term => term.trim()));
+  // Dictionary headwords and user-supplied variants are equal, independent match rules.
+  const terms = new Map<string, string>();
+  for (const entry of article.vocabulary) {
+    for (const term of [entry.word, ...entry.highlight]) {
+      const value = term.trim().replace(/\s+/gu, ' ');
+      const key = normalizeTerm(value);
+      if (key && !terms.has(key)) terms.set(key, value);
+    }
+  }
+
   const result: HighlightRange[] = [];
   for (const paragraph of article.content.paragraphs) {
-    const matches = [...terms].flatMap(term => termMatches(paragraph.text, term));
+    const matches = [...terms.values()].flatMap(term => termMatches(paragraph.text, term));
+    // Leftmost match wins; when two rules start together, the longer phrase wins.
     matches.sort((left, right) => left.start - right.start || right.end - left.end);
-    const merged: typeof matches = [];
+    let occupiedUntil = -1;
     for (const match of matches) {
-      const previous = merged.at(-1);
-      if (previous && match.start < previous.end) previous.end = Math.max(previous.end, match.end);
-      else merged.push({ ...match });
+      if (match.start < occupiedUntil) continue;
+      result.push({
+        paragraphId: paragraph.id, ...match, quote: paragraph.text.slice(match.start, match.end),
+      });
+      occupiedUntil = match.end;
     }
-    result.push(...merged.map(match => ({
-      paragraphId: paragraph.id, ...match, quote: paragraph.text.slice(match.start, match.end),
-    })));
   }
   return result;
 }
