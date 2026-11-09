@@ -41,8 +41,8 @@ function selectionCandidate(selection: Selection | null, content: Paragraph[]): 
   if (!rect.width || !rect.height) return null;
   return {
     paragraphId, start, end,
-    left: Math.max(8, Math.min(window.innerWidth - 42, rect.right + 6)),
-    top: Math.max(8, Math.min(window.innerHeight - 42, rect.bottom + 4)),
+    left: Math.max(8, Math.min(window.innerWidth - 14, rect.right)),
+    top: Math.max(8, Math.min(window.innerHeight - 14, rect.bottom)),
   };
 }
 
@@ -182,7 +182,12 @@ export default function CardPreview({ layout, ready, content, onAddSelection, ac
         onAddSelection(activeSelection.paragraphId, activeSelection.start, activeSelection.end);
         setActiveSelection(null);
         window.getSelection()?.removeAllRanges();
-      }}>+</button>}
+      }}>
+      <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14">
+        <circle cx="7" cy="7" r="6" fill="#fff" stroke="#1e90ff" strokeWidth="1.3" />
+        <path d="M4 7h6M7 4v6" fill="none" stroke="#1e90ff" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    </button>}
     {actions}
   </section>;
 }
