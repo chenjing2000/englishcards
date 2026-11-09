@@ -66,7 +66,13 @@ test('Article v6 continuous editing, portable JSON, draft recovery and strict im
 test('preview selection plus adds vocabulary while ordinary preview clicks never focus editors', async ({ page }) => {
   await page.goto('/'); await ready(page);
   const text = 'A runner crossed the field.';
-  await load(page, { ...fixture, content: { paragraphs: [{ id: 'p001', text }] }, vocabulary: [] });
+  await load(page, {
+    ...fixture,
+    title: 'A preview title',
+    content: { paragraphs: [{ id: 'p001', text }] },
+    translation: { paragraphs: [{ id: 'p001', text: '这是一段中文译文。' }] },
+    vocabulary: [],
+  });
   expect(await selectPreviewText(page, 'p001', text, 'runner')).toBe(true);
   const add = page.getByRole('button', { name: '将选中文字加入词汇' });
   await expect(add).toBeVisible();
