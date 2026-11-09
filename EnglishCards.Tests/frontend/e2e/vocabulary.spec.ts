@@ -22,8 +22,11 @@ test('per-word vocabulary tables edits and moves the selected row, inserts below
   const remove = actions.getByRole('button', { name: '删除选中词汇', exact: true });
   await expect(up.locator('svg')).toBeVisible();
   const actionSize = await up.boundingBox();
-  expect(actionSize?.width).toBe(25);
-  expect(actionSize?.height).toBe(25);
+  expect(actionSize?.width).toBe(21);
+  expect(actionSize?.height).toBe(21);
+  await expect(up).toHaveCSS('border-radius', '7px');
+  await expect(up.locator('svg')).toHaveCSS('width', '15px');
+  await expect(up.locator('svg')).toHaveCSS('height', '15px');
   const add = actions.getByRole('button', { name: '在选中词汇下方添加空白行', exact: true });
   const words = table.locator('input[aria-label^="词头 "]');
   const selected = page.locator('.vocabulary-entry.selected');
