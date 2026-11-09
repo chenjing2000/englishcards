@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 
@@ -16,7 +17,26 @@ public partial class MainWindow : Window
     private bool saveOnClose;
     private bool preparingClose;
     private bool allowClose;
+    private HwndSource? windowSource;
     public MainWindow() => InitializeComponent();
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        windowSource = PresentationSource.FromVisual(this) as HwndSource;
+        windowSource?.AddHook(BlockWindowContextMenu);
+    }
+
+    private static IntPtr BlockWindowContextMenu(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        // Prevent the native system context menu opened by right-clicking the title bar/window chrome.
+        if (message is 0x007B or 0x00A5)
+        {
+            handled = true;
+            return IntPtr.Zero;
+        }
+        return IntPtr.Zero;
+    }
 
     internal async Task InitializeAsync(string dataRoot, bool saveOnClose, CancellationToken ct)
     {
@@ -121,6 +141,8 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        windowSource?.RemoveHook(BlockWindowContextMenu);
+        windowSource = null;
         try
         {
             Editor.Dispose();
