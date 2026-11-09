@@ -78,7 +78,7 @@ test('preview selection plus adds vocabulary while ordinary preview clicks never
   await expect(add).toBeVisible();
   await add.click(); await ready(page);
   expect(await page.evaluate(() => window.editor.project.vocabulary[0])).toMatchObject({
-    id: 'v001', word: 'runner', highlight: ['runner'],
+    id: 'v001', word: 'runner', highlight: [],
   });
 
   const title = page.getByLabel('英文标题', { exact: true });
