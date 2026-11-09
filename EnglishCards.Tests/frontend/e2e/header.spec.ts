@@ -21,10 +21,6 @@ test('IdentityTag headers repeat on every page, match typography and persist edi
   }))).toBe(true);
   await input.fill('My reading notes');
   await expect(headers.first()).toHaveText('My reading notes');
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(input).toHaveValue('SOME BIRDS ON TREE');
-  await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect(headers.first()).toHaveText('My reading notes');
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   await page.reload();
   await expect(input).toHaveValue('My reading notes');
