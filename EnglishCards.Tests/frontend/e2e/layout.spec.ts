@@ -1,12 +1,25 @@
 import { test, expect } from './fixtures';
 
-test('splitter resizes both panes by dragging and keyboard without changing pagination', async ({ page }) => {
+async function dragSplitterToEdge(page: import('@playwright/test').Page, edge: 'min' | 'max') {
+  const workspace = (await page.locator('.workspace').boundingBox())!;
+  const separator = (await page.getByRole('separator', { name: '调整编辑与预览宽度' }).boundingBox())!;
+  const minimum = Math.min(280, Math.floor((workspace.width - 8) / 2));
+  const targetWidth = edge === 'min' ? minimum : workspace.width - 8 - minimum;
+  const y = separator.y + separator.height / 2;
+  await page.mouse.move(separator.x + separator.width / 2, y);
+  await page.mouse.down();
+  await page.mouse.move(workspace.x + targetWidth + 4, y, { steps: 12 });
+  await page.mouse.up();
+}
+
+test('splitter resizes both panes by mouse without changing pagination or responding to keyboard', async ({ page }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
   const separator = page.getByRole('separator', { name: '调整编辑与预览宽度' });
   await expect(separator).toBeVisible();
   const editor = page.locator('.editor-panel');
+  const preview = page.locator('.preview-panel');
   const before = (await editor.boundingBox())!.width;
-  const previewBefore = (await page.locator('.preview-panel').boundingBox())!.width;
+  const previewBefore = (await preview.boundingBox())!.width;
   const signature = await page.evaluate(() => window.editor.signature);
   const handle = (await separator.boundingBox())!;
   await page.mouse.move(handle.x + handle.width / 2, handle.y + 100);
@@ -15,13 +28,20 @@ test('splitter resizes both panes by dragging and keyboard without changing pagi
   await expect.poll(async () => (await editor.boundingBox())!.width).toBeCloseTo(before - 80, 0);
   await page.mouse.up();
   await expect.poll(async () => (await editor.boundingBox())!.width).toBeCloseTo(before - 80, 0);
-  expect((await page.locator('.preview-panel').boundingBox())!.width).toBeCloseTo(previewBefore + 80, 0);
-  await separator.focus(); await separator.press('ArrowLeft');
-  await expect.poll(async () => (await editor.boundingBox())!.width).toBeCloseTo(before - 56, 0);
+  expect((await preview.boundingBox())!.width).toBeCloseTo(previewBefore + 80, 0);
+
+  const afterDrag = (await editor.boundingBox())!.width;
+  await separator.evaluate(node => {
+    for (const key of ['ArrowLeft', 'ArrowRight', 'Home', 'End']) {
+      node.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    }
+  });
+  await expect.poll(async () => (await editor.boundingBox())!.width).toBeCloseTo(afterDrag, 0);
+
   await page.setViewportSize({ width: 1000, height: 900 });
-  await separator.press('Home');
-  await expect.poll(async () => (await page.locator('.preview-panel').boundingBox())!.width).toBeCloseTo(280, 0);
-  await separator.press('End');
+  await dragSplitterToEdge(page, 'min');
+  await expect.poll(async () => (await preview.boundingBox())!.width).toBeCloseTo(280, 0);
+  await dragSplitterToEdge(page, 'max');
   await expect.poll(async () => (await editor.boundingBox())!.width).toBeCloseTo(280, 0);
   expect(await page.evaluate(() => window.editor.signature)).toBe(signature);
   await page.screenshot({ path: '.build/test-results/resizable-layout.png' });
