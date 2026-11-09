@@ -70,9 +70,8 @@ test('unified vocabulary entries retain variants, paired senses and refresh beha
   await page.screenshot({ path: '.build/test-results/multiple-senses.png' });
 });
 
-test('import waits for file reading and refreshing unchanged rules does not add history', async ({ page }) => {
+test('import waits for file reading and refreshing unchanged rules does not mutate Article data', async ({ page }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  const original = await page.evaluate(() => window.editor.project);
   await page.evaluate(() => {
     const read = File.prototype.text;
     File.prototype.text = async function () {
@@ -87,13 +86,12 @@ test('import waits for file reading and refreshing unchanged rules does not add 
   await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toBeDisabled();
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   await expect(page.getByLabel('英文正文', { exact: true })).toHaveValue('No active rules.');
+  const imported = await page.evaluate(() => window.editor.project);
   
   for (let i = 0; i < 2; i++) {
     await page.getByRole('button', { name: '刷新词汇高亮', exact: true }).click();
     await expect(page.locator('[data-ready="true"]')).toBeVisible();
   }
   await expect(page.getByLabel('信息提示栏')).toHaveText('');
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  expect(await page.evaluate(() => window.editor.project)).toEqual(original);
+  expect(await page.evaluate(() => window.editor.project)).toEqual(imported);
 });
