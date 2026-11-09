@@ -114,11 +114,15 @@ export function commitEntryHead(article: Article, _key: EntryCollection, entryId
   if (normalized && article.vocabulary.some(item => item.id !== entryId && normalizeVocabulary(item.word) === normalized)) {
     throw new ArticleValidationError('vocabulary.word', `重复词条：${value}`);
   }
+  const previousHead = normalizeTerm(entry.word);
   const next = article.vocabulary.map(item => {
     if (item.id !== entryId) return item;
-    const highlight = value.trim() && !item.highlight.some(term => normalizeTerm(term) === normalized)
-      ? [...item.highlight, value]
-      : item.highlight;
+    // The old head is the entry's primary surface form. Remove only that rule;
+    // independently collected variants remain attached to the vocabulary entry.
+    const highlight = item.highlight.filter(term => normalizeTerm(term) !== previousHead);
+    if (normalized && !highlight.some(term => normalizeTerm(term) === normalized)) {
+      highlight.push(value);
+    }
     return { ...item, word: value, highlight };
   });
   return { ...article, vocabulary: renumberVocabulary(next) };
