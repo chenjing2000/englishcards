@@ -11,7 +11,7 @@ test('shared settings persist independently of articles and determine exact expo
   await expect(page.getByRole('table', { name: '其余设置', exact: true })).toHaveCount(1);
   await expect(page.getByLabel('强调色', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('分割线颜色', { exact: true })).toHaveCount(0);
-  for (const [selector, size] of [['.title', 30], ['.article', 34], ['.translation', 32], ['.vocab [data-edit$=\":word\"]', 34], ['.vocab [data-edit$=\":ipa\"]', 26], ['.vocab [data-edit*=\"meaning\"]', 26], ['.vocab [data-edit*=\"example\"]', 26], ['.section-heading', 24], ['.vocab-heading', 24]] as const) {
+  for (const [selector, size] of [['.title', 30], ['.article', 34], ['.translation', 32], ['.vocab [data-edit$=\":word\"]', 34], ['.vocab [data-edit$=\":ipa\"]', 30], ['.vocab [data-edit*=\"meaning\"]', 30], ['.vocab [data-edit*=\"example\"]', 30], ['.section-heading', 32], ['.vocab-heading', 32]] as const) {
     await expect(page.locator(selector).first()).toHaveCSS('font-size', `${size}px`);
   }
   await page.screenshot({ path: '.build/test-results/settings-fonts.png' });
