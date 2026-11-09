@@ -56,7 +56,7 @@ test('Article v6 editing, portable JSON, history, draft recovery and strict impo
   await expect(page.getByLabel('英文段落 2', { exact: true })).toHaveValue(changed);
 
   const alert = page.getByRole('alert');
-  for (const invalid of ['{', JSON.stringify({ ...fixture, schemaVersion: 5 }), JSON.stringify({ ...fixture, title: null }), JSON.stringify({ ...fixture, title: '\\ufffd' })]) {
+  for (const invalid of ['{', JSON.stringify({ ...fixture, schemaVersion: 5 }), JSON.stringify({ ...fixture, title: null }), JSON.stringify({ ...fixture, title: '\uFFFD' })]) {
     // Clear the previous notice so every rejected import must produce a fresh alert.
     if (await alert.count()) {
       await alert.getByRole('button', { name: '关闭', exact: true }).click();
