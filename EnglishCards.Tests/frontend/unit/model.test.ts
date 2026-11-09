@@ -41,12 +41,18 @@ describe('Article v6 persistence and vocabulary highlights', () => {
     expect(() => parseProject({ ...fixture, highlights: [{ id: 'bad', paragraphId: 'p001', start: 0, end: 3, quote: 'bad' }] })).toThrow();
   });
 
-  it('adds and removes a vocabulary highlight rule immutably', () => {
-    let article = parseProject({ ...fixture, content: { paragraphs: [{ id: 'p001', text: 'word word' }] }, vocabulary: [] });
-    article = toggleHighlight(article, 'p001', 0, 4);
-    expect(collectHighlights(article)).toHaveLength(2);
-    article = toggleHighlight(article, 'p001', 5, 9);
-    expect(collectHighlights(article)).toEqual([]);
+  it('adds and removes an explicit variant while keeping the dictionary headword highlighted', () => {
+    let article = parseProject({
+      ...fixture,
+      content: { paragraphs: [{ id: 'p001', text: 'word words' }] },
+      vocabulary: [{
+        id: 'v001', word: 'word', highlight: ['words'],
+        senses: [{ pos: '', meaning: '', example: '', exampleTranslation: '' }],
+      }],
+    });
+    expect(collectHighlights(article).map(mark => mark.quote)).toEqual(['word', 'words']);
+    article = toggleHighlight(article, 'p001', 5, 10);
+    expect(collectHighlights(article).map(mark => mark.quote)).toEqual(['word']);
     expect(article.vocabulary[0].highlight).toEqual([]);
   });
 
@@ -57,6 +63,6 @@ describe('Article v6 persistence and vocabulary highlights', () => {
     expect(collectHighlights(article)).toMatchObject([{ start: 4, end: 8, quote: 'word' }, { start: 9, end: 13, quote: 'word' }]);
     article = editParagraph(article, 'p001', 'new word changed');
     expect(collectHighlights(article)).toHaveLength(1);
-    expect(article.vocabulary.find(entry => entry.word === 'word')?.highlight).toEqual(['word']);
+    expect(article.vocabulary.find(entry => entry.word === 'word')?.highlight).toEqual([]);
   });
 });
