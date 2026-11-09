@@ -25,7 +25,7 @@ test('unified vocabulary entries retain variants, paired senses and automatic hi
   
   const add = page.getByRole('button', { name: '在选中词汇下方添加空白行', exact: true });
   await expect(page.getByRole('button', { name: '刷新词汇高亮', exact: true })).toHaveCount(0);
-  await expect(marks).toHaveText(['ran', 'took off', 'take off']);
+  await expect(marks).toHaveText(['ran', 'run', 'took off', 'take off']);
 
   await add.click();
   await page.getByLabel('词头 2', { exact: true }).fill('record');
@@ -55,7 +55,7 @@ test('unified vocabulary entries retain variants, paired senses and automatic hi
   expect(saved).not.toHaveProperty('expressions');
   expect(saved).not.toHaveProperty('mainIdea');
   await page.reload(); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await expect(marks).toHaveText(['ran', 'record', 'took off', 'take off']);
+  await expect(marks).toHaveText(['ran', 'run', 'record', 'took off', 'take off']);
   const snapshot = await page.evaluate(() => window.editor);
   const { styles: _settings, ...document } = snapshot.project;
   expect(document).toEqual(saved);
