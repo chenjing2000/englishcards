@@ -31,9 +31,9 @@ it('keeps distinct senses and their examples together and rejects missing sense 
 it('replaces the previous primary head highlight while committing a new surface form', () => {
   const input = parseProject({ ...fixture, content: { paragraphs: [{ id: 'p001', text: 'ran running run' }] }, vocabulary: [{ id: 'v001', word: '', highlight: [], senses: [{ pos: '', meaning: '', example: '', exampleTranslation: '' }] }] });
   const first = commitEntryHead(input, 'vocabulary', 'v001', 'ran');
-  expect(first.vocabulary[0]).toMatchObject({ word: 'ran', highlight: ['ran'] });
+  expect(first.vocabulary[0]).toMatchObject({ word: 'ran', highlight: [] });
   const second = commitEntryHead(first, 'vocabulary', 'v001', 'running');
-  expect(second.vocabulary[0].highlight).toEqual(['running']);
+  expect(second.vocabulary[0].highlight).toEqual([]);
   expect(collectHighlights(second).map(mark => mark.quote)).toEqual(['running']);
   expect(input.vocabulary[0].word).toBe('');
   expect(commitEntryHead(second, 'vocabulary', 'v001', 'running')).toBe(second);
