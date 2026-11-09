@@ -82,6 +82,14 @@ test('highlight editor updates independent rules live and preserves dictionary-w
   const marks = page.locator('.card .article .hot');
   await expect(marks).toHaveText(['Study']);
 
+  const word = page.getByLabel('词头 1', { exact: true });
+  await word.fill('stud');
+  await expect(marks).toHaveCount(0);
+  await word.fill('studies');
+  await expect(marks).toHaveText(['studies']);
+  await word.fill('study');
+  await expect(marks).toHaveText(['Study']);
+
   const editor = page.getByLabel('高亮词汇 1', { exact: true });
   await editor.fill('studies; studied; only fo; only that; STUDIES;;');
   await expect(marks).toHaveText(['Study', 'studies', 'studied', 'Only that']);
