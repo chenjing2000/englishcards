@@ -87,7 +87,9 @@ export default function EditorView() {
         {vm.desktop && cardActions}
       </div>
       {rejectedDraft && <div className="draft-recovery"><button type="button" onClick={vm.downloadRejectedDraft}>下载原始草稿</button></div>}
-      <div inert={!settingsReady || vm.opening || (vm.desktop && !vm.activeCardPath && !settingsOpen)} className="fields phase-c-fields">
+      {vm.desktop && !vm.activeCardPath
+        ? <div className="phase-e-empty-editor" role="status">请选择卡片馆中的 JSON 文件，或点击上方「新建卡片」开始编辑。</div>
+        : <div inert={!settingsReady || vm.opening} className="fields phase-c-fields">
         {settingsOpen && !vm.desktop ? settingsContents : <div className="article-editor" aria-label="文章编辑">
           <section className="editor-section" aria-label="Vocabulary 编辑区">
             <h2>Vocabulary</h2>
@@ -114,7 +116,7 @@ export default function EditorView() {
             <p className="hint">自然段之间用空行分隔；最多 999 段。</p>
           </section>
         </div>}
-      </div>
+      </div>}
       <div className="editor-bottom">
         {vm.cardSaveStatus === 'error' && <button type="button" className="retry-card-save" onClick={() => void vm.retryCardSave()}>重试保存当前卡片</button>}
         {!settingsOpen && <VocabularyActions viewModel={vm} focusField={setFocusId} />}
