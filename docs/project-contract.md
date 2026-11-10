@@ -1,5 +1,8 @@
 # EnglishCards 项目契约
 
+> **Phase E 当前产品行为（2026-11-10）：** 独立 Article v6 JSON 直接通过卡片馆打开，自动保存到原文件，保存期间拒绝切换且不排队；新建卡片按标题生成 JSON；正式导出为 ZIP。右栏为独立连续编辑器，左侧为按需加载目录树。桌面端不再读取旧全局草稿，不再提供单独的 JSON/TXT 导入按钮和手动保存 JSON。详见 [Phase E 最终规格](specs/PHASE_E_CARD_LIBRARY.md)。本文件以下较早期的 JSON/TXT 导入、四按钮工具栏、全局草稿恢复等阶段描述仅为历史设计，不覆盖 Phase E。
+
+
 > **当前状态（2026-11-07）：** 已批准从 schemaVersion 5 破坏性升级至 Article v6。Article v6 已接入 React 生产数据模型、分页渲染、JSON/TXT 导入、项目保存、自动草稿和 WPF/ZIP schema 边界；前端/桌面端读写均以 Article v6 为准。右侧单页编辑器、左侧新式选区加号、配套图片加载、Settings 齿轮工具栏及 14/16 DIP 编辑器排版仍待后续阶段实施。不得把 v5 与 v6 混合写入同一项目，也不得宣称最终界面重构已完成。
 
 ## 1. 产品定位与技术边界
