@@ -4,7 +4,7 @@ import {
   appendParagraph, commitEntryHead, defaults, editParagraph, emptySense, parseHighlightInput,
   addVocabulary, isValidVocabularySelection, newId, removeEntrySense, removeVocabulary, renumberVocabulary, replaceArticleParagraphs, setArticleText,
   splitSenseMeaning, toggleHighlight, vocabularyId, type EntryCollection,
-  projectDocument, styleSchema, type RenderProject, type Project, type Sense, type Styles,
+  createEmptyArticle, projectDocument, styleSchema, type RenderProject, type Project, type Sense, type Styles,
 } from '../models/project';
 import { paginate, type Layout } from '../services/pagination';
 import {
@@ -14,7 +14,7 @@ import {
 } from '../services/projectIO';
 import { desktopRequest, isDesktop } from '../services/desktopBridge';
 import { CardSaveCoordinator, type CardSaveStatus } from '../services/cardSaveCoordinator';
-import { createCardSaveCoordinator, openCardFile, serializedCard } from '../services/cardFileIO';
+import { createCardFile, createCardSaveCoordinator, openCardFile, serializedCard } from '../services/cardFileIO';
 
 type ParagraphCollection = 'content' | 'translation';
 const stringify = (project: Project) => JSON.stringify(projectDocument(project), null, 2);
@@ -76,6 +76,14 @@ export function useEditorViewModel() {
   const invalidCardSnapshot = useRef(false);
   const cardTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [cardSaveStatus, setCardSaveStatus] = useState<CardSaveStatus>('clean');
+  const [activeCardPath, setActiveCardPath] = useState<string | null>(null);
+  const [libraryRoot, setLibraryRoot] = useState(() =>
+    desktop ? localStorage.getItem('englishcards.library.root') ?? '' : '');
+  const [libraryRevision, setLibraryRevision] = useState(0);
+  function changeLibraryRoot(path: string) {
+    setLibraryRoot(path);
+    if (desktop) localStorage.setItem('englishcards.library.root', path);
+  }
   const latest = useRef({ project, opening });
   useLayoutEffect(() => { latest.current = { project, opening }; }, [project, opening]);
 
@@ -303,6 +311,7 @@ export function useEditorViewModel() {
       const session = createCardSaveCoordinator(openedPath, article);
       clearTimeout(cardTimer.current);
       cardSession.current = session;
+      setActiveCardPath(openedPath);
       invalidCardSnapshot.current = false;
       setWordDrafts({});
       update(article);
@@ -313,6 +322,41 @@ export function useEditorViewModel() {
       return true;
     } catch (reason) {
       reportError('card-open', `卡片打开失败：${String(reason)}`);
+      return false;
+    } finally { setOpening(false); }
+  }
+
+  async function newCard(directory: string): Promise<boolean> {
+    if (!desktop || !directory || opening || preparingClose.current) return false;
+    const current = cardSession.current;
+    if (invalidCardSnapshot.current || (current && current.status !== 'clean') ||
+        (!current && hasFileChanges)) {
+      if (current?.status === 'dirty') void flushCardSave(current);
+      showWarning('当前卡片正在保存或存在未保存内容，请完成后重新点击新建卡片。');
+      return false;
+    }
+    setOpening(true);
+    try {
+      const empty = createEmptyArticle();
+      const created = await createCardFile(directory, empty);
+      if (!created) return false;
+      // File creation has completed. The bridge now owns the new file identity.
+      const next = projectDocument(JSON.parse(created.text) as Project);
+      const session = createCardSaveCoordinator(created.path, next);
+      clearTimeout(cardTimer.current);
+      cardSession.current = session;
+      invalidCardSnapshot.current = false;
+      setActiveCardPath(created.path);
+      setWordDrafts({});
+      update(next);
+      setLastFile(stringify(next));
+      setVocabularySelection(null);
+      setCardSaveStatus('clean');
+      setLibraryRevision(value => value + 1);
+      reportError('card-open', '');
+      return true;
+    } catch (reason) {
+      reportError('card-create', `新建卡片失败：${String(reason)}`);
       return false;
     } finally { setOpening(false); }
   }
@@ -588,7 +632,8 @@ export function useEditorViewModel() {
   return {
     project, warning, error, settingsReady, ready, exporting, opening, desktop, closing,
     layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
-    open, openCardPath, retryCardSave, cardSaveStatus, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
+    open, openCardPath, newCard, retryCardSave, cardSaveStatus, activeCardPath,
+    libraryRoot, libraryRevision, changeLibraryRoot, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
     highlightRange, addVocabularyFromSelection, commitHead, setWordPreview, setEntryHighlights, setSenseField, setVocabularyMeaning,
     addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,
     selectedVocabulary, selectedVocabularyIndex, selectVocabulary, moveSelectedVocabulary,
