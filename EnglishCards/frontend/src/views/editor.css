@@ -120,9 +120,31 @@
 .phase-e-layout>.workspace>.editor-panel>.fields{overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}
 .phase-e-modal-backdrop{position:fixed}
 
-/* Desktop toolbar occupies its own right-aligned row below the editor title. */
-.editor-panel .phase-c-heading:has(.phase-e-actions){display:flex;flex-direction:column;align-items:stretch;gap:0;padding-bottom:12px}
-.editor-panel .phase-c-heading:has(.phase-e-actions) h1{align-self:flex-start}
-.editor-panel .phase-c-heading .phase-e-actions{align-self:flex-end;margin-top:12px}
+/* Transcript Studio toolbar parity: title and three round actions share one row. */
+.editor-panel .phase-c-heading:has(.phase-e-actions){
+  display:flex;flex-direction:row;align-items:center;justify-content:space-between;
+  gap:12px;padding:10px 12px;border-bottom:1px solid #dde5e9;
+}
+.editor-panel .phase-c-heading:has(.phase-e-actions) h1{
+  flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:18px;font-weight:650;
+}
+.editor-panel .phase-c-heading .phase-e-actions{
+  position:static;display:flex;flex:0 0 auto;align-items:center;justify-content:flex-end;
+  gap:8px;margin:0;padding:0;
+}
+.editor-panel .phase-c-heading .phase-e-actions button{
+  display:inline-flex;align-items:center;justify-content:center;flex:none;
+  width:40px;height:40px;min-width:40px;padding:0;border:none;border-radius:50%;
+  background:#A2D2E2;color:#20343f;box-shadow:none;transition:filter .15s;
+}
+.editor-panel .phase-c-heading .phase-e-actions button:hover{
+  background:#A2D2E2;border:none;filter:brightness(1.06);
+}
+.editor-panel .phase-c-heading .phase-e-actions button:disabled{opacity:.4;cursor:not-allowed}
+.editor-panel .phase-c-heading .phase-e-actions button:focus-visible{
+  outline:2px solid #007175;outline-offset:2px;
+}
+.editor-panel .phase-c-heading .phase-e-actions svg{width:20px;height:20px;display:block}
 
 .phase-e-create-error{color:#a33131;font-size:13px;margin:0;overflow-wrap:anywhere}
