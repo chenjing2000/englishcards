@@ -65,7 +65,7 @@ Latest owner verification follow-up (2026-11-10; run from `C:\\Projects\\English
 - `dotnet run --project EnglishCards.Tests\\dotnet\\EnglishCards.Tests.csproj -c Release`: **19/19 PASS**. Coverage includes save coordination, atomic/exclusive file writes and cleanup, instance lease, settings/draft persistence safety, embedded React assets, WebView2 origin/startup recovery, ZIP/PNG validation, Article v6 schema boundaries and Phase E card-library operations.
 - `npx.cmd tsx docs/skills/article-to-englishcards/scripts/validate-project.ts`: **PASS** (2 body paragraphs, 2 translation paragraphs, 1 vocabulary item).
 - `dotnet publish EnglishCards\\desktop\\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\\EnglishCards`: **succeeded**, producing `dist\\EnglishCards\\` in 1.3 seconds.
-- Owner launched `dist\\EnglishCards\\EnglishCards.exe`; no startup error was reported in the supplied console output. This confirms launch was attempted, not the visual/interaction acceptance below.
+- Owner launched `dist\\EnglishCards\\EnglishCards.exe`; confirmed the EnglishCards main window displayed normally, without a crash or automatic close. This passes the application startup check, but does not by itself establish the remaining visual/interaction acceptance below.
 
 The latest owner-provided Windows test log is for commit `b82e37ab1b3f53eee0a2d272b79e9ecacead4beb` and records:
 
