@@ -94,7 +94,7 @@ export default function EditorView() {
   return <div className="app-shell" inert={vm.desktop && (!settingsReady || vm.closing)}>
     <div className="phase-e-layout">
       {vm.desktop && <CardLibrary root={vm.libraryRoot} activePath={vm.activeCardPath}
-        revision={vm.libraryRevision} onRootChange={vm.changeLibraryRoot}
+        revision={vm.libraryRevision} onRootChange={vm.changeLibraryRoot} onError={vm.reportError}
         onOpen={path => { void vm.openCardPath(path); }} />}
     <SplitPane right={<aside className="editor-panel" id="editor-panel">
       <div className="panel-heading phase-c-heading">
