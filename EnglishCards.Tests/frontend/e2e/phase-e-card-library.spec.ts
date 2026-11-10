@@ -126,7 +126,8 @@ test('Settings uses a two-column 640 DIP dialog and New Card supports a custom f
   }, fixture);
 
   await page.goto('/');
-  await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  const newCardButton = page.getByRole('button', { name: '新建卡片' });
+  await expect(newCardButton).toBeEnabled();
   await page.getByRole('button', { name: '设置' }).click();
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings).toBeVisible();
