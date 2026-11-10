@@ -8,6 +8,7 @@ declare global {
       requests: Request[];
       failNextSave: boolean;
       corruptNextOpen: boolean;
+      failDirectoryRead: boolean;
     };
   }
 }
@@ -18,7 +19,7 @@ test.beforeEach(async ({ page }) => {
     const cards: Record<string, unknown> = {
       'C:/cards/A.json': { ...initial, title: 'Card A' },
     };
-    window.phaseEIO = { requests: [], failNextSave: false, corruptNextOpen: false };
+    window.phaseEIO = { requests: [], failNextSave: false, corruptNextOpen: false, failDirectoryRead: false };
     localStorage.setItem('englishcards.library.root', 'C:/cards');
     const respond = (id: number, value: unknown, error?: string) =>
       events.dispatchEvent(new MessageEvent('message', {
@@ -37,6 +38,9 @@ test.beforeEach(async ({ page }) => {
           files: payload === 'C:/cards'
             ? Object.keys(cards).map(path => ({ path, name: path.split('/').at(-1)! })) : [],
         };
+        if (command === 'listCardDirectory' && window.phaseEIO.failDirectoryRead && payload === 'C:/cards/Subfolder') {
+          error = 'Access denied';
+        }
         if (command === 'openCardFile') {
           value = { path: payload, text: window.phaseEIO.corruptNextOpen
             ? '{"schemaVersion":5}' : JSON.stringify(cards[payload as string]),
@@ -85,6 +89,17 @@ test('library uses ReadArticles-style expander, without heading or refresh', asy
   await expect(folder).toHaveAttribute('aria-expanded', 'true');
   await expect.poll(() => page.evaluate(() => window.phaseEIO.requests.some(item =>
     item.command === 'listCardDirectory' && item.payload === 'C:/cards/Subfolder'))).toBe(true);
+});
+
+test('card-library directory errors use the shared preview notice rather than inline alerts', async ({ page }) => {
+  await page.evaluate(() => { window.phaseEIO.failDirectoryRead = true; });
+  await page.getByRole('button', { name: '目录 Subfolder' }).click();
+  const error = page.locator('.phase-e-notices .phase-e-notice-error');
+  await expect(error).toHaveCount(1);
+  await expect(error).toContainText('Access denied');
+  await expect(page.locator('.card-library [role="alert"]')).toHaveCount(0);
+  await error.getByRole('button', { name: '关闭消息' }).click();
+  await expect(error).toHaveCount(0);
 });
 
 test('right editor title and Transcript Studio-style circular icons share one row', async ({ page }) => {
