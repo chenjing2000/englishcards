@@ -29,6 +29,21 @@
 
 本程序采用 Framework-dependent 发布，不附带 .NET Runtime。目标电脑必须安装兼容的 .NET 10 Desktop Runtime x64。WebView2 使用 Evergreen Runtime。程序不需要独立安装 Chromium，也不需要启动 Express 服务。
 
+## Windows 一键编译与测试
+
+脚本位于 [`tests/build-and-test.bat`](tests/build-and-test.bat)，可在仓库根目录或通过完整路径调用，执行时会自动切换到仓库根目录。
+
+```bat
+tests\build-and-test.bat setup    REM 首次准备依赖及 Playwright Chromium
+tests\build-and-test.bat build    REM 前端编译检查与生产资源构建
+tests\build-and-test.bat test     REM 前端单测、浏览器 E2E 与 .NET 测试
+tests\build-and-test.bat all      REM 完整验证（默认，不发布）
+tests\build-and-test.bat publish  REM Windows x64 单文件发布
+tests\build-and-test.bat help     REM 查看所有子命令
+```
+
+日常修改后可直接运行 `tests\build-and-test.bat`（等同于 `all`）。单独运行 `unit`、`e2e`、`dotnet` 可以缩小检查范围。遇到失败时脚本立即停止并返回非零退出码，不会自动删除 `userdata/`。发布是独立命令，不会在日常 `all` 验证时覆盖发布目录。
+
 ## 开发环境与验证
 
 需要 Windows x64、.NET 10 SDK、Node.js 22.12 或更高版本和 npm。在仓库根目录执行：
