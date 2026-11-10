@@ -189,10 +189,23 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         var destination = ValidateCardPath(picker.FileName);
         // New-card semantics differ from ordinary overwrite-capable autosave.
         // FileMode.CreateNew is the final exclusive no-overwrite guard.
-        await using (var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write,
-                         FileShare.None, 4096, useAsync: true))
-        await using (var writer = new StreamWriter(output))
-            await writer.WriteAsync(text);
+        var staged = Path.Combine(Path.GetDirectoryName(destination)!,
+            $".englishcards-{Guid.NewGuid():N}.tmp");
+        try
+        {
+            await using (var output = new FileStream(staged, FileMode.CreateNew, FileAccess.Write,
+                             FileShare.None, 4096, useAsync: true))
+            await using (var writer = new StreamWriter(output))
+                await writer.WriteAsync(text);
+            // Atomic, exclusive creation: never replace an existing JSON file.
+            File.Move(staged, destination, overwrite: false);
+        }
+        finally
+        {
+            try { File.Delete(staged); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
         activeCardPath = destination;
         return new { path = destination, text };
     }
