@@ -77,8 +77,9 @@ test('Phase E rejects a card switch until A is saved and requires a second click
   await expect(page.getByText('当前卡片正在保存，请保存完成后重新选择卡片。')).toBeVisible();
 
   await page.evaluate(() => window.phaseETest.releaseSave());
-  await expect.poll(() => page.evaluate(() =>
-    window.phaseETest.requests.filter(item => item.command === 'activateCardFile').length)).toBe(1);
+  await expect(page.getByRole('button', { name: '导出 ZIP' })).toBeEnabled();
+  expect(await page.evaluate(() => window.phaseETest.requests.filter(item =>
+    item.command === 'activateCardFile').length)).toBe(1);
   await page.getByRole('button', { name: 'B.json' }).click();
   await expect(title).toHaveValue('Card B');
   expect(await page.evaluate(() => window.phaseETest.requests.filter(item =>
