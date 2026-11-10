@@ -91,7 +91,7 @@ export const readSettingsFile = async (file: File) =>
   settingsSchema.parse(JSON.parse(await file.text()));
 
 async function loadDesktopFile<T>(
-  command: 'loadSettings' | 'loadDraft',
+  command: 'loadSettings',
   parse: (text: string) => T,
   fallback: T,
 ) {
@@ -103,7 +103,7 @@ async function loadDesktopFile<T>(
   }
 }
 
-export type DesktopSaveResult = { pending: boolean; settingsError: string; draftError: string };
+export type DesktopSaveResult = { pending: boolean; settingsError: string };
 
 export class DesktopPersistence {
   private queue = Promise.resolve();
@@ -113,18 +113,16 @@ export class DesktopPersistence {
 
   constructor(
     private savedSettings: string | null,
-    private savedDraft: string,
     private rejectedSettings: boolean,
-    private rejectedDraft: boolean,
   ) {}
 
   replaceSettings() { this.settingsRevision++; }
 
-  save(project: RenderProject, settingsOnly = false): Promise<DesktopSaveResult> {
+  save(project: RenderProject): Promise<DesktopSaveResult> {
     const pending = this.queued++ > 0;
     const settingsRevision = this.settingsRevision;
     const write = this.queue.then(async () => {
-      const result = { pending, settingsError: '', draftError: '' };
+      const result = { pending, settingsError: '' };
       try {
         const settings = settingsSchema.safeParse(project.styles);
         if (!settings.success) {
@@ -142,17 +140,6 @@ export class DesktopPersistence {
         }
       } catch (reason) { result.settingsError = `配置未保存：${String(reason)}`; }
 
-      if (!settingsOnly) try {
-        const document = projectDocument(project);
-        const snapshot = JSON.stringify(document);
-        if (snapshot !== this.savedDraft) {
-          result.pending = true;
-          const text = draftText(document);
-          await desktopRequest('saveDraft', { text, preserveOriginal: this.rejectedDraft });
-          this.savedDraft = snapshot;
-          this.rejectedDraft = false;
-        }
-      } catch (reason) { result.draftError = `自动草稿未保存：${String(reason)}`; }
       return result;
     });
     this.queue = write.then(() => { this.queued--; }, () => { this.queued--; });
@@ -169,9 +156,7 @@ export async function loadDesktopData() {
   );
   const persistence = new DesktopPersistence(
     settings.missing ? null : JSON.stringify(settings.value),
-    JSON.stringify(sample.project),
     settings.rejected,
-    false,
   );
   return {
     settings: settings.value,
