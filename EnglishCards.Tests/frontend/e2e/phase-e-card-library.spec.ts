@@ -75,7 +75,10 @@ test('Phase E rejects a card switch until A is saved and requires a second click
 
   await page.getByRole('button', { name: 'B.json' }).click();
   await expect(title).toHaveValue('Edited A');
-  await expect(page.getByText('当前卡片正在保存，请保存完成后重新选择卡片。')).toBeVisible();
+  const warningNotice = page.locator('.preview-panel .phase-e-notice-normal')
+    .filter({ hasText: '当前卡片正在保存，请保存完成后重新选择卡片。' });
+  await expect(warningNotice).toBeVisible();
+  await expect(warningNotice.getByRole('button', { name: '关闭消息' })).toBeVisible();
 
   await page.evaluate(() => window.phaseETest.releaseSave());
   await expect(page.getByRole('button', { name: '导出 ZIP' })).toBeEnabled();
