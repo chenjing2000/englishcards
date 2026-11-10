@@ -76,6 +76,8 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
                 "openCardFile" when payload.ValueKind == JsonValueKind.String => await OpenCardFileAsync(payload.GetString()!),
                 "saveCardFile" when payload.ValueKind == JsonValueKind.Object => await SaveCardFileAsync(payload),
                 "listCardDirectory" when payload.ValueKind == JsonValueKind.String => ListCardDirectory(payload.GetString()!),
+                "chooseCardLibrary" when payload.ValueKind == JsonValueKind.Null => ChooseCardLibrary(),
+                "createCardFile" when payload.ValueKind == JsonValueKind.Object => await CreateCardFileAsync(payload),
                 "saveProject" when payload.ValueKind == JsonValueKind.String => await SaveProjectAsync(payload.GetString()!),
                 "loadSettings" when payload.ValueKind == JsonValueKind.Null => await data.LoadSettingsAsync(),
                 "loadDraft" when payload.ValueKind == JsonValueKind.Null => await data.LoadDraftAsync(),
@@ -155,6 +157,44 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         if (!File.Exists(path)) throw new FileNotFoundException("卡片文件已被删除，已拒绝自动重新创建。", path);
         await UserDataStore.WriteAtomicallyAsync(path, text);
         return true;
+    }
+
+    private string? ChooseCardLibrary()
+    {
+        var picker = new OpenFolderDialog
+        {
+            Title = "选择卡片馆目录",
+            InitialDirectory = data.ProjectsPath,
+            Multiselect = false
+        };
+        return picker.ShowDialog(owner) == true ? picker.FolderName : null;
+    }
+
+    private async Task<object?> CreateCardFileAsync(JsonElement payload)
+    {
+        if (!payload.TryGetProperty("text", out var textValue) || textValue.ValueKind != JsonValueKind.String ||
+            !payload.TryGetProperty("directory", out var folderValue) || folderValue.ValueKind != JsonValueKind.String)
+            throw new InvalidDataException("无效的新建卡片请求。");
+        var folder = Path.GetFullPath(folderValue.GetString()!);
+        if (!Directory.Exists(folder)) throw new DirectoryNotFoundException("卡片馆目录不存在。");
+        var text = textValue.GetString()!;
+        using (var parsed = JsonDocument.Parse(text))
+            ArticleContractValidator.Validate(parsed.RootElement);
+        var picker = new SaveFileDialog
+        {
+            Filter = SaveArticleFilter, DefaultExt = ".json", AddExtension = true,
+            FileName = "新建卡片.json", InitialDirectory = folder, OverwritePrompt = true
+        };
+        if (picker.ShowDialog(owner) != true) return null;
+        var destination = ValidateCardPath(picker.FileName);
+        // New-card semantics differ from ordinary overwrite-capable autosave.
+        // FileMode.CreateNew is the final exclusive no-overwrite guard.
+        await using (var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write,
+                         FileShare.None, 4096, useAsync: true))
+        await using (var writer = new StreamWriter(output))
+            await writer.WriteAsync(text);
+        activeCardPath = destination;
+        return new { path = destination, text };
     }
 
     private static object ListCardDirectory(string directory)
