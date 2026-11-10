@@ -97,6 +97,26 @@ test('Phase E new card creates JSON before activating the editor', async ({ page
   await expect(page.getByRole('button', { name: 'My New Card.json' })).toBeVisible();
 });
 
+test('opened desktop card is editable with pointer input and mouse-wheel scrolling', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  const fields = page.locator('.fields');
+  await expect(fields).not.toHaveAttribute('inert', '');
+  const title = page.getByLabel('英文标题', { exact: true });
+  await expect(title).toBeEditable();
+  await title.click();
+  await title.fill('A editable with a mouse');
+  await expect(title).toHaveValue('A editable with a mouse');
+  const content = page.getByLabel('英文正文', { exact: true });
+  await expect(content).toBeEditable();
+  await content.fill(Array.from({ length: 90 }, (_, index) => `Paragraph ${index + 1} with reading text.`).join('\n\n'));
+  await expect.poll(() => page.evaluate(() =>
+    window.phaseEIO.requests.some(item => item.command === 'saveCardFile'))).toBe(true);
+  const before = await fields.evaluate(element => element.scrollTop);
+  await page.mouse.move(1000, 600);
+  await page.mouse.wheel(0, 550);
+  await expect.poll(() => fields.evaluate(element => element.scrollTop)).toBeGreaterThan(before);
+});
+
 test('Phase E save failure retains A and allows explicit retry', async ({ page }) => {
   await page.getByRole('button', { name: 'A.json' }).click();
   const title = page.getByLabel('英文标题', { exact: true });
