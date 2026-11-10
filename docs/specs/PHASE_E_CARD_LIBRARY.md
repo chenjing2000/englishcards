@@ -39,6 +39,14 @@ This specification supersedes conflicting older import, draft, toolbar and works
 - Settings is an in-workspace modal surface; preserve existing valid settings fields and default reset, remove import-settings UI.
 - Notifications appear centered at the bottom of the preview pane: default 300 DIP, min 240, max 360; normal messages fade over 5 seconds; errors persist until dismissed; all messages have close buttons; multiple notices stack upwards and reflow down as earlier notices disappear.
 
+## Phase E final UI adjustments (2026-11-10)
+
+- Floating notices remain anchored to the preview pane's lower center but render in a body-level overlay above modal backdrops, so create-file errors are visible while the New Card dialog remains open.
+- Normal, warning, and error notices all have default width **360 DIP**, minimum **240 DIP**, and maximum **480 DIP**, further constrained by available preview width. Multiple notices continue to stack upwards. Normal notices expire after five seconds of active display, pause on hover, and are individually dismissible. Errors persist until dismissed or resolved.
+- Design Settings modal is centered with **320 DIP** default width, **280 DIP** minimum, and **360 DIP** maximum. Reduce its horizontal content padding and use a 60/40 two-column settings table to avoid unnecessary wrapping; internal scrolling remains available.
+- New Card modal does not show an inline duplicate-file or filesystem-error label. Business errors are reported once through the shared notice service. Failed creation leaves the dialog open with the original title and does not overwrite a JSON file. A successful subsequent creation closes the dialog, clears the resolved create error, and emits a normal success notice.
+- Dismissing a save-error notice must **not** clear the underlying failed-save status or unlock a protected card switch.
+
 ## 4. Implementation sequence and gates
 
 0. Freeze requirements, inspect baseline and establish regression coverage.
