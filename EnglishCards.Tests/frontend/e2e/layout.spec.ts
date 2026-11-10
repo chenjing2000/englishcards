@@ -51,6 +51,7 @@ test('splitter remains draggable beside an active vocabulary editor field', asyn
   await page.goto('/');
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   const word = page.getByLabel('词头 1', { exact: true });
+  const originalWord = await word.inputValue();
   await word.focus();
 
   const editor = page.locator('.editor-panel');
@@ -65,7 +66,7 @@ test('splitter remains draggable beside an active vocabulary editor field', asyn
   await page.mouse.up();
 
   await expect.poll(async () => (await editor.boundingBox())!.width).toBeCloseTo(before - 80, 0);
-  await expect(word).toHaveValue('study');
+  await expect(word).toHaveValue(originalWord);
 });
 
 test('vocabulary preview is rendered as one full-width vertical list', async ({ page }) => {
