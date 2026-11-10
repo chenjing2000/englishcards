@@ -13,6 +13,8 @@ import {
   type DesktopPersistence, type DesktopSaveResult,
 } from '../services/projectIO';
 import { desktopRequest, isDesktop } from '../services/desktopBridge';
+import { CardSaveCoordinator, type CardSaveStatus } from '../services/cardSaveCoordinator';
+import { createCardSaveCoordinator, openCardFile, serializedCard } from '../services/cardFileIO';
 
 type ParagraphCollection = 'content' | 'translation';
 const stringify = (project: Project) => JSON.stringify(projectDocument(project), null, 2);
@@ -69,8 +71,44 @@ export function useEditorViewModel() {
   const importingSettings = useRef(false);
   const desktopStore = useRef<DesktopPersistence | null>(null);
   const desktopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Phase E file sessions are optional until the library UI replaces legacy open.
+  const cardSession = useRef<CardSaveCoordinator | null>(null);
+  const cardTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [cardSaveStatus, setCardSaveStatus] = useState<CardSaveStatus>('clean');
   const latest = useRef({ project, opening });
   useLayoutEffect(() => { latest.current = { project, opening }; }, [project, opening]);
+
+  function reportCardStatus(session: CardSaveCoordinator) {
+    if (cardSession.current !== session) return;
+    setCardSaveStatus(session.status);
+    reportError('card-save', session.error ? `当前卡片保存失败：${session.error}` : '');
+  }
+
+  async function flushCardSave(session: CardSaveCoordinator): Promise<boolean> {
+    clearTimeout(cardTimer.current);
+    if (session.status === 'error') { reportCardStatus(session); return false; }
+    const saved = await session.flush();
+    reportCardStatus(session);
+    return saved && session.status === 'clean';
+  }
+
+  // Register a strict v6 snapshot before any user can navigate away.
+  useLayoutEffect(() => {
+    const session = cardSession.current;
+    if (!session) return;
+    try {
+      session.edit(serializedCard(project));
+      reportCardStatus(session);
+      if (session.status !== 'dirty') return;
+      clearTimeout(cardTimer.current);
+      cardTimer.current = setTimeout(() => {
+        void flushCardSave(session);
+      }, 300);
+    } catch (reason) {
+      reportError('card-validation', `当前输入尚不是有效 Article v6，无法保存：${String(reason)}`);
+    }
+    return () => clearTimeout(cardTimer.current);
+  }, [project]);
   const [settingsReady, setSettingsReady] = useState(false);
   const savedSettings = useRef('');
   const settingsQueue = useRef(Promise.resolve());
@@ -169,7 +207,7 @@ export function useEditorViewModel() {
     if (!settingsReady || !store || preparingClose.current) return;
     let current = true;
     desktopTimer.current = setTimeout(() => {
-      void store.save(project).then(result => { if (current) reportDesktopSave(result); });
+      void store.save(project, cardSession.current !== null).then(result => { if (current) reportDesktopSave(result); });
     }, 300);
     return () => { current = false; clearTimeout(desktopTimer.current); };
   }, [project, settingsReady]);
@@ -189,7 +227,10 @@ export function useEditorViewModel() {
           return { pending: true, errors: [], busy: true };
         }
         clearTimeout(desktopTimer.current);
-        const result = await desktopStore.current?.save(latest.current.project);
+        const card = cardSession.current;
+        if (card && !(await flushCardSave(card)))
+          return { pending: true, errors: ['当前卡片未能成功保存。'] };
+        const result = await desktopStore.current?.save(latest.current.project, card !== null);
         if (!result) return { pending: false, errors: [] };
         reportDesktopSave(result);
         return { pending: result.pending, errors: [result.settingsError, result.draftError].filter(Boolean) };
@@ -229,6 +270,49 @@ export function useEditorViewModel() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [hasFileChanges, settingsReady, project.styles]);
 
+  /** Phase E directory-tree entry point; a rejected click is never queued. */
+  async function openCardPath(path: string): Promise<boolean> {
+    if (!desktop || opening || preparingClose.current) return false;
+    const previous = cardSession.current;
+    if (previous && previous.status !== 'clean') {
+      if (previous.status === 'dirty') void flushCardSave(previous);
+      showWarning(previous.status === 'error'
+        ? '当前卡片保存失败，请重试保存后重新选择卡片。'
+        : '当前卡片正在保存，请保存完成后重新选择卡片。');
+      return false;
+    }
+    // A file session may not replace an uncommitted legacy editor document.
+    if (!previous && hasFileChanges) {
+      showWarning('当前文章有尚未保存的修改，已拒绝打开其他卡片。');
+      return false;
+    }
+    setOpening(true);
+    try {
+      const { path: openedPath, article } = await openCardFile(path);
+      const session = createCardSaveCoordinator(openedPath, article);
+      clearTimeout(cardTimer.current);
+      cardSession.current = session;
+      setWordDrafts({});
+      update(article);
+      setLastFile(stringify(article));
+      setVocabularySelection(null);
+      setCardSaveStatus('clean');
+      reportError('card-open', '');
+      return true;
+    } catch (reason) {
+      reportError('card-open', `卡片打开失败：${String(reason)}`);
+      return false;
+    } finally { setOpening(false); }
+  }
+
+  async function retryCardSave(): Promise<boolean> {
+    const session = cardSession.current;
+    if (!session) return false;
+    const saved = await session.retry();
+    reportCardStatus(session);
+    return saved;
+  }
+
   async function open(file?: File) {
     if (!file && !isDesktop()) return;
     const request = ++openRequest.current;
@@ -266,6 +350,7 @@ export function useEditorViewModel() {
 
   async function exportImages() {
     if (!ready || exporting) return;
+    if (cardSession.current && !(await flushCardSave(cardSession.current))) return;
     setExporting(true);
     try {
       const outcome = await requestExport(project, rendered!.layout.signature, rendered!.layout.pages.length);
@@ -486,7 +571,7 @@ export function useEditorViewModel() {
   return {
     project, warning, error, settingsReady, ready, exporting, opening, desktop, closing,
     layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
-    open, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
+    open, openCardPath, retryCardSave, cardSaveStatus, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
     highlightRange, addVocabularyFromSelection, commitHead, setWordPreview, setEntryHighlights, setSenseField, setVocabularyMeaning,
     addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,
     selectedVocabulary, selectedVocabularyIndex, selectVocabulary, moveSelectedVocabulary,
