@@ -2,11 +2,11 @@
 
 **EnglishCards** 是面向 Windows x64 的本地英语精读卡片编辑器，采用 **WPF (.NET 10) + WebView2 + React/TypeScript**。
 
-**Phase E 实现与前端自动化验证已完成，正在等待最后的 Windows/WPF 实机验收。** 功能包括三栏工作区、文件型 Article v6 自动保存、独立 JSON 新建、导出 ZIP、统一浮动通知和紧凑设置窗口。开发分支为 `feature/phase-e-card-library`，尚未合并到 `main`。
+**Phase E 已完成并合并到 `main`。** 功能包括三栏工作区、文件型 Article v6 自动保存、独立 JSON 新建、导出 ZIP、统一浮动通知和紧凑设置窗口。最终 Windows/WPF 实机验收及 GitHub Windows CI 均已通过。
 
 桌面端打开卡片馆里的 JSON 文件并直接保存到原文件。保存尚未完成时，切换卡片请求会被拒绝；保存完成后必须重新点击。旧全局草稿不会自动恢复或迁移，程序也不会自行删除既有草稿文件。
 
-最新规则以 [Phase E 卡片馆规格](docs/specs/PHASE_E_CARD_LIBRARY.md) 为准。当前分支最近一次前端验证为 Vitest 64/64、Playwright 69/69、TypeScript/Vite 构建成功；合并前仍须完成 .NET 桌面测试、正式发布和真实 Windows/WPF/WebView2 验收。
+最新规则以 [Phase E 卡片馆规格](docs/specs/PHASE_E_CARD_LIBRARY.md) 为准。Phase E 验证记录：Vitest 64/64、Playwright 69/69、.NET 桌面测试 19/19、TypeScript/Vite 生产构建、Article v6 Skill 校验、Windows x64 发布、真实 WPF/WebView2 启动与关键 UI 实机验收，以及 GitHub Windows CI 均已通过。
 
 ## 已确认的目标产品规则
 
