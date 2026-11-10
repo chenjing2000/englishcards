@@ -48,11 +48,13 @@ function NoticeItem({ item, onClose }: { item: Notice; onClose: () => void }) {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     if (item.kind === 'error' || hover) return;
-    const start = Date.now();
-    const tick = setInterval(() => setElapsed(current =>
-      Math.min(5000, current + (Date.now() - (last.current || start)))), 50);
-    // Track time since previous tick rather than assuming fixed interval cadence.
-    const last = { current: start };
+    let last = Date.now();
+    const tick = setInterval(() => {
+      const now = Date.now();
+      const delta = now - last;
+      last = now;
+      setElapsed(current => Math.min(5000, current + delta));
+    }, 50);
     return () => clearInterval(tick);
   }, [item.kind, hover]);
   useEffect(() => {
