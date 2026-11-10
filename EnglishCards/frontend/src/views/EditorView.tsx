@@ -126,7 +126,8 @@ export default function EditorView() {
         {!settingsOpen && <VocabularyActions viewModel={vm} focusField={setFocusId} />}
         <NotificationBar error={error} warning={warning} closeError={vm.clearError} />
       </div>
-    </aside>} left={<CardPreview layout={layout} ready={ready} content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection}
+    </aside>} left={<CardPreview layout={vm.desktop && !vm.activeCardPath ? undefined : layout}
+      ready={ready && (!vm.desktop || !!vm.activeCardPath)} content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection}
       actions={vm.desktop ? null : <ProjectActions open={vm.open} save={vm.save} exportImages={vm.exportImages} ready={ready} exporting={exporting} />} />} />
     </div>
     {vm.desktop && newCardOpen && <div className="phase-e-modal-backdrop" role="presentation">
