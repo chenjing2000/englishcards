@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Threading;
@@ -14,6 +16,7 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
     private const string OpenArticleFilter = "EnglishCards 文章 (*.json;*.txt)|*.json;*.txt|Article JSON (*.json)|*.json|Plain Text (*.txt)|*.txt";
     private const string SaveArticleFilter = "Article JSON (*.json)|*.json";
     private string? activeCardPath;
+    private string? activeFingerprint;
     private long navigation;
     private Task fileCommandTail = Task.CompletedTask;
 
@@ -74,7 +77,7 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
             {
                 "openProject" when payload.ValueKind == JsonValueKind.Null => await OpenProjectAsync(),
                 "openCardFile" when payload.ValueKind == JsonValueKind.String => await OpenCardFileAsync(payload.GetString()!),
-                "activateCardFile" when payload.ValueKind == JsonValueKind.String => ActivateCardFile(payload.GetString()!),
+                "activateCardFile" when payload.ValueKind == JsonValueKind.Object => await ActivateCardFileAsync(payload),
                 "saveCardFile" when payload.ValueKind == JsonValueKind.Object => await SaveCardFileAsync(payload),
                 "listCardDirectory" when payload.ValueKind == JsonValueKind.String => ListCardDirectory(payload.GetString()!),
                 "chooseCardLibrary" when payload.ValueKind == JsonValueKind.Null => ChooseCardLibrary(),
@@ -133,21 +136,32 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         return Path.GetFullPath(path);
     }
 
+    private static string Fingerprint(string text) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
+
     private async Task<object> OpenCardFileAsync(string requestedPath)
     {
         var path = ValidateCardPath(requestedPath);
         var text = await File.ReadAllTextAsync(path);
         using var parsed = JsonDocument.Parse(text);
         ArticleContractValidator.Validate(parsed.RootElement);
-        // Do not change activeCardPath until the React side also validates this document.
-        return new { path, text };
+        // Identity remains unchanged until frontend validation also succeeds.
+        return new { path, text, fingerprint = Fingerprint(text) };
     }
 
-    private bool ActivateCardFile(string requestedPath)
+    private async Task<bool> ActivateCardFileAsync(JsonElement payload)
     {
-        var path = ValidateCardPath(requestedPath);
-        if (!File.Exists(path)) throw new FileNotFoundException("卡片文件不存在。", path);
+        if (!payload.TryGetProperty("path", out var pathValue) || pathValue.ValueKind != JsonValueKind.String ||
+            !payload.TryGetProperty("fingerprint", out var fingerprintValue) ||
+            fingerprintValue.ValueKind != JsonValueKind.String)
+            throw new InvalidDataException("无效的卡片激活请求。");
+        var path = ValidateCardPath(pathValue.GetString()!);
+        var expected = fingerprintValue.GetString()!;
+        var current = await File.ReadAllTextAsync(path);
+        if (!string.Equals(Fingerprint(current), expected, StringComparison.Ordinal))
+            throw new IOException("卡片文件在读取过程中发生外部修改，请重新选择。");
         activeCardPath = path;
+        activeFingerprint = expected;
         return true;
     }
 
@@ -163,7 +177,11 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         using var parsed = JsonDocument.Parse(text);
         ArticleContractValidator.Validate(parsed.RootElement);
         if (!File.Exists(path)) throw new FileNotFoundException("卡片文件已被删除，已拒绝自动重新创建。", path);
+        var onDisk = await File.ReadAllTextAsync(path);
+        if (activeFingerprint is null || !string.Equals(Fingerprint(onDisk), activeFingerprint, StringComparison.Ordinal))
+            throw new IOException("卡片文件已被其他程序修改，自动保存已停止，请先处理文件冲突。");
         await UserDataStore.WriteAtomicallyAsync(path, text);
+        activeFingerprint = Fingerprint(text);
         return true;
     }
 
@@ -215,6 +233,7 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
             catch (UnauthorizedAccessException) { }
         }
         activeCardPath = destination;
+        activeFingerprint = Fingerprint(text);
         return new { path = destination, text };
     }
 
