@@ -120,7 +120,7 @@ export class DesktopPersistence {
 
   replaceSettings() { this.settingsRevision++; }
 
-  save(project: RenderProject): Promise<DesktopSaveResult> {
+  save(project: RenderProject, settingsOnly = false): Promise<DesktopSaveResult> {
     const pending = this.queued++ > 0;
     const settingsRevision = this.settingsRevision;
     const write = this.queue.then(async () => {
@@ -142,7 +142,7 @@ export class DesktopPersistence {
         }
       } catch (reason) { result.settingsError = `配置未保存：${String(reason)}`; }
 
-      try {
+      if (!settingsOnly) try {
         const document = projectDocument(project);
         const snapshot = JSON.stringify(document);
         if (snapshot !== this.savedDraft) {
