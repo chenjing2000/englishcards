@@ -44,7 +44,7 @@ test('Phase E rejects a card switch until A is saved and requires a second click
           ],
         };
         if (command === 'openCardFile') value = {
-          path: payload, text: JSON.stringify(cards[payload as string]),
+          path: payload, text: JSON.stringify(cards[payload as string]), fingerprint: 'FAKEHASH',
         };
         if (command === 'saveCardFile') {
           const item = payload as { path: string; text: string };
