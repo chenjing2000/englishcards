@@ -213,8 +213,15 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         };
         if (picker.ShowDialog(owner) != true) return null;
         var destination = ValidateCardPath(picker.FileName);
-        // New-card semantics differ from ordinary overwrite-capable autosave.
-        // FileMode.CreateNew is the final exclusive no-overwrite guard.
+        await WriteNewCardAsync(destination, text);
+        activeCardPath = destination;
+        activeFingerprint = Fingerprint(text);
+        return new { path = destination, text };
+    }
+
+    // Testable exclusive creation primitive shared by the new-card dialog.
+    internal static async Task WriteNewCardAsync(string destination, string text)
+    {
         var staged = Path.Combine(Path.GetDirectoryName(destination)!,
             $".englishcards-{Guid.NewGuid():N}.tmp");
         try
@@ -223,7 +230,6 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
                              FileShare.None, 4096, useAsync: true))
             await using (var writer = new StreamWriter(output))
                 await writer.WriteAsync(text);
-            // Atomic, exclusive creation: never replace an existing JSON file.
             File.Move(staged, destination, overwrite: false);
         }
         finally
@@ -232,9 +238,6 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
             catch (IOException) { }
             catch (UnauthorizedAccessException) { }
         }
-        activeCardPath = destination;
-        activeFingerprint = Fingerprint(text);
-        return new { path = destination, text };
     }
 
     private static object ListCardDirectory(string directory)
