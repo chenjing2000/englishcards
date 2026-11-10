@@ -492,3 +492,29 @@ try
     Console.WriteLine("PASS Phase E validated JSON paths and shallow card library listing");
 }
 finally { cardDirectory.Delete(recursive: true); }
+
+
+// Phase E: new-card creation must never overwrite existing files, including races.
+var writeNewCard = bridgeType.GetMethod("WriteNewCardAsync", BindingFlags.Static | BindingFlags.NonPublic)
+    ?? throw new Exception("Phase E exclusive card creation primitive is missing.");
+Task CreateNewCard(string path, string json) =>
+    (Task)writeNewCard.Invoke(null, [path, json])!;
+var newCardDirectory = Directory.CreateTempSubdirectory("EnglishCards-new-card-test-");
+try
+{
+    var existing = Path.Combine(newCardDirectory.FullName, "Existing.json");
+    var created = Path.Combine(newCardDirectory.FullName, "New.json");
+    await File.WriteAllTextAsync(existing, "ORIGINAL");
+    await CreateNewCard(created, compactArticle);
+    if (await File.ReadAllTextAsync(created) != compactArticle)
+        throw new Exception("New-card creation must write the complete JSON snapshot.");
+    bool collisionRejected = false;
+    try { await CreateNewCard(existing, compactArticle); }
+    catch (IOException) { collisionRejected = true; }
+    if (!collisionRejected || await File.ReadAllTextAsync(existing) != "ORIGINAL")
+        throw new Exception("Existing JSON must remain byte-identical when creation conflicts.");
+    if (Directory.GetFiles(newCardDirectory.FullName, "*.tmp").Length != 0)
+        throw new Exception("New-card staging files must be removed after creation or failure.");
+    Console.WriteLine("PASS Phase E new-card creation is exclusive and cleans temporary files");
+}
+finally { newCardDirectory.Delete(recursive: true); }
