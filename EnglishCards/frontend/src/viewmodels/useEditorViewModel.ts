@@ -88,7 +88,9 @@ export function useEditorViewModel() {
   async function flushCardSave(session: CardSaveCoordinator): Promise<boolean> {
     clearTimeout(cardTimer.current);
     if (session.status === 'error') { reportCardStatus(session); return false; }
-    const saved = await session.flush();
+    const pending = session.flush();
+    reportCardStatus(session);
+    const saved = await pending;
     reportCardStatus(session);
     return saved && session.status === 'clean';
   }
