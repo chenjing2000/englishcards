@@ -4,7 +4,7 @@ import { useEditorViewModel } from '../viewmodels/useEditorViewModel';
 import VocabularyTable, { VocabularyActions } from './VocabularyTable';
 import CardPreview from './CardPreview';
 import NotificationBar from './NotificationBar';
-import ProjectActions from './ProjectActions';
+import CardLibrary from './CardLibrary';
 import SplitPane from './SplitPane';
 import AutoSizeTextarea from './AutoSizeTextarea';
 import ContinuousParagraphEditor from './ContinuousParagraphEditor';
@@ -50,6 +50,10 @@ export default function EditorView() {
   }
 
   return <div className="app-shell" inert={vm.desktop && (!settingsReady || vm.closing)}>
+    <div className="phase-e-layout">
+      {vm.desktop && <CardLibrary root={vm.libraryRoot} activePath={vm.activeCardPath}
+        revision={vm.libraryRevision} onRootChange={vm.changeLibraryRoot}
+        onOpen={path => { void vm.openCardPath(path); }} />}
     <SplitPane right={<aside className="editor-panel" id="editor-panel">
       <div className="panel-heading phase-c-heading">
         <h1>英语阅读卡片编辑器</h1>
@@ -102,6 +106,15 @@ export default function EditorView() {
         <NotificationBar error={error} warning={warning} closeError={vm.clearError} />
       </div>
     </aside>} left={<CardPreview layout={layout} ready={ready} content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection}
-      actions={<ProjectActions open={vm.open} save={vm.save} exportImages={vm.exportImages} ready={ready} exporting={exporting} />} />} />
+      actions={<div className="phase-e-actions" role="group" aria-label="卡片操作">
+        <button type="button" aria-label="设置" title="设置" onClick={() => setSettingsOpen(value => !value)}>⚙</button>
+        <button type="button" aria-label="新建卡片" title="新建卡片"
+          disabled={!vm.desktop || !vm.libraryRoot || vm.opening}
+          onClick={() => { void vm.newCard(vm.libraryRoot); }}>＋</button>
+        <button type="button" aria-label="导出 ZIP" title="导出 ZIP"
+          disabled={!ready || exporting || vm.cardSaveStatus !== 'clean'}
+          onClick={() => { void vm.exportImages(); }}>⇩</button>
+      </div>} />} />
+    </div>
   </div>;
 }
