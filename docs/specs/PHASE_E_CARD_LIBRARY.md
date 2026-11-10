@@ -1,10 +1,12 @@
 # Phase E — Card Library and File-backed Article Workflow
 
-Status: **Approved product decisions; implementation in progress**
+Status: **Implementation and frontend automation complete; final Windows/WPF acceptance pending**
 Base: `main` at `dba7fd5861020570dd97496e195f1d202d69b2f4` (2026-11-10)
 Branch: `feature/phase-e-card-library`
 
 This specification supersedes conflicting older import, draft, toolbar and workspace instructions in `README.md`, `docs/project-contract.md` and `docs/specs/PHASE2B_PRODUCT_ADDITIONS.md`. Existing Article v6 constraints and validated editor/preview behavior remain in force.
+
+Latest automated verification on commit `b82e37ab`: Vitest 64/64, TypeScript/Vite production build successful, Playwright 69/69. These results do not replace the .NET test run, `dotnet publish`, or final WPF/WebView2 owner acceptance.
 
 ## 1. Product scope
 
