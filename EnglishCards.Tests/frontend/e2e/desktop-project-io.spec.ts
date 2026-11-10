@@ -178,6 +178,9 @@ test('new-card duplicate errors use one visible preview toast while modal keeps 
   await page.getByRole('button', { name: '创建卡片' }).click();
 
   const duplicate = notices.locator('.phase-e-notice-error');
+  await expect(notices).toHaveCSS('width', '360px');
+  await expect(notices).toHaveCSS('min-width', '240px');
+  await expect(notices).toHaveCSS('max-height', /.+/);
   await expect(duplicate).toHaveCount(1);
   await expect(duplicate).toContainText('同名卡片已存在');
   await expect(dialog.getByText('同名卡片已存在')).toHaveCount(0);
