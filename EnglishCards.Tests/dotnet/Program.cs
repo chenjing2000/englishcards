@@ -456,3 +456,39 @@ for (int i = 2; i <= 1000; i++)
     paragraphArray.Add(new JsonObject { ["id"] = $"p{i:000}", ["text"] = $"p{i}" });
 ExpectArticleRejected(tooManyParagraphs.ToJsonString(), "the 1000th paragraph");
 Console.WriteLine("PASS WPF Article v6 boundary validates complete schema, canonical IDs, duplicate vocabulary and paragraph limits");
+
+
+// Phase E: only absolute JSON paths are eligible for file-backed cards.
+// Directory listing is deliberately shallow and does not index nested cards.
+var bridgeFlags = BindingFlags.Static | BindingFlags.NonPublic;
+var validateCardPath = bridgeType.GetMethod("ValidateCardPath", bridgeFlags)
+    ?? throw new Exception("Phase E card path validation is missing.");
+var listCardDirectory = bridgeType.GetMethod("ListCardDirectory", bridgeFlags)
+    ?? throw new Exception("Phase E lazy directory listing is missing.");
+var cardDirectory = Directory.CreateTempSubdirectory("EnglishCards-card-library-");
+try
+{
+    var cardFile = Path.Combine(cardDirectory.FullName, "A.json");
+    await File.WriteAllTextAsync(cardFile, compactArticle);
+    await File.WriteAllTextAsync(Path.Combine(cardDirectory.FullName, "ignore.txt"), "ignore");
+    var childDirectory = Directory.CreateDirectory(Path.Combine(cardDirectory.FullName, "nested"));
+    await File.WriteAllTextAsync(Path.Combine(childDirectory.FullName, "nested.json"), compactArticle);
+
+    if ((string)validateCardPath.Invoke(null, [cardFile])! != Path.GetFullPath(cardFile))
+        throw new Exception("Absolute JSON card paths must be normalized.");
+    bool invalidPathRejected = false;
+    try { validateCardPath.Invoke(null, [Path.Combine(cardDirectory.FullName, "ignore.txt")]); }
+    catch (TargetInvocationException error) when (error.InnerException is InvalidDataException)
+    { invalidPathRejected = true; }
+    if (!invalidPathRejected) throw new Exception("Non-JSON card paths must be rejected.");
+
+    var listing = listCardDirectory.Invoke(null, [cardDirectory.FullName])!;
+    var files = (System.Collections.IEnumerable)listing.GetType().GetProperty("files")!.GetValue(listing)!;
+    var folders = (System.Collections.IEnumerable)listing.GetType().GetProperty("folders")!.GetValue(listing)!;
+    var fileNames = files.Cast<object>().Select(item =>
+        (string)item.GetType().GetProperty("name")!.GetValue(item)!).ToArray();
+    if (!fileNames.SequenceEqual(["A.json"]) || folders.Cast<object>().Count() != 1)
+        throw new Exception("Card directory listing must return only immediate JSON files and folders.");
+    Console.WriteLine("PASS Phase E validated JSON paths and shallow card library listing");
+}
+finally { cardDirectory.Delete(recursive: true); }
