@@ -1,6 +1,6 @@
 # Phase E — Phase B integration and Windows acceptance checklist
 
-Status: **Candidate only; not yet Windows-validated**
+Status: **Frontend automation passed; .NET/publish and final WPF owner acceptance pending**
 Branch: `feature/phase-e-card-library`
 
 ## Automated verification
@@ -37,12 +37,12 @@ Use a **new test directory**, not an existing valuable collection of JSON cards.
 8. Check **设置** and the default-style action. Old **导入配置** must not be offered.
 9. Confirm older `userdata/drafts` content is neither automatically loaded nor automatically deleted.
 
-## Known incomplete scope
+## Current remaining scope
 
-- The settings surface is still an editor-region panel; its final in-workspace modal presentation is Phase C2.
-- Notification stacking, preview-bottom positioning and five-second normal-message expiry are Phase C3.
-- Legacy draft and import helpers remain in some non-desktop/test code. The desktop boot/save flow no longer reads/writes the global article draft; final dead-code cleanup and obsolete test migration remain to be completed.
-- Not all earlier E2E tests are guaranteed to remain compatible; report any failures rather than hiding or skipping them.
+- Browser-only legacy JSON/TXT import and local-draft helpers remain for older non-desktop E2E fixtures. They are not part of the desktop Card Library workflow. Retire them only together with their fixtures; do not delete user-owned draft files.
+- The application icon `EnglishCards/desktop/Assets/clover_icon.ico` already exists on both `main` and the Phase E branch with the same blob SHA; no additional binary-icon commit is pending.
+- No automated GitHub Actions status was reported for the current Phase E head. The owner's local Windows test log is the evidence for frontend automation.
+- The final WPF/WebView2 build and owner acceptance remain mandatory before merge.
 
 ## Evidence
 
@@ -58,26 +58,30 @@ Record command exit codes, all failing test names with stack traces, and the exa
 - Verify left-click editing of title/vocabulary/content and wheel scrolling **after a JSON has actually opened**. The desktop E2E now includes a pointer and wheel check; real WPF behavior still needs owner acceptance.
 - User-managed folders and JSON naming remain independent. No automatic folder deletion or card-directory database.
 
-## Phase E final stabilization (2026-11-10)
+## Phase E final UI stabilization and verification (2026-11-10)
 
-After the owner confirmed the four notification-related E2E failures were resolved (16/16 focused tests passed), the stabilization branch adds:
+The latest owner-provided Windows test log is for commit `b82e37ab1b3f53eee0a2d272b79e9ecacead4beb` and records:
 
-- Preview-pane notices: bottom-center, 300 DIP default (240–360 design range), 5-second normal lifecycle paused on hover, persistent error notifications, explicit close action, upward stacking and independent source dismissal
-- Article v6 Skill full-example validation and relative-import correction; owner independently confirmed the validator PASS
-- Removal of the unused import-settings command/parser from the desktop ViewModel and IO layer
-- Retention of browser-only legacy JSON/TXT import and local draft code until its E2E fixtures and UI entry points can be retired together; do **not** delete user-owned legacy drafts
-- E2E regression for two independent simultaneous errors, visual stack order, individual dismissal, and retained save-retry lock
+- `npm.cmd test`: **64/64 passed** (13 files)
+- `npm.cmd run build`: TypeScript check and Vite production build succeeded. Two non-fatal Rollup annotation warnings originate in Zod dependency files.
+- `npm.cmd run test:e2e`: **69/69 passed** (including Card Library error notifications, duplicate JSON creation, 320 DIP settings modal, pointer editing, save locking and ZIP/export regressions)
 
-Validation required for these commits (not yet owner-verified):
+The owner has previously confirmed the Article v6 Skill validator passes. This latest log does not repeat that validator, .NET tests or publish, so those must not be inferred as passing for this exact head.
+
+Current UI values and behavior:
+- Preview notifications: default 360 DIP, minimum 240, maximum 480; preview-bottom center, above modal backdrops, upward stacking; normal messages expire after five seconds of active display and pause on hover; errors persist until dismissed or resolved.
+- Design Settings modal: default 320 DIP, minimum 280, maximum 360; compact 60/40 settings table.
+- New Card and Card Library errors appear only through the shared floating notification layer. A duplicate filename does not overwrite the existing JSON; the New Card dialog retains its title for correction.
+- A successful new-card creation clears the resolved create error and reports success through a normal notification.
+
+Remaining Windows commands (run from repository root after pulling the latest branch):
 
 ```powershell
-npm.cmd test
-npm.cmd run build
-npx.cmd playwright test --config tools/playwright.config.ts desktop-project-io.spec.ts phase-e-card-library.spec.ts
-npm.cmd run test:e2e
 dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Release
 npx.cmd tsx docs/skills/article-to-englishcards/scripts/validate-project.ts
 dotnet publish EnglishCards\desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\EnglishCards
 ```
 
-Real Windows acceptance: open valid A.json, edit vocabulary and paragraphs with mouse, verify 300-ms autosave; block B navigation on dirty/pending/error and click B again after success; verify new title-named JSON never overwrites a file; test settings modal, ZIP export, and notification hover/timing/stacking. The GitHub binary icon resource is a separate pending change and **not** included in the commits above.
+After publishing, close the running application before replacing files and do not remove `dist/EnglishCards/userdata`. Owner acceptance must verify the actual WPF/WebView2 executable: the 360/240/480 DIP notification width, 320/280/360 DIP settings width, notification visibility above the New Card/Settings modal, duplicate-file error handling, card autosave/switch lock, settings persistence and ZIP export.
+
+Merge gate: only after the above .NET run and publish succeed and the owner confirms the latest executable behaves correctly. The `clover_icon.ico` binary is already present in the base `main` branch and does not block Phase E.
