@@ -15,9 +15,18 @@ export function chooseCardLibrary(): Promise<string | null> {
 }
 
 /** Create an independent new Article v6 file, never overwriting an existing path. */
-export function createCardFile(directory: string, article: Project): Promise<{ path: string; text: string } | null> {
-  return desktopRequest<{ path: string; text: string } | null>('createCardFile', {
+export function cardFileName(title: string): string {
+  const name = title.normalize('NFC')
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/gu, '-')
+    .replace(/\s+/gu, ' ').replace(/[. ]+$/gu, '').trim().slice(0, 100);
+  const safe = name || 'Untitled';
+  return (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/iu.test(safe) ? '_' : '') + safe + '.json';
+}
+
+export function createCardFile(directory: string, article: Project): Promise<{ path: string; text: string }> {
+  return desktopRequest<{ path: string; text: string }>('createCardFile', {
     directory,
+    fileName: cardFileName(article.title),
     text: serializedCard(article),
   });
 }
