@@ -22,7 +22,8 @@ export function chooseCardLibrary(): Promise<string | null> {
 /** Create an independent new Article v6 file, never overwriting an existing path. */
 export function cardFileName(title: string): string {
   const name = title.normalize('NFC')
-    .replace(/[<>:"/\\|?*\u0000-\u001f]/gu, '-')
+    .replace(/[<>:"|?*\\u0000-\\u001f]/gu, '-')
+    .replaceAll('/', '-').replaceAll(String.fromCharCode(92), '-')
     .replace(/\s+/gu, ' ').replace(/[. ]+$/gu, '').trim().slice(0, 100);
   const safe = name || 'Untitled';
   return (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/iu.test(safe) ? '_' : '') + safe + '.json';
