@@ -8,7 +8,7 @@ import {
 } from '../models/project';
 import { paginate, type Layout } from '../services/pagination';
 import {
-  cacheDraft, download, loadDesktopData, loadSettings, readSettingsFile, saveSettings,
+  cacheDraft, download, loadDesktopData, loadSettings, saveSettings,
   openProject, saveProject, requestExport, restoreDraft, sampleDraft,
   type DesktopPersistence, type DesktopSaveResult,
 } from '../services/projectIO';
@@ -69,7 +69,6 @@ export function useEditorViewModel() {
   const openRequest = useRef(0);
   const openedFile = useRef(0);
   const saving = useRef(false);
-  const importingSettings = useRef(false);
   const desktopStore = useRef<DesktopPersistence | null>(null);
   const desktopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Phase E file sessions are optional until the library UI replaces legacy open.
@@ -266,7 +265,7 @@ export function useEditorViewModel() {
           (document.activeElement as HTMLElement | null)?.blur();
           setClosing(true);
         });
-        if (latest.current.opening || saving.current || importingSettings.current) {
+        if (latest.current.opening || saving.current) {
           return { pending: true, errors: [], busy: true };
         }
         clearTimeout(desktopTimer.current);
@@ -648,16 +647,6 @@ export function useEditorViewModel() {
     update(current => ({ ...current, styles: { ...styles } } as Project));
   }
   function resetStyles() { replaceStyles(defaults); }
-  async function importSettings(file?: File) {
-    if (!desktop || !file || importingSettings.current) return;
-    importingSettings.current = true;
-    try {
-      replaceStyles(await readSettingsFile(file));
-      reportError('settings-import', '');
-    } catch (reason) {
-      reportError('settings-import', `配置导入失败：${String(reason)}`);
-    } finally { importingSettings.current = false; }
-  }
   function clearError(source?: string) {
     const target = source ?? Object.keys(errors)[0];
     if (target) reportError(target, '');
@@ -682,6 +671,6 @@ export function useEditorViewModel() {
     addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,
     selectedVocabulary, selectedVocabularyIndex, selectVocabulary, moveSelectedVocabulary,
     deleteSelectedVocabulary, insertVocabularyBelow,
-    clearError, downloadRejectedDraft, importSettings,
+    clearError, downloadRejectedDraft,
   };
 }
