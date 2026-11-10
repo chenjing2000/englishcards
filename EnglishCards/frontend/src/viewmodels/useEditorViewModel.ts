@@ -24,6 +24,7 @@ export function useEditorViewModel() {
   const [boot, setBoot] = useState(desktop ? sampleDraft : restoreDraft);
   const [project, setProject] = useState<RenderProject>({ ...boot.project, styles: { ...defaults } });
   const [wordDrafts, setWordDrafts] = useState<Record<string, string>>({});
+  const wordDraftsRef = useRef<Record<string, string>>({});
   const previewProject = useMemo<RenderProject>(() => {
     let changed = false;
     const vocabulary = project.vocabulary.map(entry => {
@@ -243,8 +244,9 @@ export function useEditorViewModel() {
         }
         clearTimeout(desktopTimer.current);
         const card = cardSession.current;
-        if (card && (invalidCardSnapshot.current || !(await flushCardSave(card))))
-          return { pending: true, errors: ['当前卡片未能成功保存。'] };
+        if (card && (invalidCardSnapshot.current || Object.keys(wordDraftsRef.current).length > 0 ||
+            !(await flushCardSave(card))))
+          return { pending: true, errors: ['当前卡片仍有未提交的输入或未能成功保存。'] };
         const result = await desktopStore.current?.save(latest.current.project, true);
         if (!result) return { pending: false, errors: [] };
         reportDesktopSave(result);
@@ -289,7 +291,7 @@ export function useEditorViewModel() {
   async function openCardPath(path: string): Promise<boolean> {
     if (!desktop || opening || preparingClose.current) return false;
     const previous = cardSession.current;
-    if (previous && invalidCardSnapshot.current) {
+    if (previous && (invalidCardSnapshot.current || Object.keys(wordDraftsRef.current).length > 0)) {
       showWarning('当前卡片仍有未完成或无效的输入，无法切换。');
       return false;
     }
@@ -313,6 +315,7 @@ export function useEditorViewModel() {
       cardSession.current = session;
       setActiveCardPath(openedPath);
       invalidCardSnapshot.current = false;
+      wordDraftsRef.current = {};
       setWordDrafts({});
       update(article);
       setLastFile(stringify(article));
@@ -329,7 +332,8 @@ export function useEditorViewModel() {
   async function newCard(directory: string): Promise<boolean> {
     if (!desktop || !directory || opening || preparingClose.current) return false;
     const current = cardSession.current;
-    if (invalidCardSnapshot.current || (current && current.status !== 'clean') ||
+    if (invalidCardSnapshot.current || Object.keys(wordDraftsRef.current).length > 0 ||
+        (current && current.status !== 'clean') ||
         (!current && hasFileChanges)) {
       if (current?.status === 'dirty') void flushCardSave(current);
       showWarning('当前卡片正在保存或存在未保存内容，请完成后重新点击新建卡片。');
@@ -347,6 +351,7 @@ export function useEditorViewModel() {
       cardSession.current = session;
       invalidCardSnapshot.current = false;
       setActiveCardPath(created.path);
+      wordDraftsRef.current = {};
       setWordDrafts({});
       update(next);
       setLastFile(stringify(next));
@@ -411,7 +416,8 @@ export function useEditorViewModel() {
 
   async function exportImages() {
     if (!ready || exporting) return;
-    if (cardSession.current && (invalidCardSnapshot.current || !(await flushCardSave(cardSession.current)))) return;
+    if (cardSession.current && (invalidCardSnapshot.current ||
+        Object.keys(wordDraftsRef.current).length > 0 || !(await flushCardSave(cardSession.current)))) return;
     setExporting(true);
     try {
       const outcome = await requestExport(project, rendered!.layout.signature, rendered!.layout.pages.length);
@@ -493,6 +499,10 @@ export function useEditorViewModel() {
     }
   }
   function setWordPreview(id: string, value: string | null) {
+    const next = { ...wordDraftsRef.current };
+    if (value === null) delete next[id];
+    else next[id] = value;
+    wordDraftsRef.current = next;
     setWordDrafts(current => {
       if (value === null) {
         if (!Object.prototype.hasOwnProperty.call(current, id)) return current;
@@ -519,12 +529,16 @@ export function useEditorViewModel() {
         : item),
     }));
   }
-  function commitHead(_key: EntryCollection, id: string, value: string) {
+  function commitHead(_key: EntryCollection, id: string, value: string): boolean {
     try {
       const next = commitEntryHead(project, 'vocabulary', id, value);
       if (next !== project) update(next);
       reportError('entry', '');
-    } catch (reason) { reportError('entry', `词条保存失败：${String(reason)}`); }
+      return true;
+    } catch (reason) {
+      reportError('entry', `词条保存失败：${String(reason)}`);
+      return false;
+    }
   }
   function setSenseField(_key: EntryCollection, id: string, index: number, field: keyof Sense, value: string) {
     update(current => ({
