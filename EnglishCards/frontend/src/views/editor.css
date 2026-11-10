@@ -54,3 +54,25 @@
 .selection-add-button{position:fixed;z-index:30;display:flex;align-items:center;justify-content:center;width:14px;height:14px;min-width:14px;padding:0;border:0;border-radius:0;background:transparent;line-height:0;box-shadow:none;cursor:pointer}
 .selection-add-button:hover{background:transparent;border:0;filter:brightness(.94)}
 .selection-add-button svg{display:block;width:14px;height:14px;flex:0 0 14px}
+
+
+/* Phase E: the library is a fixed 310 DIP workspace column. */
+.phase-e-layout{height:100%;min-width:0}
+.phase-e-layout:has(.card-library){display:grid;grid-template-columns:310px minmax(0,1fr)}
+.phase-e-layout>.workspace{height:100%}
+.card-library{background:#f6f8f7;border-right:1px solid #d7e1df;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.library-heading{padding:16px 12px 10px;border-bottom:1px solid #e0e8e5}
+.library-heading h2{font-size:16px;margin:0 0 10px;color:#27495b}
+.library-controls{display:flex;gap:8px}
+.library-controls button{padding:6px 10px;font-size:12px}
+.library-tree{overflow:auto;flex:1;padding:8px 4px}
+.library-folder,.library-file{display:flex;align-items:center;text-align:left;gap:6px;width:100%;min-width:0;border:0;background:transparent;border-radius:5px;padding:6px 8px;font-size:13px;color:#314b47;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.library-folder span:last-child{overflow:hidden;text-overflow:ellipsis}
+.library-folder:hover,.library-file:hover{background:#e4eeeb;border:0}
+.library-file[aria-current="page"]{background:#d3e5eb;color:#27495b;font-weight:700}
+.library-empty,.library-muted{font-size:12px;color:#75837f;padding:10px;line-height:1.6}
+.library-error{font-size:12px;color:#a53636;white-space:normal;padding:8px 12px;overflow-wrap:anywhere}
+.phase-e-actions{position:absolute;right:8px;top:8px;z-index:3;display:flex;gap:8px}
+.phase-e-actions button{display:flex;justify-content:center;align-items:center;width:40px;height:40px;min-width:40px;padding:0;border:0;border-radius:50%;background:#d3e5eb;color:#27495b;font-size:24px;line-height:1}
+.phase-e-actions button:hover{background:#bfd8e0;border:0}
+.retry-card-save{font-size:12px;margin:6px 12px}
