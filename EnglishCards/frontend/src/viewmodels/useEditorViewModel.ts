@@ -108,6 +108,8 @@ export function useEditorViewModel() {
   function changeLibraryRoot(path: string) {
     libraryRootWasChanged.current = true;
     setLibraryRoot(path);
+    // Re-selecting the same root refreshes its direct children without a Refresh button.
+    setLibraryRevision(value => value + 1);
     if (desktop) localStorage.setItem('englishcards.library.root', path);
   }
   const latest = useRef({ project, opening });
