@@ -124,3 +124,5 @@
 .editor-panel .phase-c-heading:has(.phase-e-actions){display:flex;flex-direction:column;align-items:stretch;gap:0;padding-bottom:12px}
 .editor-panel .phase-c-heading:has(.phase-e-actions) h1{align-self:flex-start}
 .editor-panel .phase-c-heading .phase-e-actions{align-self:flex-end;margin-top:12px}
+
+.phase-e-create-error{color:#a33131;font-size:13px;margin:0;overflow-wrap:anywhere}
