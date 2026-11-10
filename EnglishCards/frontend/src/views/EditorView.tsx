@@ -5,6 +5,10 @@ import VocabularyTable, { VocabularyActions } from './VocabularyTable';
 import CardPreview from './CardPreview';
 import NotificationBar from './NotificationBar';
 import CardLibrary from './CardLibrary';
+import ProjectActions from './ProjectActions';
+import settingsIcon from '../assets/icons/toolbar/settings.svg';
+import newCardIcon from '../assets/icons/toolbar/new-card.svg';
+import exportZipIcon from '../assets/icons/toolbar/export-zip.svg';
 import SplitPane from './SplitPane';
 import AutoSizeTextarea from './AutoSizeTextarea';
 import ContinuousParagraphEditor from './ContinuousParagraphEditor';
@@ -57,12 +61,12 @@ export default function EditorView() {
     <SplitPane right={<aside className="editor-panel" id="editor-panel">
       <div className="panel-heading phase-c-heading">
         <h1>英语阅读卡片编辑器</h1>
-        <button type="button" aria-label={settingsOpen ? '返回文章编辑' : '打开设置'} onClick={() => setSettingsOpen(value => !value)}>
+        {!vm.desktop && <button type="button" aria-label={settingsOpen ? '返回文章编辑' : '打开设置'} onClick={() => setSettingsOpen(value => !value)}>
           {settingsOpen ? '返回编辑' : '设置'}
-        </button>
+        </button>}
       </div>
       {rejectedDraft && <div className="draft-recovery"><button type="button" onClick={vm.downloadRejectedDraft}>下载原始草稿</button></div>}
-      <div inert={!settingsReady || vm.opening} className="fields phase-c-fields">
+      <div inert={!settingsReady || vm.opening || (vm.desktop && !vm.activeCardPath && !settingsOpen)} className="fields phase-c-fields">
         {settingsOpen ? <div className="style-settings" aria-label="设置面板">
           {settingsTable('字号设置', fontFields)}{settingsTable('其余设置', otherFields)}
           <p className="hint style-settings-hint">字号与页面尺寸单位为 px；有效配置自动保存到 {vm.desktop ? 'userdata/settings/settings.json' : 'config/settings.json'}。</p>
@@ -106,15 +110,16 @@ export default function EditorView() {
         <NotificationBar error={error} warning={warning} closeError={vm.clearError} />
       </div>
     </aside>} left={<CardPreview layout={layout} ready={ready} content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection}
-      actions={<div className="phase-e-actions" role="group" aria-label="卡片操作">
-        <button type="button" aria-label="设置" title="设置" onClick={() => setSettingsOpen(value => !value)}>⚙</button>
+      actions={vm.desktop ? <div className="phase-e-actions" role="group" aria-label="卡片操作">
+        <button type="button" aria-label="设置" title="设置"
+          onClick={() => setSettingsOpen(value => !value)}><img src={settingsIcon} alt="" /></button>
         <button type="button" aria-label="新建卡片" title="新建卡片"
-          disabled={!vm.desktop || !vm.libraryRoot || vm.opening}
-          onClick={() => { void vm.newCard(vm.libraryRoot); }}>＋</button>
+          disabled={!vm.libraryRoot || vm.opening}
+          onClick={() => { void vm.newCard(vm.libraryRoot); }}><img src={newCardIcon} alt="" /></button>
         <button type="button" aria-label="导出 ZIP" title="导出 ZIP"
-          disabled={!ready || exporting || vm.cardSaveStatus !== 'clean'}
-          onClick={() => { void vm.exportImages(); }}>⇩</button>
-      </div>} />} />
+          disabled={!ready || exporting || !vm.activeCardPath || vm.cardSaveStatus !== 'clean'}
+          onClick={() => { void vm.exportImages(); }}><img src={exportZipIcon} alt="" /></button>
+      </div> : <ProjectActions open={vm.open} save={vm.save} exportImages={vm.exportImages} ready={ready} exporting={exporting} />} />} />
     </div>
   </div>;
 }
