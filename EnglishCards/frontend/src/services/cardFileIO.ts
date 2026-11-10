@@ -9,6 +9,19 @@ export type LibraryDirectory = {
   files: LibraryEntry[];
 };
 
+/** Ask the Windows host for an explicit library root; cancellation returns null. */
+export function chooseCardLibrary(): Promise<string | null> {
+  return desktopRequest<string | null>('chooseCardLibrary');
+}
+
+/** Create an independent new Article v6 file, never overwriting an existing path. */
+export function createCardFile(directory: string, article: Project): Promise<{ path: string; text: string } | null> {
+  return desktopRequest<{ path: string; text: string } | null>('createCardFile', {
+    directory,
+    text: serializedCard(article),
+  });
+}
+
 /** Load only one directory level; folder expansion initiates the next request. */
 export function listCardDirectory(path: string): Promise<LibraryDirectory> {
   return desktopRequest<LibraryDirectory>('listCardDirectory', path);
