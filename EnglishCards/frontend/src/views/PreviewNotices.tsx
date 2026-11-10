@@ -60,7 +60,7 @@ function NoticeItem({ item, onClose }: { item: Notice; onClose: () => void }) {
   useEffect(() => {
     if (item.kind === 'normal' && elapsed >= 5000) onClose();
   }, [elapsed, item.kind]);
-  const ending = item.kind === 'normal' && elapsed >= 4750;
+  const ending = item.kind === 'normal' && !hover && elapsed >= 4750;
   return <div className={`phase-e-notice phase-e-notice-${item.kind}${ending ? ' phase-e-notice-ending' : ''}`}
     role={item.kind === 'error' ? 'alert' : 'status'}
     onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
