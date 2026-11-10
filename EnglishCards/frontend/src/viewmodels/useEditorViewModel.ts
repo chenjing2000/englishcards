@@ -81,6 +81,7 @@ export function useEditorViewModel() {
   const [libraryRoot, setLibraryRoot] = useState(() =>
     desktop ? localStorage.getItem('englishcards.library.root') ?? '' : '');
   const [libraryRevision, setLibraryRevision] = useState(0);
+  const libraryRootWasChanged = useRef(false);
   useEffect(() => {
     if (!desktop) return;
     let cancelled = false;
@@ -94,7 +95,7 @@ export function useEditorViewModel() {
       } catch { /* Previous folder is unavailable: reset to userdata. */ }
       try {
         const fallback = await defaultCardLibrary();
-        if (!cancelled && typeof fallback === 'string' && fallback) {
+        if (!cancelled && !libraryRootWasChanged.current && typeof fallback === 'string' && fallback) {
           setLibraryRoot(current => current === initial ? fallback : current);
           localStorage.setItem('englishcards.library.root', fallback);
         }
@@ -105,6 +106,7 @@ export function useEditorViewModel() {
 
 
   function changeLibraryRoot(path: string) {
+    libraryRootWasChanged.current = true;
     setLibraryRoot(path);
     if (desktop) localStorage.setItem('englishcards.library.root', path);
   }
