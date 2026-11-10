@@ -1,12 +1,12 @@
 # Phase E — Card Library and File-backed Article Workflow
 
-Status: **Implementation and frontend automation complete; final Windows/WPF acceptance pending**
-Base: `main` at `dba7fd5861020570dd97496e195f1d202d69b2f4` (2026-11-10)
-Branch: `feature/phase-e-card-library`
+Status: **Complete; Windows/WPF acceptance passed and merged into `main`**
+Merged by PR [#2](https://github.com/chenjing2000/englishcards/pull/2) on 2026-11-10.
+Merge commit: `8e47296dfa484f4f807550578ce9f3b147ad466e`
 
 This specification supersedes conflicting older import, draft, toolbar and workspace instructions in `README.md`, `docs/project-contract.md` and `docs/specs/PHASE2B_PRODUCT_ADDITIONS.md`. Existing Article v6 constraints and validated editor/preview behavior remain in force.
 
-Latest automated verification on commit `b82e37ab`: Vitest 64/64, TypeScript/Vite production build successful, Playwright 69/69. These results do not replace the .NET test run, `dotnet publish`, or final WPF/WebView2 owner acceptance.
+Final verification: Vitest 64/64, Playwright 69/69, .NET desktop tests 19/19, TypeScript/Vite production build, Article v6 Skill validator, Windows x64 publish, Windows executable startup, owner-confirmed final UI acceptance, and GitHub Windows CI all passed. PR #2 was merged into `main` with a merge commit.
 
 ## 1. Product scope
 
