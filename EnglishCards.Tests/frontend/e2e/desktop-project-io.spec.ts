@@ -164,7 +164,8 @@ test('Phase E save failure retains A and allows explicit retry', async ({ page }
   await page.evaluate(() => { window.phaseEIO.failNextSave = true; });
   await title.fill('A cannot save');
   await expect(page.getByRole('button', { name: '重试保存当前卡片' })).toBeVisible();
-  await expect(page.getByRole('alert')).toContainText('Disk locked');
+  await expect(page.locator('.preview-panel .phase-e-notice-error')).toContainText('Disk locked');
+  await expect(page.locator('.preview-panel .phase-e-notice-error').getByRole('button', { name: '关闭消息' })).toBeVisible();
   await page.getByRole('button', { name: '重试保存当前卡片' }).click();
   await expect(page.getByRole('button', { name: '重试保存当前卡片' })).toHaveCount(0);
   const saves = await page.evaluate(() => window.phaseEIO.requests.filter(item => item.command === 'saveCardFile'));
