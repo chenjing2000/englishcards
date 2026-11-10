@@ -76,3 +76,6 @@
 .phase-e-actions button{display:flex;justify-content:center;align-items:center;width:40px;height:40px;min-width:40px;padding:0;border:0;border-radius:50%;background:#d3e5eb;color:#27495b;font-size:24px;line-height:1}
 .phase-e-actions button:hover{background:#bfd8e0;border:0}
 .retry-card-save{font-size:12px;margin:6px 12px}
+
+.phase-e-actions img{display:block;width:20px;height:20px;object-fit:contain;pointer-events:none}
+.phase-e-actions button:disabled{opacity:.45;cursor:default}
