@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { parseArticleV6 } from '../../../EnglishCards/frontend/src/v6/article.ts';
+import { parseArticleV6 } from '../../../../EnglishCards/frontend/src/v6/article.ts';
 
 const files = process.argv.slice(2);
 const skillPath = fileURLToPath(new URL('../SKILL.md', import.meta.url));
