@@ -1,35 +1,23 @@
 {
+  "schemaVersion": 6,
   "id": "brainco-example",
   "title": "Brain-Computer Interfaces: Beyond Neuralink",
-  "personalizedHeader": "SOME BIRDS ON TREE",
-  "readingLevel": 6000,
-  "source": {
+  "identityTag": "SOME BIRDS ON TREE",
+  "content": {
     "paragraphs": [
       {
-        "id": "en-1",
+        "id": "p001",
         "text": "THE EXHIBITION hall at BrainCo, a “neuro-tech” startup based in the city of Hangzhou, showcases just how much its wearable devices are capable of. At one exhibit an amputee plays the piano before easily removing a bionic arm that can be attached without surgery. Elsewhere another amputee with an artificial leg paces back and forth, challenging onlookers to guess which limb is mechanical."
       },
       {
-        "id": "en-2",
+        "id": "p002",
         "text": "BrainCo’s devices are not only for victims of serious accidents. At another station, your correspondent is asked to lie down and don a mask that pumps low-amplitude electrical micro-currents into his frontal lobe, supposedly to induce relaxation. For the past decade “brain-computer interfaces” (BCIs)—machines that can deliver signals to and receive them from the human brain—have been closely associated with Neuralink, an American startup founded by Elon Musk in 2016. Neuralink was the first company to conduct trials of wireless brain implants that allow severely disabled people to control computers for long periods of time with only their thoughts and no additional hardware."
-      }
-    ]
-  },
-  "translation": {
-    "paragraphs": [
-      {
-        "id": "zh-1",
-        "text": "位于杭州的“神经科技”初创企业 BrainCo 的展厅，展示了其可穿戴设备究竟有多大能耐。在一个展区，一名截肢者先弹奏钢琴，随后轻松取下一只无需手术即可装配的仿生手臂。在另一处，一名装着假腿的截肢者来回踱步，让围观者猜测他的哪一条腿是机械假肢。BrainCo 的设备并非只为严重事故的受害者设计。在另一个体验区，记者被要求躺下并戴上一副面罩；面罩向他大脑的额叶输送低振幅微电流，据称可以使人放松。"
-      },
-      {
-        "id": "zh-2",
-        "text": "过去十年，“脑机接口”（BCI）——能够向人脑传递信号、并接收人脑发出信号的机器——一直与 Neuralink 紧密联系在一起。Neuralink 是一家美国初创企业，由埃隆·马斯克于 2016 年创立。Neuralink 是第一家开展无线脑部植入装置试验的公司。这类装置使严重残障人士无需任何额外硬件、仅凭意念就能长时间控制计算机。"
       }
     ]
   },
   "vocabulary": [
     {
-      "id": "v-1",
+      "id": "v001",
       "word": "neuro-tech",
       "highlight": [
         "neuro-tech"
@@ -44,7 +32,7 @@
       ]
     },
     {
-      "id": "v-2",
+      "id": "v002",
       "word": "showcase",
       "ipa": "/ˈʃəʊkeɪs/",
       "highlight": [
@@ -60,7 +48,7 @@
       ]
     },
     {
-      "id": "v-3",
+      "id": "v003",
       "word": "wearable",
       "ipa": "/ˈweərəbl/",
       "highlight": [
@@ -76,7 +64,7 @@
       ]
     },
     {
-      "id": "v-4",
+      "id": "v004",
       "word": "amputee",
       "ipa": "/ˌæmpjʊˈtiː/",
       "highlight": [
@@ -92,7 +80,7 @@
       ]
     },
     {
-      "id": "v-5",
+      "id": "v005",
       "word": "bionic",
       "ipa": "/baɪˈɒnɪk/",
       "highlight": [
@@ -108,7 +96,7 @@
       ]
     },
     {
-      "id": "v-6",
+      "id": "v006",
       "word": "onlooker",
       "ipa": "/ˈɒnlʊkə/",
       "highlight": [
@@ -124,7 +112,7 @@
       ]
     },
     {
-      "id": "v-7",
+      "id": "v007",
       "word": "limb",
       "ipa": "/lɪm/",
       "highlight": [
@@ -140,7 +128,7 @@
       ]
     },
     {
-      "id": "v-8",
+      "id": "v008",
       "word": "don",
       "ipa": "/dɒn/",
       "highlight": [
@@ -156,7 +144,7 @@
       ]
     },
     {
-      "id": "v-9",
+      "id": "v009",
       "word": "supposedly",
       "ipa": "/səˈpəʊzɪdli/",
       "highlight": [
@@ -172,7 +160,7 @@
       ]
     },
     {
-      "id": "v-10",
+      "id": "v010",
       "word": "induce",
       "ipa": "/ɪnˈdjuːs/",
       "highlight": [
@@ -188,7 +176,7 @@
       ]
     },
     {
-      "id": "v-11",
+      "id": "v011",
       "word": "micro-current",
       "highlight": [
         "micro-currents"
@@ -203,7 +191,7 @@
       ]
     },
     {
-      "id": "v-12",
+      "id": "v012",
       "word": "wireless",
       "ipa": "/ˈwaɪələs/",
       "highlight": [
@@ -219,7 +207,7 @@
       ]
     },
     {
-      "id": "v-13",
+      "id": "v013",
       "word": "severely",
       "ipa": "/sɪˈvɪəli/",
       "highlight": [
@@ -235,7 +223,7 @@
       ]
     },
     {
-      "id": "v-low-amplitude",
+      "id": "v014",
       "word": "low-amplitude",
       "ipa": "",
       "highlight": [
@@ -249,12 +237,10 @@
           "exampleTranslation": ""
         }
       ]
-    }
-  ],
-  "expressions": [
+    },
     {
-      "id": "x-1",
-      "phrase": "pace back and forth",
+      "id": "v015",
+      "word": "pace back and forth",
       "highlight": [
         "paces back and forth"
       ],
@@ -268,8 +254,8 @@
       ]
     },
     {
-      "id": "x-2",
-      "phrase": "low-amplitude electrical micro-currents",
+      "id": "v016",
+      "word": "low-amplitude electrical micro-currents",
       "highlight": [],
       "senses": [
         {
@@ -281,8 +267,8 @@
       ]
     },
     {
-      "id": "x-3",
-      "phrase": "frontal lobe",
+      "id": "v017",
+      "word": "frontal lobe",
       "highlight": [
         "frontal lobe"
       ],
@@ -296,8 +282,8 @@
       ]
     },
     {
-      "id": "x-4",
-      "phrase": "brain-computer interface",
+      "id": "v018",
+      "word": "brain-computer interface",
       "highlight": [
         "brain-computer interfaces"
       ],
@@ -311,8 +297,8 @@
       ]
     },
     {
-      "id": "x-5",
-      "phrase": "be closely associated with",
+      "id": "v019",
+      "word": "be closely associated with",
       "highlight": [
         "have been closely associated with"
       ],
@@ -326,8 +312,8 @@
       ]
     },
     {
-      "id": "x-6",
-      "phrase": "conduct trials",
+      "id": "v020",
+      "word": "conduct trials",
       "highlight": [
         "conduct trials"
       ],
@@ -341,8 +327,8 @@
       ]
     },
     {
-      "id": "x-7",
-      "phrase": "brain implants",
+      "id": "v021",
+      "word": "brain implants",
       "highlight": [
         "brain implants"
       ],
@@ -356,8 +342,8 @@
       ]
     },
     {
-      "id": "x-8",
-      "phrase": "deliver signals",
+      "id": "v022",
+      "word": "deliver signals",
       "highlight": [
         "deliver signals"
       ],
@@ -371,8 +357,8 @@
       ]
     },
     {
-      "id": "x-9",
-      "phrase": "additional hardware",
+      "id": "v023",
+      "word": "additional hardware",
       "highlight": [
         "additional hardware"
       ],
@@ -386,8 +372,16 @@
       ]
     }
   ],
-  "mainIdea": "文章通过 BrainCo 的仿生肢体和神经科技设备，介绍人脑与机器交互的不同路径。",
-  "theme": "classic",
-  "schemaVersion": 5,
-  "warnings": []
+  "translation": {
+    "paragraphs": [
+      {
+        "id": "p001",
+        "text": "位于杭州的“神经科技”初创企业 BrainCo 的展厅，展示了其可穿戴设备究竟有多大能耐。在一个展区，一名截肢者先弹奏钢琴，随后轻松取下一只无需手术即可装配的仿生手臂。在另一处，一名装着假腿的截肢者来回踱步，让围观者猜测他的哪一条腿是机械假肢。BrainCo 的设备并非只为严重事故的受害者设计。在另一个体验区，记者被要求躺下并戴上一副面罩；面罩向他大脑的额叶输送低振幅微电流，据称可以使人放松。"
+      },
+      {
+        "id": "p002",
+        "text": "过去十年，“脑机接口”（BCI）——能够向人脑传递信号、并接收人脑发出信号的机器——一直与 Neuralink 紧密联系在一起。Neuralink 是一家美国初创企业，由埃隆·马斯克于 2016 年创立。Neuralink 是第一家开展无线脑部植入装置试验的公司。这类装置使严重残障人士无需任何额外硬件、仅凭意念就能长时间控制计算机。"
+      }
+    ]
+  }
 }

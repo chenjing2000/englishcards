@@ -13,7 +13,7 @@ for (const staleFails of [false, true]) test(`the latest file wins when an older
       return read.call(this);
     };
   }, staleFails);
-  const open = (name: string, title: string) => page.getByLabel('打开项目 JSON').setInputFiles({ name, mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ ...fixture, title })) });
+  const open = (name: string, title: string) => page.getByLabel('导入 Article JSON 或 TXT').setInputFiles({ name, mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ ...fixture, title })) });
   await open('older.json', 'Older project');
   await open('latest.json', 'Latest project');
   await page.evaluate(() => (window as unknown as { releaseRead: (name: string) => void }).releaseRead('latest.json'));

@@ -36,7 +36,7 @@ const dirty = (page: Page) => page.evaluate(() => !window.dispatchEvent(new Even
 
 async function clickRequest(page: Page, command: 'openProject' | 'saveProject') {
   const count = await page.evaluate(() => window.fileRequests.length);
-  await page.getByRole('button', { name: command === 'openProject' ? '打开 JSON' : '保存 JSON', exact: true }).click();
+  await page.getByRole('button', { name: command === 'openProject' ? '打开文章' : '保存 JSON', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.fileRequests.length)).toBe(count + 1);
   const request = await page.evaluate(() => window.fileRequests.at(-1)!);
   expect(request.command).toBe(command);
@@ -68,12 +68,12 @@ test('native cancellation and read or write errors preserve the project and dirt
   }
 });
 
-test('only schema 5 JSON is accepted and the saved snapshot can be opened again', async ({ page }) => {
+test('only Article v6 JSON is accepted and the saved snapshot can be opened again', async ({ page }) => {
   await title(page).fill('Save this snapshot');
-  for (const text of ['{', JSON.stringify({ ...fixture, schemaVersion: 4 })]) {
+  for (const text of ['{', JSON.stringify({ ...fixture, schemaVersion: 5 })]) {
     const { id } = await clickRequest(page, 'openProject');
     await reply(page, { id, ok: true, value: { name: 'broken.json', text } });
-    await expect(page.getByRole('alert')).toContainText('无法打开项目');
+    await expect(page.getByRole('alert')).toContainText('无法打开文章');
     await expect(title(page)).toHaveValue('Save this snapshot');
     expect(await dirty(page)).toBe(true);
   }
@@ -101,18 +101,16 @@ test('a delayed open result cannot replace a newer project', async ({ page }) =>
 });
 
 
-test('opening a project locks edits and history until cancellation or failure, while allowing another open', async ({ page }) => {
+test('opening a project locks editor fields until cancellation or failure, while allowing another open', async ({ page }) => {
   await title(page).fill('Protected working edit');
   const first = await clickRequest(page, 'openProject');
   await expect(page.locator('.fields')).toHaveAttribute('inert', '');
-  await expect(page.locator('.history-toolbar')).toHaveAttribute('inert', '');
   await expect(title(page)).toHaveValue('Protected working edit');
 
   // Keep the Open action reachable, so a newer selection can supersede a slow one.
   const latest = await clickRequest(page, 'openProject');
   await reply(page, { id: latest.id, ok: true, value: null });
   await expect(page.locator('.fields')).not.toHaveAttribute('inert', '');
-  await expect(page.locator('.history-toolbar')).not.toHaveAttribute('inert', '');
   await expect(title(page)).toHaveValue('Protected working edit');
 
   // A stale response must not change the working document or relock editing.

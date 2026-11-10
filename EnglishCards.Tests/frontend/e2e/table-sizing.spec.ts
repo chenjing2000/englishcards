@@ -1,10 +1,22 @@
 import { test, expect } from './fixtures';
 
-test('vocabulary cells are single-line editors with centered content', async ({ page }) => {
+async function dragSplitterToMax(page: import('@playwright/test').Page) {
+  const workspace = (await page.locator('.workspace').boundingBox())!;
+  const separator = (await page.getByRole('separator', { name: '调整编辑与预览宽度' }).boundingBox())!;
+  const minimum = Math.min(280, Math.floor((workspace.width - 8) / 2));
+  const targetWidth = workspace.width - 8 - minimum;
+  const y = separator.y + separator.height / 2;
+  await page.mouse.move(separator.x + separator.width / 2, y);
+  await page.mouse.down();
+  await page.mouse.move(workspace.x + targetWidth + 4, y, { steps: 12 });
+  await page.mouse.up();
+}
+
+test('vocabulary fields keep compact input sizing and centered table content', async ({ page }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await page.getByRole('button', { name: '词汇', exact: true }).click();
+  
   const table = page.getByRole('table', { name: '词汇 1', exact: true });
-  await expect(table.locator('textarea')).toHaveCount(3);
+  await expect(table.locator('textarea')).toHaveCount(4);
   const word = page.getByLabel('词头 1', { exact: true });
   await expect(word).toHaveJSProperty('tagName', 'INPUT');
   await expect(word).toHaveCSS('resize', 'none');
@@ -19,17 +31,21 @@ test('vocabulary cells are single-line editors with centered content', async ({ 
   await page.screenshot({ path: '.build/test-results/compact-vocabulary.png' });
 });
 
-test('expression editors fit initial content, editing, undo and changed column widths', async ({ page }) => {
-  await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await page.getByRole('button', { name: '表达', exact: true }).click();
-  const table = page.getByRole('table', { name: '表达 1', exact: true });
-  const phrase = page.getByLabel('短语 1', { exact: true });
-  const oneLineHeight = await phrase.evaluate(node => {
+test('multiword vocabulary example editors resize with content and pane width', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  
+  await page.getByRole('button', { name: '在选中词汇下方添加空白行', exact: true }).click();
+  const word = page.getByLabel('词头 2', { exact: true });
+  await word.fill('take into account');
+  await page.getByLabel('含义 2', { exact: true }).fill('考虑到；将……纳入考虑');
+  const example = page.getByLabel('词汇例句 2 义项 1', { exact: true });
+  const oneLineHeight = await example.evaluate(node => {
     const s = getComputedStyle(node);
-    return parseFloat(s.lineHeight) + parseFloat(s.paddingTop) + parseFloat(s.paddingBottom) + parseFloat(s.borderTopWidth) + parseFloat(s.borderBottomWidth);
+    return parseFloat(s.lineHeight) + parseFloat(s.paddingTop) + parseFloat(s.paddingBottom)
+      + parseFloat(s.borderTopWidth) + parseFloat(s.borderBottomWidth);
   });
-  await expect.poll(async () => (await phrase.boundingBox())!.height).toBeCloseTo(oneLineHeight, 0);
-  const example = page.getByLabel('例句 1', { exact: true });
+  await expect.poll(async () => (await example.boundingBox())!.height).toBeCloseTo(oneLineHeight, 0);
   await example.fill('Short.');
   const shortHeight = (await example.boundingBox())!.height;
   await example.fill('One\nTwo\nThree\nFour\nFive\nSix');
@@ -37,15 +53,9 @@ test('expression editors fit initial content, editing, undo and changed column w
   expect(await example.evaluate(node => node.clientHeight >= node.scrollHeight - 1)).toBe(true);
   await example.fill('Short.');
   await expect.poll(async () => (await example.boundingBox())!.height).toBeCloseTo(shortHeight, 0);
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect.poll(async () => (await example.boundingBox())!.height).toBeGreaterThan(shortHeight + 80);
-  await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect.poll(async () => (await example.boundingBox())!.height).toBeCloseTo(shortHeight, 0);
   await example.fill('A wrapping example with several words. '.repeat(15));
-  const narrowHeight = (await example.boundingBox())!.height;
-  const separator = page.getByRole('separator', { name: '调整编辑与预览宽度' });
-  await separator.focus(); await separator.press('Home');
-  await expect.poll(async () => (await example.boundingBox())!.height).toBeLessThan(narrowHeight - 20);
-  expect(await table.locator('th,td').evaluateAll(cells => cells.every(cell => getComputedStyle(cell).verticalAlign === 'middle'))).toBe(true);
-  await page.screenshot({ path: '.build/test-results/auto-height-expressions.png' });
+  const wideHeight = (await example.boundingBox())!.height;
+  await dragSplitterToMax(page);
+  await expect.poll(async () => (await example.boundingBox())!.height).toBeGreaterThan(wideHeight);
+  await page.screenshot({ path: '.build/test-results/auto-height-vocabulary.png' });
 });

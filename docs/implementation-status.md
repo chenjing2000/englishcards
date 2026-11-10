@@ -1,6 +1,6 @@
 # EnglishCards 桌面版实施状态与验收记录
 
-> 本文前半部分包含历史阶段记录，旧路径（`desktop/`、`src/`、`tests/`、`dist/wpf/`）仅用于追溯。当前目录与目标数据契约以 `docs/project-contract.md` 为准。
+> 本文包含历史阶段记录。旧路径和已被覆盖的历史产品决策仅用于追溯。当前目录、Article v6 及 Phase 2B-0 新增规则以 `docs/project-contract.md` 和 `docs/specs/PHASE2B_PRODUCT_ADDITIONS.md` 为准。
 
 2026-11-06；当前行为以 `docs/project-contract.md` 为准。本文包含历史执行环境记录及用户补充的 Windows 验收结果。
 
@@ -128,9 +128,201 @@ The owner supplied a fresh PowerShell log after the Vitest test-file fix:
 
 - Production code moved to `EnglishCards/desktop/` and `EnglishCards/frontend/`.
 - Tests moved to `EnglishCards.Tests/dotnet/` and `EnglishCards.Tests/frontend/{unit,e2e}/`.
-- Skills moved from `docs/skills/` to root `skills/`; the Article-to-EnglishCards Skill now describes Article v6.
+- Skills were initially moved from `docs/skills/` to root `skills/` during Phase 2A; the Article-to-EnglishCards Skill now describes Article v6.
 - Development-only Express test server moved to `tools/test-server/`.
 - Vite output target changed from `artifacts/dist/` to `EnglishCards/.build/frontend-dist/`; test outputs use root `.build/`. The permanent `artifacts/` directory has been eliminated from the intended layout.
 - WPF embedded-resource paths, .NET test project reference, Vite, Playwright, TypeScript aliases and publish output target were updated.
 - The runtime editor and desktop bridge still use v5. This phase only reorganizes paths; it does not claim v6 app integration.
 - The new directory layout has not yet been re-run on Windows. Container verification is limited by unavailable npm dependencies and no Windows/.NET runtime in this environment.
+
+
+## 2026-11-07 — Phase 2B-0 product specification freeze
+
+The owner approved the following additions before production v6 integration:
+
+- Default preview/editor pane ratio is 55:45. Existing splitter, 280 DIP minimum pane widths and manual layout persistence remain.
+- Vocabulary generation Skill distinguishes single-word entries from multiword entries. Single words require POS, British IPA, meaning, example and example translation; separate senses are required for different parts of speech. Multiword entries omit POS and IPA but require meaning, example and translation. This is a Skill quality rule, not a strict application import gate.
+- Vocabulary editor/list uses one vertical column.
+- Right-side editor content uses 14 DIP; directory/section headings use 16 DIP bold.
+- Project Skills move to `docs/skills/`.
+- JSON import searches only the selected JSON's immediate directory for PNG/JPG, case-insensitive by extension, sorts filenames case-insensitively and temporarily loads the first match. No image field or filename is added to Article. The loaded image is session-scoped and shared by preview and PNG/ZIP rendering; it is top-aligned and clipped at the agreed available height.
+- Settings becomes a gear-icon entry instead of the old Style tab. Workspace top-right toolbar order: Settings, Open JSON, Save JSON, Export ZIP. Buttons are 40 DIP circular surfaces with 20 DIP icons, `#D3E5EB` background and `#27495B` strokes.
+- Four standalone SVG icon assets are added under `EnglishCards/frontend/src/assets/icons/toolbar/`.
+
+This phase updates specifications, Skill guidance, repository paths and icon assets only. No production UI, importer, persistence or export implementation has yet been changed.
+
+Phase 2B-0 supersedes that intermediate placement: project Skills are now under `docs/skills/`.
+
+
+## 2026-11-07 — Phase 2B-1: Article v6 production data layer
+
+### Implemented
+
+- Replaced the frontend production `Project` shape with an Article v6 facade (`Project` is now an Article v6 alias; runtime-only styles remain separate on `RenderProject`).
+- Removed production data access to v5 `source`, `expressions`, `mainIdea` and `personalizedHeader`; `identityTag`, `content.paragraphs`, unified `vocabulary`, and `translation.paragraphs` are now used.
+- Switched production JSON import and plain-text import to `ArticleImportCoordinator`; desktop Open dialog accepts `.json` and `.txt`; malformed/legacy JSON does not fall back to plaintext.
+- Switched project JSON save, browser/desktop draft wrapper, and `article.json` ZIP snapshot to Article v6.
+- Updated WPF save validation and ZIP export schema checks from version 5 to version 6.
+- Updated the dev export server to write `article.json`.
+- Updated the BrainCo sample fixture to Article v6 (this is a new v6 sample fixture; runtime code does not migrate old JSON).
+- Updated vocabulary list to one vertical collection and removed the separate Expressions and Main Idea editor/preview data paths. The later one-TabPage editor and left-preview selection-plus interaction are still pending.
+- Updated default splitter ratio to 55:45.
+- Added explicit quarantine of the previous localStorage draft key `reading-editor.draft.v2`; it is never parsed or migrated. Desktop v5 draft wrappers are likewise rejected by the v6 reader and preserved by the existing rejected-draft flow.
+- Updated unit/E2E/.NET test sources to Article v6 and canonical `p001..p999` / `v001..v999` IDs.
+
+### Validation performed in the authoring environment
+
+- TypeScript syntax parse: 56 files parsed, zero syntax errors.
+- Article v6 core smoke test: passed.
+- JSON/TXT importer smoke test: passed, including legacy JSON and malformed JSON rejection.
+- Full `npm ci` could not be completed because the authoring environment has no cached npm registry packages and network installation is unavailable. Therefore Vitest, Playwright, TypeScript semantic checking, .NET tests and WPF publish have **not** been run in this environment.
+- The user must run the Windows test/build commands against the delivered source package before Phase 2B-1 is marked fully verified.
+
+### Not included yet
+
+- Companion image discovery and session-scoped image rendering/export.
+- One continuous Vocabulary → Content → Translation editor TabPage.
+- Left-preview selection-plus interaction with same-paragraph/same-card and English-only constraints.
+- Settings gear and four-icon workspace toolbar.
+- 14 DIP editor content / 16 DIP bold section heading typography.
+- Full PNG/ZIP image crop consistency validation.
+
+
+## 2026-11-07 — Phase 2B-1 production data-layer boundary hardening
+
+A direct reinspection corrected the earlier migration audit: the supplied Phase 2B-0 source already uses Article v6 across the frontend model, editor view model, importer, persistence, pagination and WPF schema gates. No wholesale v5-to-v6 rewrite was needed.
+
+This patch adds `ArticleContractValidator` to repeat strict Article v6 validation at the WPF trust boundary. It is invoked for standalone project saves, ZIP export requests, and validation of the exported `article.json`. The .NET test harness now covers invalid schema versions, legacy fields, noncanonical IDs, duplicate vocabulary, paragraph overflow and malformed exported Article structure.
+
+The remaining separate tabs, toolbar, single-column editor, companion image and other approved UI changes remain scheduled for subsequent phases. No UI changes are claimed in this phase.
+
+## 2026-11-09 — Phase C: unified Article editor
+
+- Replaced the old 原文/词汇/译文/样式 tabs with a single scrolling editor: Vocabulary → Content → Translation.
+- Content and Translation each use one continuous textarea, separated into natural paragraphs by blank lines. The input buffer retains unfinished line breaks while editing; successful changes are parsed into canonical Article v6 paragraphs and IDs.
+- Title and IdentityTag remain separate editable fields immediately before Content.
+- Settings remain accessible via a temporary standalone Settings button; the finalized upper-right gear plus four-button toolbar are deferred to the approved later toolbar phase.
+- Removed the right-side paragraph-by-paragraph editor and highlight buttons. Preview selection-plus interaction is explicitly deferred to Phase D; it has not been implemented in Phase C.
+- Preview-to-editor click navigation, vocabulary editing, undo/redo, JSON saving, drafts and ZIP data model remain wired to Article v6.
+- Added Phase C E2E coverage for section order, continuous paragraphs, IDs, Undo/Redo and settings access. Three obsolete tests dependent on selection-to-highlight buttons are marked skipped until the left-preview interaction replaces them in Phase D. They must be re-enabled or replaced with equivalent coverage at that time.
+- Windows CI run 42607275999: Vitest 48 passed, Vite build passed, Playwright 57 passed / 3 skipped, .NET test step passed. Real WPF/WebView2 visual verification and Windows publish smoke test are still pending.
+
+### Phase C — Windows desktop acceptance (2026-11-09)
+
+The user completed the Windows WPF/WebView2 acceptance checklist successfully:
+
+- Vocabulary → Content → Translation ordering and right-pane scrolling behave as expected.
+- Continuous paragraph creation/deletion, blank-line parsing and preview synchronization work.
+- Undo/Redo works for article body, translation and vocabulary edits.
+- Preview clicks on title, body, vocabulary and translation focus the correct editor.
+- JSON save, draft restoration after restart, article data and settings persist correctly.
+- ZIP export preserves paragraph structure, image content and Chinese rendering.
+- Cursor placement, scrolling and long-article editing showed no visible jumping.
+
+**Phase C is accepted on the user's Windows desktop.** No outstanding Phase C defects were reported. The three E2E tests skipped in CI remain intentionally deferred because they exercise the superseded right-editor selection/highlight controls; equivalent left-preview selection-plus coverage is required in Phase D.
+
+## 2026-11-09 — Phase D: left-preview vocabulary selection
+
+- Added a contextual plus action to the left paginated preview. It appears at the lower-right edge of a valid text selection; the right-hand continuous editor does not expose this action.
+- Selection offsets are mapped from rendered .text-line fragments back to Article v6 UTF-16 paragraph offsets, including nested highlight spans and wrapped lines.
+- Eligibility is restricted to complete English words/phrases containing Latin letters and no Han characters. Both endpoints must belong to the same source paragraph and the same rendered card.
+- Added addVocabularyFromSelection as a dedicated add-only action. Existing headwords and existing highlighted variants are not duplicated; selecting an already-present term displays a warning. The previous toggle/cancel model helper remains covered independently.
+- Newly added entries receive canonical vNNN IDs, an initial empty sense, and a highlight variant. Existing history and preview pagination continue to drive Undo/Redo and rendering.
+- Replaced the skipped legacy right-editor highlight E2E cases with left-preview plus interaction coverage. Restored the notification timing test using the duplicate-selection warning. No E2E tests are skipped in the current CI run.
+- Windows CI run 42612499165: Vitest 50 passed; Vite build passed; Playwright 61 passed; .NET 17 checks passed; overall workflow succeeded.
+- Windows desktop interaction acceptance is pending. The user should verify actual selection/plus positioning, word/phrase insertion, duplicate warning, invalid selection suppression, Undo/Redo, and persistence/export in WPF/WebView2.
+
+## 2026-11-09 — Phase D interaction simplification
+
+This update supersedes the earlier Phase D interaction description where it conflicts:
+
+- Left preview is now a reading and vocabulary-extraction surface. Ordinary single-click and double-click do not navigate to or focus the right editor. Text selection and the contextual plus action remain available.
+- Right editor is independent; users enter fields by directly interacting with the right-side controls. Both sides stay synchronized through the shared Article v6 project state.
+- Undo/Redo controls, keyboard commands, and the ViewModel history stack have been removed. Automatic draft persistence, settings persistence, JSON save/import, and ZIP export remain.
+- Right-click is disabled across the React application: contextmenu, right-button pointerdown, and right-button mousedown are canceled in the capture phase. Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z are blocked; standard Ctrl+C/Ctrl+V/Ctrl+A shortcuts remain available.
+- WPF/WebView2 disables native default context menus and handles ContextMenuRequested at the host boundary.
+- E2E coverage is being migrated from preview-to-editor navigation and undo/redo to independent preview behavior, global input policy, and data persistence without history.
+- Companion images and the finalized four-button toolbar remain outside this change. No Article v6 schema or pagination changes are included.
+- Windows desktop acceptance must verify the WPF/WebView2 context menu is suppressed, right-click is inert in all editor surfaces, clipboard shortcuts still work, and preview selection-plus behavior remains unaffected.
+
+### Phase D interaction cleanup — CI verification (2026-11-09)
+
+- The first regression run identified two stale E2E expectations: the removed history toolbar was still asserted in desktop-project-io, and senses-navigation still expected preview clicks to focus the editor. Both tests were corrected to assert the new product behavior; no production workaround was added.
+- Final Windows GitHub Actions run 42620924667 succeeded on commit f801d8670b49dacb775af0984fcd03b6a674a4d3:
+  - Vitest: 50 passed across 10 test files.
+  - React/Vite production build: passed.
+  - Playwright: 61 passed, 0 skipped.
+  - Windows .NET desktop tests: 17 passed.
+- Added global capture-phase suppression for contextmenu, right-button pointerdown/pointerup, mousedown/mouseup and auxclick. Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z are canceled; standard clipboard shortcuts remain untouched.
+- WPF host disables WebView2 default context menus and handles ContextMenuRequested. The WPF main-window hook also suppresses the native title-bar/window-chrome context menu.
+- Windows native shell file-picker dialogs remain OS-owned; this change does not attempt to modify Explorer context menus inside those system dialogs.
+- Automated CI is green. Real WPF/WebView2 desktop acceptance is still pending; the user should verify the visible editor, right-click behavior (including the main window title bar), selection-plus, clipboard shortcuts, persistence and ZIP export before Phase D is accepted.
+
+## 2026-11-09 — Phase D.1: highlight synchronization and editor interaction refinement
+
+### User Windows acceptance feedback
+
+The owner confirmed the Phase D baseline behavior on Windows:
+
+- Preview clicks do not navigate to the right editor.
+- Selection-plus adds a word or phrase; duplicate vocabulary is reported without creating a duplicate.
+- Partial-word selections, Han-containing selections, and selections crossing paragraph/card boundaries do not show the add action.
+- Undo/Redo and right-click are disabled as intended; clipboard shortcuts remain usable.
+- Draft persistence, JSON save and ZIP export preserve data.
+
+New refinements requested:
+
+- Match the left-preview selection-plus icon to ReadArticles `SelectionAddAdorner`: a 14×14 white circular button with a 1.3 px DodgerBlue outline and rounded blue plus strokes.
+- When a vocabulary head is renamed, remove its previous primary headword from the entry's highlight rules, add the new headword, and preserve other independently selected surface variants. This prevents an obsolete phrase such as `only for` remaining highlighted after the headword becomes `only`.
+- Remove the manual highlight refresh control. It previously only invalidated/re-ran pagination and did not change Article highlight rules; ordinary project updates already trigger pagination.
+- Redraw the remaining four vocabulary row actions (move up/down, add, delete) as SVG icons. Increase each control from 20×20 to 25×25 px, use larger rounded corners, opaque backgrounds and distinct blue/teal/coral icon treatments.
+- Update default `vocabularySize` from 26 to 30 and `headingSize` from 24 to 32.
+- Improve splitter responsiveness by applying drag widths directly to the workspace once per animation frame, avoiding React state updates for every pointer movement, and defer preview zoom clamping until drag completion. Keyboard resizing remains supported.
+
+### Implementation and verification
+
+- The old headword highlight rule is removed on commit; independent variants remain. A unit test covers rename, preservation and clearing behavior.
+- E2E coverage verifies the obsolete phrase disappears automatically after a headword rename and persists correctly after reload.
+- The obsolete refresh button is removed and tests now verify automatic preview updates.
+- Splitter E2E now checks that pane width changes before pointer release.
+- Windows build, unit/E2E/.NET CI and WPF visual acceptance are pending for this Phase D.1 update.
+
+## 2026-11-09 — Phase D.2: unified vocabulary matching and live highlight editing
+
+### Confirmed behavior
+
+- Every vocabulary entry's `word` is a primary full-text match rule, even when `highlight` is empty.
+- Each item in `highlight` is an additional independent full-text match rule.
+- Highlight editor text is separated by English semicolons. Rules are trimmed, internal whitespace is normalized, empty entries are ignored, and case-insensitive duplicates (including the primary `word`) are omitted.
+- Highlight rules update on every input event. The editor preserves the user's in-progress semicolon/spacing text while the project model receives parsed rules.
+- Matching is case-insensitive and requires a complete English word or complete continuous phrase. Punctuation between phrase words is not treated as whitespace.
+- Overlap resolution is leftmost-first; matches sharing a start position prefer the longest range. Distinct matches are never merged into an invented larger phrase.
+- Renaming a dictionary headword removes redundant copies of the old and new headword from `highlight`; other variants remain unchanged.
+- Selecting a term already represented by either `word` or `highlight` does not create a duplicate vocabulary entry. New selected entries store the selected text in `word` and start with an empty `highlight` array.
+- The splitter is mouse-only. Keyboard Arrow/Home/End adjustment is removed.
+- Vocabulary action buttons are 21×21 px, with 15×15 px SVG icons, 7 px rounded corners, 4 px gaps and opaque, operation-specific backgrounds. The manual refresh action is removed.
+
+### Implementation
+
+- Updated the Article model's vocabulary insertion and highlight collection logic.
+- Added `parseHighlightInput` and `formatHighlightInput`, plus a local-draft Highlight textarea component.
+- Added a Highlight row between IPA and Meaning in each vocabulary editor.
+- Updated the view model to commit parsed highlight rules on every input event.
+- Updated the splitter and vocabulary action styling.
+- Updated unit/E2E coverage for word-only matching, semicolon parsing, case-insensitive de-duplication, phrase boundaries, overlap priority, JSON persistence, mouse-only resizing and the final button dimensions.
+- Added conditional WPF executable icon/resource configuration and window/taskbar icon loading for `EnglishCards/desktop/Assets/clover_icon.ico`.
+
+### Verification status
+
+- Frontend unit tests: passed.
+- TypeScript and Vite production build: passed.
+- The first updated Playwright run passed 61 tests; two remaining assertions were stale and have now been corrected (source capitalization and the final 21 px button size). A full rerun is pending.
+- Windows .NET tests and final WPF publish are pending the successful Playwright run.
+- The ICO source file is not yet committed in this branch. Copy the supplied `clover_icon(1).ico` to `EnglishCards/desktop/Assets/clover_icon.ico`; the csproj embeds it into the EXE and the WPF window loads the same resource for the taskbar/window icon. Until that file is present, the application retains the Windows fallback icon.
+
+### Final CI result for the Phase D.2 code
+
+- GitHub Actions run `42643691101` completed successfully on 2026-11-09.
+- Frontend unit tests, TypeScript checks, Vite production build, all 63 Playwright E2E tests, and Windows .NET tests passed.
+- The .NET compile issue caused by the missing `System.IO` import in the optional icon loader was corrected before this successful run.
+- Final WPF publish and visual shell verification remain part of local Windows acceptance. The original ICO still needs to be copied into `EnglishCards/desktop/Assets/clover_icon.ico` and committed so the executable embeds it; without that binary, the project intentionally uses the Windows fallback icon.

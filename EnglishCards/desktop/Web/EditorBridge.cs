@@ -11,7 +11,8 @@ namespace EnglishCards;
 
 internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore data, ZipExportService exporter)
 {
-    private const string ProjectFilter = "EnglishCards 项目 (*.json)|*.json";
+    private const string OpenArticleFilter = "EnglishCards 文章 (*.json;*.txt)|*.json;*.txt|Article JSON (*.json)|*.json|Plain Text (*.txt)|*.txt";
+    private const string SaveArticleFilter = "Article JSON (*.json)|*.json";
     private long navigation;
     private Task fileCommandTail = Task.CompletedTask;
 
@@ -111,7 +112,7 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
 
     private async Task<object?> OpenProjectAsync()
     {
-        var path = ChooseFile(new OpenFileDialog { Filter = ProjectFilter, CheckFileExists = true, InitialDirectory = data.ProjectsPath });
+        var path = ChooseFile(new OpenFileDialog { Filter = OpenArticleFilter, CheckFileExists = true, InitialDirectory = data.ProjectsPath });
         if (path is null) return null;
         return new { name = Path.GetFileName(path), text = await File.ReadAllTextAsync(path) };
     }
@@ -121,13 +122,11 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         // The editor validates the full schema with parseProject before sending the snapshot.
         using var document = JsonDocument.Parse(text);
         var project = document.RootElement;
-        if (project.ValueKind != JsonValueKind.Object || !project.TryGetProperty("schemaVersion", out var version) ||
-            version.ValueKind != JsonValueKind.Number || !version.TryGetInt32(out int schema) || schema != 5)
-            throw new InvalidDataException("仅支持 schemaVersion: 5。");
+        ArticleContractValidator.Validate(project);
 
         var path = ChooseFile(new SaveFileDialog
         {
-            Filter = ProjectFilter, DefaultExt = ".json", FileName = "reading-project.json", OverwritePrompt = true, InitialDirectory = data.ProjectsPath
+            Filter = SaveArticleFilter, DefaultExt = ".json", FileName = "article.json", OverwritePrompt = true, InitialDirectory = data.ProjectsPath
         });
         if (path is null) return null;
         await UserDataStore.WriteAtomicallyAsync(path, text);
@@ -148,7 +147,7 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         data.EnsureRejectedDraftAvailable();
         var path = ChooseFile(new SaveFileDialog
         {
-            Filter = ProjectFilter, DefaultExt = ".json", FileName = "rejected-draft.json", OverwritePrompt = true, InitialDirectory = data.ProjectsPath
+            Filter = SaveArticleFilter, DefaultExt = ".json", FileName = "rejected-draft.json", OverwritePrompt = true, InitialDirectory = data.ProjectsPath
         });
         if (path is null) return null;
         await data.ExportRejectedDraftAsync(path);

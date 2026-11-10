@@ -7,7 +7,7 @@ import { SettingsStore } from '@test-server/settingsStore';
 
 it('defines all agreed defaults and validates usable page dimensions', () => {
   expect(defaults).toEqual({ titleSize: 30, bodySize: 34, mainIdeaSize: 32, translationSize: 32,
-    headerSize: 18, footerSize: 17, wordSize: 34, vocabularySize: 26, phraseSize: 34, expressionSize: 30, headingSize: 24,
+    headerSize: 18, footerSize: 17, wordSize: 34, vocabularySize: 30, phraseSize: 34, expressionSize: 30, headingSize: 32,
     lineHeight: 1.45, translationLineHeight: 1.62, paragraphGap: 18, marginX: 54, marginTop: 34, marginBottom: 80, pageWidth: 1200, pageHeight: 1600 });
   expect(settingsSchema.safeParse({ ...defaults, pageWidth: 400, marginX: 200 }).success).toBe(false);
   expect(settingsSchema.safeParse({ ...defaults, pageHeight: 400, marginTop: 200, marginBottom: 200 }).success).toBe(false);

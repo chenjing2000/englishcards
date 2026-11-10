@@ -2,6 +2,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 var bridgeType = Assembly.Load("EnglishCards").GetType("EnglishCards.EditorBridge", throwOnError: true)!;
@@ -59,8 +60,8 @@ var directory = Directory.CreateTempSubdirectory("EnglishCards-file-test-");
 var destination = Path.Combine(directory.FullName, "sample.json");
 try
 {
-    const string original = """{"schemaVersion":5,"title":"保存原文"}""";
-    const string edited = """{"schemaVersion":5,"title":"保存成功"}""";
+    const string original = """{"schemaVersion":6,"id":"x","title":"保存原文","identityTag":"","content":{"paragraphs":[]},"vocabulary":[],"translation":{"paragraphs":[]}}""";
+    const string edited = """{"schemaVersion":6,"id":"x","title":"保存成功","identityTag":"","content":{"paragraphs":[]},"vocabulary":[],"translation":{"paragraphs":[]}}""";
     var originalBytes = Encoding.UTF8.GetBytes(original);
     await Save(destination, original);
     if (!File.ReadAllBytes(destination).SequenceEqual(originalBytes))
@@ -336,11 +337,11 @@ Console.WriteLine("PASS WebView2 startup failure exposes the official Microsoft 
 // Exported article JSON must be readable, UTF-8 without BOM, and semantically identical.
 var formatterType = bridgeType.Assembly.GetType("EnglishCards.ArticleJsonFormatter", throwOnError: true)!;
 var formatJson = formatterType.GetMethod("FormatUtf8", BindingFlags.Static | BindingFlags.NonPublic)!;
-const string compactArticle = """{"schemaVersion":5,"title":"中文标题","nested":{"items":[{"word":"neuro-tech","meaning":"神经科技的"},{"word":"showcase","meaning":"展示"}]}}""";
+const string compactArticle = """{"schemaVersion":6,"id":"x","title":"中文标题","identityTag":"","content":{"paragraphs":[]},"vocabulary":[],"translation":{"paragraphs":[]}}""";
 var prettyBytes = (byte[])formatJson.Invoke(null, [compactArticle])!;
 var prettyArticle = Encoding.UTF8.GetString(prettyBytes);
 if ((prettyBytes.Length >= 3 && prettyBytes[0] == 0xEF && prettyBytes[1] == 0xBB && prettyBytes[2] == 0xBF) ||
-    !prettyArticle.Contains("\n  \"schemaVersion\": 5", StringComparison.Ordinal) ||
+    !prettyArticle.Contains("\n  \"schemaVersion\": 6", StringComparison.Ordinal) ||
     !prettyArticle.Contains("中文标题", StringComparison.Ordinal) ||
     !prettyArticle.EndsWith('\n') ||
     !JsonNode.DeepEquals(JsonNode.Parse(compactArticle), JsonNode.Parse(prettyArticle)))
@@ -356,7 +357,7 @@ Task ValidateArchive(string path, int pages, int width, int height) =>
 byte[] ValidPng() => Convert.FromBase64String(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==");
 
-async Task WriteTestArchive(string path, byte[] png, string article = """{"schemaVersion":5,"title":"test"}""")
+async Task WriteTestArchive(string path, byte[] png, string article = """{"schemaVersion":6,"id":"test","title":"test","identityTag":"","content":{"paragraphs":[]},"vocabulary":[],"translation":{"paragraphs":[]}}""")
 {
     await using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
     using var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: true);
@@ -399,13 +400,59 @@ try
     if (!truncatedRejected) throw new Exception("ZIP validation must reject a truncated PNG header.");
 
     var invalidArticle = Path.Combine(archiveTestDirectory.FullName, "invalid-article.zip");
-    await WriteTestArchive(invalidArticle, ValidPng(), """{"schemaVersion":"5"}""");
+    await WriteTestArchive(invalidArticle, ValidPng(), """{"schemaVersion":"6"}""");
     bool articleRejected = false;
     try { await ValidateArchive(invalidArticle, 1, 1, 1); }
     catch (InvalidDataException) { articleRejected = true; }
     if (!articleRejected) throw new Exception("ZIP validation must reject an invalid article schema version.");
 
+    var malformedArticle = Path.Combine(archiveTestDirectory.FullName, "malformed-article.zip");
+    await WriteTestArchive(malformedArticle, ValidPng(),
+        """{"schemaVersion":6,"id":"x","title":"missing required fields"}""");
+    bool malformedArticleRejected = false;
+    try { await ValidateArchive(malformedArticle, 1, 1, 1); }
+    catch (InvalidDataException) { malformedArticleRejected = true; }
+    if (!malformedArticleRejected) throw new Exception("ZIP validation must reject Article v6 documents with missing required fields.");
+
     Console.WriteLine("PASS ZIP validation checks PNG signature, dimensions and reads the complete entry");
     Console.WriteLine("PASS ZIP validation rejects truncated images and invalid article schema");
 }
 finally { archiveTestDirectory.Delete(recursive: true); }
+
+
+// The WPF boundary must validate the complete Article v6 contract, not only its version number.
+var articleValidatorType = bridgeType.Assembly.GetType("EnglishCards.ArticleContractValidator", throwOnError: true)!;
+var validateArticle = articleValidatorType.GetMethod("Validate", BindingFlags.Static | BindingFlags.NonPublic)!;
+const string validArticleV6 = """{"schemaVersion":6,"id":"x","title":"Article","identityTag":"","content":{"paragraphs":[{"id":"p001","text":"Body"}]},"vocabulary":[{"id":"v001","word":"run","ipa":"/rʌn/","highlight":["run"],"senses":[{"pos":"v.","meaning":"跑","example":"Run fast.","exampleTranslation":"快跑。"}]}],"translation":{"paragraphs":[{"id":"p001","text":"正文"}]}}""";
+
+void ValidateArticle(string json)
+{
+    using var parsed = JsonDocument.Parse(json);
+    validateArticle.Invoke(null, [parsed.RootElement]);
+}
+void ExpectArticleRejected(string json, string scenario)
+{
+    bool rejected = false;
+    try { ValidateArticle(json); }
+    catch (TargetInvocationException error) when (error.InnerException is InvalidDataException) { rejected = true; }
+    if (!rejected) throw new Exception($"Article v6 validator must reject {scenario}.");
+}
+
+ValidateArticle(validArticleV6);
+ExpectArticleRejected("""{"schemaVersion":5,"id":"x","title":"","identityTag":"","content":{"paragraphs":[]},"vocabulary":[],"translation":{"paragraphs":[]}}""", "v5 schema");
+ExpectArticleRejected(validArticleV6.Replace("\"identityTag\":\"\"", "\"identityTag\":\"\",\"mainIdea\":\"legacy\"", StringComparison.Ordinal), "legacy fields");
+ExpectArticleRejected(validArticleV6.Replace("\"id\":\"p001\"", "\"id\":\"p002\"", StringComparison.Ordinal), "non-sequential paragraph IDs");
+ExpectArticleRejected(validArticleV6.Replace("\"id\":\"v001\"", "\"id\":\"v002\"", StringComparison.Ordinal), "non-sequential vocabulary IDs");
+var duplicateVocabularyArticle = JsonNode.Parse(validArticleV6)!.AsObject();
+var duplicateVocabulary = duplicateVocabularyArticle["vocabulary"]!.AsArray();
+var duplicateEntry = duplicateVocabulary[0]!.DeepClone().AsObject();
+duplicateEntry["id"] = "v002";
+duplicateEntry["word"] = "RUN";
+duplicateVocabulary.Add(duplicateEntry);
+ExpectArticleRejected(duplicateVocabularyArticle.ToJsonString(), "duplicate vocabulary entries");
+var tooManyParagraphs = JsonNode.Parse(validArticleV6)!.AsObject();
+var paragraphArray = tooManyParagraphs["content"]!["paragraphs"]!.AsArray();
+for (int i = 2; i <= 1000; i++)
+    paragraphArray.Add(new JsonObject { ["id"] = $"p{i:000}", ["text"] = $"p{i}" });
+ExpectArticleRejected(tooManyParagraphs.ToJsonString(), "the 1000th paragraph");
+Console.WriteLine("PASS WPF Article v6 boundary validates complete schema, canonical IDs, duplicate vocabulary and paragraph limits");

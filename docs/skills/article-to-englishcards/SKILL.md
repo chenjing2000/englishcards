@@ -66,11 +66,12 @@ description: Use when a user provides an English article and wants an importable
 
 - Vocabulary 最多 999 项，按当前顺序连续使用 `v001`–`v999`。
 - `word` 是唯一核心词头字段，可保存单词、词组或习语；不要使用 `phrase` 或 `text` 替代。
-- `ipa` 可省略；无可靠依据时使用空字符串，不编造音标。
+- **单个单词词条**：`word` 按空白分隔后恰好是一个单词时，必须提供英式音标 `ipa`，并为该词配置词性、含义、例句和例句翻译。若该词在当前语境或词典义项中涉及不同词性，必须在 `senses` 中分别列出每种词性及其对应含义、例句和例句翻译；不得把不同词性的释义混在同一个义项中。音标属于词头，只填写一次，不在每个 sense 中重复。
+- **多词词条**：`word` 按空白分隔后包含两个或更多单词时，不配置词性和音标；`ipa` 留空或省略，每个 sense 的 `pos` 使用空字符串。仍必须提供准确含义、英文例句及例句翻译。
+- 单词数量按空白分隔判断，不按连字符或撇号拆分：`well-known`、`don't` 各按一个单词处理；`a far cry from` 按多词表达处理。
 - `highlight` 必须是字符串数组，列出正文中应高亮的实际表面形式；不需要时使用 `[]`。
-- `senses` 必须至少包含一个义项。每个义项必须包含 `pos`、`meaning`、`example`、`exampleTranslation` 四个字符串字段；未知内容留空字符串。
-- 同一词条的不同词性或不同含义分别放入 `senses`，不能压缩成平行数组。
-- 词性使用 `n.`、`v.` 等简明形式；词组不适用时使用空字符串。
+- `senses` 必须至少包含一个义项。每个义项必须包含 `pos`、`meaning`、`example`、`exampleTranslation` 四个字符串字段。单词的每个相关词性分别列为独立义项；多词表达的 `pos` 为空字符串。
+- 词性使用 `n.`、`v.`、`adj.`、`adv.` 等简明形式。
 - 同一 `word` 经 NFC 规范化、首尾去空白、连续空白合并及英文大小写不敏感比较后不得重复。
 - 词汇条目 ID 按当前数组顺序连续编号。删除条目后，剩余条目重新编号。
 
@@ -134,8 +135,8 @@ description: Use when a user provides an English article and wants an importable
 在仓库根目录、依赖安装完成后运行：
 
 ```powershell
-npx.cmd tsx skills/article-to-englishcards/scripts/validate-project.ts
-npx.cmd tsx skills/article-to-englishcards/scripts/validate-project.ts "C:\path\article.json"
+npx.cmd tsx docs/skills/article-to-englishcards/scripts/validate-project.ts
+npx.cmd tsx docs/skills/article-to-englishcards/scripts/validate-project.ts "C:\path\article.json"
 ```
 
 脚本复用生产 Article v6 校验器，只验证不改写文件。通过仅表示结构符合当前 v6 模型，不代表翻译、词义、例句质量或分页/导出已经通过实机验证。

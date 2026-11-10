@@ -5,7 +5,7 @@ import { parseRenderProject } from '@frontend/models/project';
 test('cold font loading preserves the first layout with Latin Extended characters and Windows CJK fallback', async ({ page }) => {
   await page.route('**/*.woff2', async route => { await new Promise(resolve => setTimeout(resolve, 150)); await route.continue(); });
   await page.goto('/render'); await page.waitForFunction(() => typeof window.renderProject === 'function');
-  const project = parseRenderProject({ ...fixture, title: 'Test', source: { paragraphs: [] }, translation: { paragraphs: [] }, expressions: [], mainIdea: 'Test', vocabulary: [{ id: 'v1', word: 'word', ipa: '', senses: [{ pos: 'Ł'.repeat(100), meaning: 'Test', example: '', exampleTranslation: '' }] }] });
+  const project = parseRenderProject({ ...fixture, title: 'Test', content: { paragraphs: [] }, translation: { paragraphs: [] }, vocabulary: [{ id: 'v001', word: 'word', ipa: '', highlight: [], senses: [{ pos: 'Ł'.repeat(100), meaning: 'Test', example: '', exampleTranslation: '' }] }] });
   const signatures = await page.evaluate(async project => {
     const first = await window.renderProject(project);
     const diagnostics = window.renderDiagnostics;

@@ -53,7 +53,7 @@ test('desktop waits for both files before enabling editing and initializes missi
       if (command === 'loadSettings') host.reply(id, null);
       if (command === 'loadDraft') host.reply(id, text);
     }
-  }, JSON.stringify({ project: { ...fixture, title: 'Restored from desktop disk' } }));
+  }, JSON.stringify({ article: { ...fixture, title: 'Restored from desktop disk' }, modifiedAt: '2026-11-07T00:00:00.000Z' }));
   await ready(page);
   await expect(title(page)).toHaveValue('Restored from desktop disk');
   await expect.poll(async () => (await requests(page, 'saveSettings')).length).toBe(1);
@@ -69,31 +69,31 @@ test('damaged files are reported and preserved when a validated import and new d
   expect(await requests(page, 'saveRejectedDraft')).toHaveLength(1);
   expect(await requests(page, 'saveSettings')).toHaveLength(0);
   expect(await requests(page, 'saveDraft')).toHaveLength(0);
-  await page.getByRole('button', { name: '样式', exact: true }).click();
+  await page.getByRole('button', { name: '打开设置', exact: true }).click();
   const input = page.getByLabel('导入配置 JSON 文件', { exact: true });
   await input.setInputFiles({ name: 'old-settings.json', mimeType: 'application/json', buffer: Buffer.from('{"bodySize":0}') });
   await expect(page.getByRole('alert')).toContainText('配置导入失败');
   expect(await requests(page, 'saveSettings')).toHaveLength(0);
   await input.setInputFiles({ name: 'old-settings.json', mimeType: 'application/json', buffer: Buffer.from('{"bodySize":40}') });
   await expect(page.getByLabel('英文正文字号')).toHaveValue('40');
-  await page.getByRole('button', { name: '原文', exact: true }).click();
+  await page.getByRole('button', { name: '返回文章编辑', exact: true }).click();
   await title(page).fill('New desktop draft');
   expect((await close(page)).errors).toEqual([]);
   expect((await requests(page, 'saveSettings')).at(-1)?.payload).toMatchObject({ preserveOriginal: true });
   expect((await requests(page, 'saveDraft')).at(-1)?.payload).toMatchObject({ preserveOriginal: true });
 });
 
-test('close waits for in-flight writes and saves both final snapshots after undo', async ({ page }) => {
+test('close waits for in-flight writes and saves both final snapshots after a later edit', async ({ page }) => {
   await start(page, { settings: JSON.stringify(defaults), draft: null });
   await ready(page);
-  await page.getByRole('button', { name: '样式', exact: true }).click();
+  await page.getByRole('button', { name: '打开设置', exact: true }).click();
   const bodySize = page.getByLabel('英文正文字号');
   await page.evaluate(() => { (window as unknown as TestPage).holdWrite = true; });
   await bodySize.fill('40');
   await expect.poll(async () => (await requests(page, 'saveSettings')).length).toBe(1);
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await bodySize.fill('34');
   await expect(bodySize).toHaveValue('34');
-  await page.getByRole('button', { name: '原文', exact: true }).click();
+  await page.getByRole('button', { name: '返回文章编辑', exact: true }).click();
   await title(page).fill('Last draft before closing');
   const result = close(page);
   await expect(page.locator('.app-shell')).toHaveAttribute('inert', '');
@@ -105,7 +105,7 @@ test('close waits for in-flight writes and saves both final snapshots after undo
   });
   expect(await result).toMatchObject({ pending: true, errors: [] });
   expect((await requests(page, 'saveSettings')).map(request => JSON.parse(request.payload!.text).bodySize)).toEqual([40, 34]);
-  expect(JSON.parse((await requests(page, 'saveDraft')).at(-1)!.payload!.text).project.title).toBe('Last draft before closing');
+  expect(JSON.parse((await requests(page, 'saveDraft')).at(-1)!.payload!.text).article.title).toBe('Last draft before closing');
 });
 
 test('failed close keeps the current edit available for retry', async ({ page }) => {
@@ -124,5 +124,5 @@ test('failed close keeps the current edit available for retry', async ({ page })
   await expect(title(page)).toHaveValue('Recoverable edit');
   await page.evaluate(() => { (window as unknown as TestPage).holdWrite = false; });
   expect(await close(page)).toMatchObject({ pending: true, errors: [] });
-  expect(JSON.parse((await requests(page, 'saveDraft')).at(-1)!.payload!.text).project.title).toBe('Recoverable edit');
+  expect(JSON.parse((await requests(page, 'saveDraft')).at(-1)!.payload!.text).article.title).toBe('Recoverable edit');
 });

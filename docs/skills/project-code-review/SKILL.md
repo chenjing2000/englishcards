@@ -26,4 +26,4 @@ description: Use when a user requests a comprehensive project code review, clean
 - **Server（`tools/test-server/`）**：负责本机 HTTP、后台 Chromium、PNG/ZIP 导出和资源释放；可复用共享模型及校验规则，不混入客户端状态或 UI 控件逻辑。
 - **依赖与入口**：View 调用 ViewModel；ViewModel 调用 Model / Services；Services 可依赖 Model；Model 不反向依赖其他层。`EnglishCards/frontend/src/main.tsx` 仅作应用与渲染入口。避免跨层循环依赖，不为消除少量重复添加 DI 容器、事件总线或通用仓储。
 - **修改边界**：新增能力放入相应职责目录，复用现有直接清晰的调用链。已有分层合理时只做局部修改；必要的迁移同步调整导入和调用方，保持已确认的 Article v6、EXE 同级 userdata、撤销重做、草稿、预览与 ZIP 导出契约，按受影响路径验证。
-- **格式同步**：调整项目字段或导入规则时，同时检查 `skills/article-to-englishcards/SKILL.md` 的 JSON 契约、完整示例和校验脚本，使用实际 `parseArticleV6` 验证，避免 skill 与程序各维护一套互相矛盾的格式。
+- **格式同步**：调整项目字段或导入规则时，同时检查 `docs/skills/article-to-englishcards/SKILL.md` 的 JSON 契约、完整示例和校验脚本，使用实际 `parseArticleV6` 验证，避免 skill 与程序各维护一套互相矛盾的格式。

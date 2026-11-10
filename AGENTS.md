@@ -4,7 +4,7 @@ Before changing this repository:
 
 1. Read [`docs/project-contract.md`](docs/project-contract.md).
 2. Read the relevant specifications under [`docs/specs/`](docs/specs/).
-3. For Windows desktop review, follow [`skills/windows-app-review/SKILL.md`](skills/windows-app-review/SKILL.md) and its adjacent reference documents.
+3. For Windows desktop review, follow [`docs/skills/windows-app-review/SKILL.md`](skills/windows-app-review/SKILL.md) and its adjacent reference documents.
 4. Inspect the current working tree and preserve user changes. A source ZIP without `.git` metadata cannot establish branch, commit, or remote state.
 5. Choose verification from the project contract. Distinguish automated tests, real Windows/WebView2 checks, and owner-reported historical acceptance.
 
@@ -24,7 +24,7 @@ Before changing this repository:
 - `EnglishCards/`: all production functionality and runtime assets. WPF source is under `desktop/`; React/TypeScript source and frontend assets are under `frontend/`.
 - `EnglishCards.Tests/`: .NET tests under `dotnet/`; Vitest and Playwright tests under `frontend/`.
 - `docs/`: architecture, specifications, review records, plans, and reference material.
-- `skills/`: project and development skills, kept separate from production source and general docs.
+- `docs/skills/`: project and development Skills, maintained alongside project documentation.
 - `tools/`: build, test, publish, comparison, demo, and development-only test-server tools.
 - `dist/EnglishCards/`: the single official publish output. Do not create parallel publish folders such as `dist/wpf`, `publish`, or `release`.
 - `EnglishCards/.build/` and root `.build/`: disposable generated build/test output. There is no permanent `artifacts/` directory.

@@ -34,8 +34,7 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
             !request.TryGetProperty("signature", out var signatureValue) || signatureValue.ValueKind != JsonValueKind.String ||
             !request.TryGetProperty("pages", out var pagesValue) || !pagesValue.TryGetInt32(out var pages) || pages < 1)
             throw new InvalidDataException("导出快照格式无效。");
-        if (!document.TryGetProperty("schemaVersion", out var version) || version.GetInt32() != 5)
-            throw new InvalidDataException("只能导出 schemaVersion 5 项目。");
+        ArticleContractValidator.Validate(document);
         if (Encoding.UTF8.GetByteCount(project.GetRawText()) > 5 * 1024 * 1024)
             throw new InvalidDataException("项目数据超过 5 MiB 的导出请求上限。");
         string signature = signatureValue.GetString()!;
@@ -185,12 +184,7 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
         await using (var articleStream = articleEntry.Open())
         using (var exportedArticle = await JsonDocument.ParseAsync(articleStream, cancellationToken: ct))
         {
-            var root = exportedArticle.RootElement;
-            if (root.ValueKind != JsonValueKind.Object ||
-                !root.TryGetProperty("schemaVersion", out var exportedVersion) ||
-                exportedVersion.ValueKind != JsonValueKind.Number ||
-                !exportedVersion.TryGetInt32(out int schemaVersion) || schemaVersion != 5)
-                throw new InvalidDataException("导出的 article.json 结构无效。");
+            ArticleContractValidator.Validate(exportedArticle.RootElement);
         }
 
         byte[] pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];

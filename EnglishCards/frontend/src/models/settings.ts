@@ -3,8 +3,8 @@ import { z } from 'zod';
 const size = z.number().int().min(12).max(80);
 const fields = z.object({
   titleSize: size.default(30), bodySize: size.default(34), mainIdeaSize: size.default(32), translationSize: size.default(32),
-  headerSize: size.default(18), footerSize: size.default(17), wordSize: size.default(34), vocabularySize: size.default(26),
-  phraseSize: size.default(34), expressionSize: size.default(30), headingSize: size.default(24),
+  headerSize: size.default(18), footerSize: size.default(17), wordSize: size.default(34), vocabularySize: size.default(30),
+  phraseSize: size.default(34), expressionSize: size.default(30), headingSize: size.default(32),
   lineHeight: z.number().min(1.2).max(2.4).default(1.45), translationLineHeight: z.number().min(1.2).max(2.4).default(1.62),
   paragraphGap: z.number().min(0).max(100).default(18), marginX: z.number().min(24).max(200).default(54),
   marginTop: z.number().min(24).max(200).default(34), marginBottom: z.number().min(65).max(400).default(80),

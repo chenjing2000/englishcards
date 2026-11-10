@@ -1,60 +1,98 @@
-import { z } from 'zod';
-
 import { defaults, settingsSchema, type Styles } from './settings';
-export { defaults, settingsSchema as styleSchema, type Styles } from './settings';
+import {
+  ARTICLE_VERSION, MAX_PARAGRAPHS, MAX_VOCABULARY, ArticleValidationError,
+  addVocabulary as addArticleVocabulary, articleToPlainText, createEmptySense,
+  normalizeVocabulary, paragraphId, parseArticleV6, paragraphsFromText,
+  removeVocabulary as removeArticleVocabulary, replaceParagraphText,
+  vocabularyId, type Article, type Paragraph, type Sense, type VocabularyItem,
+} from '../v6/article';
 
-const id = z.string().min(1).max(200);
-const text = z.string().max(300000).refine(value => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffd]/u.test(value), '含无效控制字符或乱码替代符');
-const paragraph = z.object({ id, text });
-const variants = z.array(text).max(2000).default([]);
-export const emptySense = () => ({ pos: '', meaning: '', example: '', exampleTranslation: '' });
-const senseSchema = z.object({ pos: text, meaning: text, example: text, exampleTranslation: text }).strict();
-const senses = z.array(senseSchema).min(1).max(2000);
-const common = {
-  id, title: text, personalizedHeader: text.default('SOME BIRDS ON TREE'), readingLevel: z.number().optional(),
-  source: z.object({ paragraphs: z.array(paragraph).max(500) }),
-  translation: z.object({ paragraphs: z.array(paragraph).max(500) }),
-  vocabulary: z.array(z.object({ id, word: text, ipa: text.optional(), highlight: variants, senses }).strict()).max(2000),
-  expressions: z.array(z.object({ id, phrase: text, highlight: variants, senses }).strict()).max(2000),
-  mainIdea: text,
-  theme: z.literal('classic').default('classic'),
+export {
+  defaults, settingsSchema as styleSchema, type Styles,
+  ARTICLE_VERSION, MAX_PARAGRAPHS, MAX_VOCABULARY,
+  ArticleValidationError, articleToPlainText, createEmptySense,
+  normalizeVocabulary, paragraphId, parseArticleV6, paragraphsFromText,
+  vocabularyId,
 };
-const currentSchema = z.object({ ...common, schemaVersion: z.literal(5), warnings: z.array(z.string()).default([]) }).strict();
-export type Project = z.infer<typeof currentSchema>;
-export type RenderProject = Project & { styles: Styles };
-export function projectDocument(input: Project & { styles?: Styles }): Project { const { styles: _settings, ...document } = input; return document; }
-export function parseRenderProject(input: unknown): RenderProject {
-  const { styles, ...document } = input as Record<string, unknown>;
-  return { ...parseProject(document), styles: settingsSchema.parse(styles ?? defaults) };
+export type { Article, Paragraph, Sense, VocabularyItem };
+export type Project = Article;
+export type RenderProject = Article & { styles: Styles };
+export type EntryCollection = 'vocabulary';
+
+export const emptySense = createEmptySense;
+export const newId = () => crypto.randomUUID();
+export const layoutKey = (kind: string, sourceId: string) => JSON.stringify([kind, sourceId]);
+export const senseSourceId = (id: string, index: number, field: string) =>
+  index === 0 ? `${id}:${field}` : JSON.stringify([id, index, field]);
+
+export function projectDocument(input: Article | RenderProject): Article {
+  const { styles: _runtimeStyles, ...document } = input as RenderProject;
+  return parseArticleV6(document);
 }
-export type EntryCollection = 'vocabulary' | 'expressions';
-export type Sense = Project['vocabulary'][number]['senses'][number];
+
+export function parseProject(input: unknown): Article {
+  return parseArticleV6(input);
+}
+
+export function parseRenderProject(input: unknown): RenderProject {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new ArticleValidationError('article', '必须为对象');
+  }
+  const { styles, ...document } = input as Record<string, unknown>;
+  return { ...parseArticleV6(document), styles: settingsSchema.parse(styles ?? defaults) };
+}
+
+export function createEmptyArticle(title = ''): Article {
+  return parseArticleV6({
+    schemaVersion: ARTICLE_VERSION,
+    id: newId(),
+    title,
+    identityTag: '',
+    vocabulary: [],
+    content: { paragraphs: [] },
+    translation: { paragraphs: [] },
+  });
+}
+
 export function splitSenseMeaning(value: string, previousPos = ''): Pick<Sense, 'pos' | 'meaning'> {
-  if (previousPos && value.startsWith(`${previousPos} `)) return { pos: previousPos, meaning: value.slice(previousPos.length + 1) };
+  if (previousPos && value.startsWith(`${previousPos} `)) {
+    return { pos: previousPos, meaning: value.slice(previousPos.length + 1) };
+  }
   if (previousPos && value === previousPos) return { pos: previousPos, meaning: '' };
   const match = /^([A-Za-z][A-Za-z./&-]*\.)(?:\s([\s\S]*))?$/u.exec(value);
   return match ? { pos: match[1], meaning: match[2] ?? '' } : { pos: '', meaning: value };
 }
-export const newId = () => crypto.randomUUID();
-export const layoutKey = (kind: string, sourceId: string) => JSON.stringify([kind, sourceId]);
-
-export function parseProject(input: unknown): Project {
-  if (input && typeof input === 'object' && 'schemaVersion' in input && input.schemaVersion !== 5) {
-    throw new Error('仅支持 schemaVersion: 5，旧格式不再支持，请按当前 skill 重新生成 JSON。');
-  }
-  const project = currentSchema.parse(input);
-  const ids = [project.id, ...project.source.paragraphs.map(item => item.id), ...project.translation.paragraphs.map(item => item.id), ...project.vocabulary.map(item => item.id), ...project.expressions.map(item => item.id)];
-  if (new Set(ids).size !== ids.length) throw new Error('项目含重复 ID，请为各条目使用唯一 ID。');
-  return project;
-}
 
 export type HighlightRange = { paragraphId: string; start: number; end: number; quote: string };
-const normalizeTerm = (term: string) => term.trim().replace(/\s+/gu, ' ').toLowerCase();
+
+const normalizeTerm = (term: string) => term.normalize('NFC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en');
+/** Parse the semicolon-separated editor value into independent, de-duplicated rules. */
+export function parseHighlightInput(value: string, word = ''): string[] {
+  const seen = new Set<string>();
+  const primary = normalizeTerm(word);
+  if (primary) seen.add(primary);
+  const result: string[] = [];
+  for (const part of value.split(';')) {
+    const term = part.normalize('NFC').trim().replace(/\s+/gu, ' ');
+    const key = normalizeTerm(term);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(term);
+  }
+  return result;
+}
+
+/** Format stored rules for editing, omitting rules already represented by the word field. */
+export function formatHighlightInput(highlight: string[], word = ''): string {
+  return parseHighlightInput(highlight.join(';'), word).join('; ');
+}
+
 
 function termMatches(source: string, term: string): { start: number; end: number }[] {
   const value = term.trim().replace(/\s+/gu, ' ');
   if (!value) return [];
-  const pattern = new RegExp('(?<![\\p{L}\\p{N}\\p{M}_])' + value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/gu, '\\s+') + '(?![\\p{L}\\p{N}\\p{M}_])', 'giu');
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/gu, '\\s+');
+  const pattern = new RegExp('(?<![\\p{L}\\p{N}\\p{M}_])' + escaped + '(?![\\p{L}\\p{N}\\p{M}_])', 'giu');
   const matches: { start: number; end: number }[] = [];
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(source))) {
@@ -71,71 +109,134 @@ function isWholeTermSelection(source: string, start: number, end: number): boole
   return termMatches(source, selected).some(match => match.start === first && match.end === last);
 }
 
-function addHighlightTerm(project: Project, selected: string): Project {
-  const term = selected.trim();
-  const normalized = normalizeTerm(term);
-  if (!normalized || [...project.vocabulary, ...project.expressions].some(entry => entry.highlight.some(value => normalizeTerm(value) === normalized))) return project;
-  const wordIndex = project.vocabulary.findIndex(entry => normalizeTerm(entry.word) === normalized);
-  if (wordIndex !== -1) return { ...project, vocabulary: project.vocabulary.map((entry, index) => index === wordIndex ? { ...entry, highlight: [...entry.highlight, term] } : entry) };
-  const phraseIndex = project.expressions.findIndex(entry => normalizeTerm(entry.phrase) === normalized);
-  if (phraseIndex !== -1) return { ...project, expressions: project.expressions.map((entry, index) => index === phraseIndex ? { ...entry, highlight: [...entry.highlight, term] } : entry) };
-  if (/\s/u.test(term)) return { ...project, expressions: [...project.expressions, { id: newId(), phrase: term, highlight: [term], senses: [emptySense()] }] };
-  return { ...project, vocabulary: [...project.vocabulary, { id: newId(), word: term, ipa: '', highlight: [term], senses: [emptySense()] }] };
+/** A preview selection must be a complete English word/phrase with no Han characters. */
+export function isValidVocabularySelection(source: string, start: number, end: number): boolean {
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > source.length) return false;
+  const selected = source.slice(start, end);
+  return /[A-Za-z]/u.test(selected) && !/\p{Script=Han}/u.test(selected)
+    && isWholeTermSelection(source, start, end);
 }
 
-export function collectHighlights(project: Project): HighlightRange[] {
-  const terms = new Set([...project.vocabulary, ...project.expressions].flatMap(entry => entry.highlight).filter(term => term.trim()));
-  const result: HighlightRange[] = [];
-  for (const paragraph of project.source.paragraphs) {
-    const matches = [...terms].flatMap(term => termMatches(paragraph.text, term));
-    matches.sort((left, right) => left.start - right.start || right.end - left.end);
-    const merged: typeof matches = [];
-    for (const match of matches) {
-      const previous = merged.at(-1);
-      if (previous && match.start < previous.end) previous.end = Math.max(previous.end, match.end);
-      else merged.push({ ...match });
+export function renumberVocabulary(entries: VocabularyItem[]): VocabularyItem[] {
+  if (entries.length > MAX_VOCABULARY) {
+    throw new ArticleValidationError('vocabulary', '最多允许 999 个词条');
+  }
+  return entries.map((entry, index) => ({ ...entry, id: vocabularyId(index + 1) }));
+}
+
+export function addVocabulary(article: Article, selected: string): Article {
+  return addArticleVocabulary(article, selected);
+}
+
+export function commitEntryHead(article: Article, _key: EntryCollection, entryId: string, value: string): Article {
+  const entry = article.vocabulary.find(item => item.id === entryId);
+  if (!entry || entry.word === value) return article;
+  const normalized = normalizeVocabulary(value);
+  if (normalized && article.vocabulary.some(item => item.id !== entryId && normalizeVocabulary(item.word) === normalized)) {
+    throw new ArticleValidationError('vocabulary.word', `重复词条：${value}`);
+  }
+  const previousHead = normalizeTerm(entry.word);
+  const next = article.vocabulary.map(item => {
+    if (item.id !== entryId) return item;
+    // Word is a primary rule by itself; remove redundant copies of the old or new head.
+    // All other explicitly managed variants remain independent.
+    const highlight = item.highlight.filter(term => {
+      const key = normalizeTerm(term);
+      return key !== previousHead && key !== normalized;
+    });
+    return { ...item, word: value, highlight };
+  });
+  return { ...article, vocabulary: renumberVocabulary(next) };
+}
+
+export function removeEntrySense(article: Article, _key: EntryCollection, id: string, index: number): Article {
+  const entry = article.vocabulary.find(item => item.id === id);
+  if (!entry || entry.senses.length <= 1 || index < 0 || index >= entry.senses.length) return article;
+  return {
+    ...article,
+    vocabulary: article.vocabulary.map(item => item.id === id
+      ? { ...item, senses: item.senses.filter((_, senseIndex) => senseIndex !== index) }
+      : item),
+  };
+}
+
+export function editParagraph(article: Article, paragraphIdValue: string, next: string, key: 'content' | 'translation' = 'content'): Article {
+  const collection = article[key].paragraphs;
+  if (!collection.some(item => item.id === paragraphIdValue)) return article;
+  const paragraphs = collection.map(item => item.id === paragraphIdValue ? { ...item, text: next } : item);
+  return key === 'content'
+    ? { ...article, content: { paragraphs } }
+    : { ...article, translation: { paragraphs } };
+}
+
+export function appendParagraph(article: Article, key: 'content' | 'translation'): Article {
+  const paragraphs = article[key].paragraphs;
+  if (paragraphs.length >= MAX_PARAGRAPHS) {
+    throw new ArticleValidationError(`${key}.paragraphs`, '最多允许 999 个自然段落');
+  }
+  const next = [...paragraphs, { id: paragraphId(paragraphs.length + 1), text: '' }];
+  return key === 'content'
+    ? { ...article, content: { paragraphs: next } }
+    : { ...article, translation: { paragraphs: next } };
+}
+
+export function setArticleText(article: Article, key: 'title' | 'identityTag', value: string): Article {
+  return key === 'title' ? { ...article, title: value } : { ...article, identityTag: value };
+}
+
+export function toggleHighlight(article: Article, paragraphIdValue: string, start: number, end: number): Article {
+  if (end <= start) return article;
+  const paragraph = article.content.paragraphs.find(item => item.id === paragraphIdValue);
+  if (!paragraph) return article;
+
+  let removed = false;
+  const vocabulary = article.vocabulary.map(entry => {
+    const highlight = entry.highlight.filter(term => {
+      const overlaps = termMatches(paragraph.text, term).some(match => match.start < end && match.end > start);
+      if (overlaps) removed = true;
+      return !overlaps;
+    });
+    return highlight.length === entry.highlight.length ? entry : { ...entry, highlight };
+  });
+  if (removed) return { ...article, vocabulary };
+
+  if (!isValidVocabularySelection(paragraph.text, start, end)) return article;
+  return addVocabulary(article, paragraph.text.slice(start, end));
+}
+
+export function collectHighlights(article: Article): HighlightRange[] {
+  // Dictionary headwords and user-supplied variants are equal, independent match rules.
+  const terms = new Map<string, string>();
+  for (const entry of article.vocabulary) {
+    for (const term of [entry.word, ...entry.highlight]) {
+      const value = term.trim().replace(/\s+/gu, ' ');
+      const key = normalizeTerm(value);
+      if (key && !terms.has(key)) terms.set(key, value);
     }
-    result.push(...merged.map(match => ({ paragraphId: paragraph.id, ...match, quote: paragraph.text.slice(match.start, match.end) })));
+  }
+
+  const result: HighlightRange[] = [];
+  for (const paragraph of article.content.paragraphs) {
+    const matches = [...terms.values()].flatMap(term => termMatches(paragraph.text, term));
+    // Leftmost match wins; when two rules start together, the longer phrase wins.
+    matches.sort((left, right) => left.start - right.start || right.end - left.end);
+    let occupiedUntil = -1;
+    for (const match of matches) {
+      if (match.start < occupiedUntil) continue;
+      result.push({
+        paragraphId: paragraph.id, ...match, quote: paragraph.text.slice(match.start, match.end),
+      });
+      occupiedUntil = match.end;
+    }
   }
   return result;
 }
 
-export const senseSourceId = (id: string, index: number, field: string) => index === 0 ? `${id}:${field}` : JSON.stringify([id, index, field]);
-
-export function commitEntryHead(project: Project, key: EntryCollection, entryId: string, value: string): Project {
-  const property = key === 'vocabulary' ? 'word' : 'phrase';
-  let changed = false;
-  const entries = project[key].map(entry => {
-    const current = 'word' in entry ? entry.word : entry.phrase;
-    if (entry.id !== entryId || current === value) return entry;
-    const term = value.trim();
-    const highlight = term && !entry.highlight.includes(value) ? variants.parse([...entry.highlight, value]) : entry.highlight;
-    changed = true;
-    return { ...entry, [property]: value, highlight };
-  });
-  return changed ? { ...project, [key]: entries } as Project : project;
+export function replaceArticleParagraphs(article: Article, section: 'content' | 'translation', fullText: string): Article {
+  return replaceParagraphText(article, section, fullText);
 }
 
-export function removeEntrySense(project: Project, key: EntryCollection, id: string, index: number): Project {
-  const entry = project[key].find(entry => entry.id === id);
-  if (!entry || entry.senses.length <= 1 || index < 0 || index >= entry.senses.length) return project;
-  return { ...project, [key]: project[key].map(item => item.id === id ? { ...item, senses: item.senses.filter((_, i) => i !== index) } : item) };
+export function removeVocabulary(article: Article, id: string): Article {
+  return removeArticleVocabulary(article, id);
 }
 
-export function editParagraph(project: Project, paragraphId: string, next: string, key: 'source' | 'translation' = 'source'): Project {
-  return { ...project, [key]: { paragraphs: project[key].paragraphs.map(item => item.id === paragraphId ? { ...item, text: next } : item) } };
-}
-
-export function toggleHighlight(project: Project, paragraphId: string, start: number, end: number): Project {
-  if (end <= start) return project;
-  const paragraph = project.source.paragraphs.find(item => item.id === paragraphId)!;
-  let removed = false;
-  function withoutSelectedRule<T extends { highlight: string[] }>(entry: T): T {
-    const highlight = entry.highlight.filter(term => !termMatches(paragraph.text, term).some(match => match.start < end && match.end > start));
-    if (highlight.length === entry.highlight.length) return entry;
-    removed = true; return { ...entry, highlight };
-  }
-  const vocabulary = project.vocabulary.map(withoutSelectedRule), expressions = project.expressions.map(withoutSelectedRule);
-  if (removed) return { ...project, vocabulary, expressions };
-  return isWholeTermSelection(paragraph.text, start, end) ? addHighlightTerm(project, paragraph.text.slice(start, end)) : project;
-}

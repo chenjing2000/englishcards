@@ -18,7 +18,7 @@ This phase reorganizes source, tests, skills, tooling and generated outputs. It 
 | `tests/*.test.ts`, `tests/v6/` | `EnglishCards.Tests/frontend/unit/` | Vitest tests |
 | `tests/e2e/` | `EnglishCards.Tests/frontend/e2e/` | Playwright tests |
 | `desktop/EnglishCards.Tests/` | `EnglishCards.Tests/dotnet/` | .NET desktop tests |
-| `docs/skills/` | `skills/` | Root-level project Skills |
+| `docs/docs/skills/` | `docs/skills/` | Root-level project Skills |
 | `src/server/` | `tools/test-server/` | Development-only Express test server |
 
 Repository-level manifests (`package.json`, `package-lock.json`, `tsconfig.json`) remain at the root because they coordinate build and test tools across the WPF, frontend and test projects.
@@ -46,7 +46,7 @@ Repository-level manifests (`package.json`, `package-lock.json`, `tsconfig.json`
 ## Documentation and Skills
 
 - `AGENTS.md`, `README.md`, `docs/project-contract.md`, active specifications and implementation status now describe the target v6 contract and the new repository layout.
-- `skills/article-to-englishcards/` now emits Article v6 only and validates through `parseArticleV6`.
+- `docs/docs/skills/article-to-englishcards/` now emits Article v6 only and validates through `parseArticleV6`.
 - Historical reports and plans remain available but are explicitly marked as historical; their old paths/schema references are not current instructions.
 
 ## Static checks performed in this environment
