@@ -70,7 +70,7 @@ export default function PreviewNotices({ errors, warning, closeError }: Props) {
   }
 
   return createPortal(<div className="phase-e-notices" aria-label="消息通知" aria-live="polite"
-    style={{ left: placement.left, bottom: placement.bottom, maxWidth: placement.availableWidth }}>
+    style={{ left: placement.left, bottom: placement.bottom, maxWidth: Math.min(480, placement.availableWidth) }}>
 
     {items.map(item => <NoticeItem key={item.id} item={item} onClose={() => remove(item)} />)}
   </div>, document.body);
