@@ -87,9 +87,6 @@ export function cacheDraft(project: RenderProject) {
   localStorage.setItem(DRAFT, draftText(projectDocument(project)));
 }
 
-export const readSettingsFile = async (file: File) =>
-  settingsSchema.parse(JSON.parse(await file.text()));
-
 async function loadDesktopFile<T>(
   command: 'loadSettings',
   parse: (text: string) => T,
