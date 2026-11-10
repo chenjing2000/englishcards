@@ -52,7 +52,7 @@ test.beforeEach(async ({ page }) => {
         }
         if (command === 'createCardFile') {
           const contents = (payload as { text: string }).text;
-          const path = 'C:/cards/new.json';
+          const path = 'C:/cards/' + (payload as { fileName: string }).fileName;
           cards[path] = JSON.parse(contents);
           value = { path, text: contents };
         }
@@ -80,7 +80,11 @@ test('Phase E invalid Article JSON never replaces the active card', async ({ pag
 
 test('Phase E new card creates JSON before activating the editor', async ({ page }) => {
   await page.getByRole('button', { name: '新建卡片' }).click();
-  await expect(page.getByLabel('英文标题', { exact: true })).toHaveValue('');
+  await expect(page.getByRole('dialog', { name: '新建卡片' })).toBeVisible();
+  await page.getByLabel('英文标题', { exact: true }).fill('My New Card');
+  await expect(page.getByText('默认文件名：My New Card.json')).toBeVisible();
+  await page.getByRole('button', { name: '创建卡片' }).click();
+  await expect(page.getByLabel('英文标题', { exact: true })).toHaveValue('My New Card');
   const requests = await page.evaluate(() => window.phaseEIO.requests);
   const create = requests.find(item => item.command === 'createCardFile');
   expect(create).toBeDefined();
@@ -88,8 +92,9 @@ test('Phase E new card creates JSON before activating the editor', async ({ page
   expect(payload.directory).toBe('C:/cards');
   const document = JSON.parse(payload.text);
   expect(document.schemaVersion).toBe(6);
-  expect(document.title).toBe('');
-  await expect(page.getByRole('button', { name: 'new.json' })).toBeVisible();
+  expect(document.title).toBe('My New Card');
+  expect(payload).toHaveProperty('fileName', 'My New Card.json');
+  await expect(page.getByRole('button', { name: 'My New Card.json' })).toBeVisible();
 });
 
 test('Phase E save failure retains A and allows explicit retry', async ({ page }) => {
