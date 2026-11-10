@@ -14,7 +14,7 @@ import {
 } from '../services/projectIO';
 import { desktopRequest, isDesktop } from '../services/desktopBridge';
 import { CardSaveCoordinator, type CardSaveStatus } from '../services/cardSaveCoordinator';
-import { createCardFile, createCardSaveCoordinator, openCardFile, serializedCard } from '../services/cardFileIO';
+import { createCardFile, createCardSaveCoordinator, defaultCardLibrary, listCardDirectory, openCardFile, serializedCard } from '../services/cardFileIO';
 
 type ParagraphCollection = 'content' | 'translation';
 const stringify = (project: Project) => JSON.stringify(projectDocument(project), null, 2);
@@ -81,6 +81,29 @@ export function useEditorViewModel() {
   const [libraryRoot, setLibraryRoot] = useState(() =>
     desktop ? localStorage.getItem('englishcards.library.root') ?? '' : '');
   const [libraryRevision, setLibraryRevision] = useState(0);
+  useEffect(() => {
+    if (!desktop) return;
+    let cancelled = false;
+    const initial = libraryRoot;
+    void (async () => {
+      try {
+        if (initial) {
+          await listCardDirectory(initial);
+          return;
+        }
+      } catch { /* Previous folder is unavailable: reset to userdata. */ }
+      try {
+        const fallback = await defaultCardLibrary();
+        if (!cancelled && typeof fallback === 'string' && fallback) {
+          setLibraryRoot(current => current === initial ? fallback : current);
+          localStorage.setItem('englishcards.library.root', fallback);
+        }
+      } catch { /* No directory can be selected until the bridge becomes available. */ }
+    })();
+    return () => { cancelled = true; };
+  }, [desktop]);
+
+
   function changeLibraryRoot(path: string) {
     setLibraryRoot(path);
     if (desktop) localStorage.setItem('englishcards.library.root', path);
