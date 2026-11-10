@@ -97,6 +97,7 @@ export default function EditorView() {
         </div>}
       </div>
       <div className="editor-bottom">
+        {vm.cardSaveStatus === 'error' && <button type="button" className="retry-card-save" onClick={() => void vm.retryCardSave()}>重试保存当前卡片</button>}
         {!settingsOpen && <VocabularyActions viewModel={vm} focusField={setFocusId} />}
         <NotificationBar error={error} warning={warning} closeError={vm.clearError} />
       </div>
