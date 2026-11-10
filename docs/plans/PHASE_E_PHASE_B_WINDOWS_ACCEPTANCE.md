@@ -37,12 +37,10 @@ Use a **new test directory**, not an existing valuable collection of JSON cards.
 8. Check **设置** and the default-style action. Old **导入配置** must not be offered.
 9. Confirm older `userdata/drafts` content is neither automatically loaded nor automatically deleted.
 
-## Current remaining scope
+## Non-blocking scope notes
 
 - Browser-only legacy JSON/TXT import and local-draft helpers remain for older non-desktop E2E fixtures. They are not part of the desktop Card Library workflow. Retire them only together with their fixtures; do not delete user-owned draft files.
-- The application icon `EnglishCards/desktop/Assets/clover_icon.ico` already exists on both `main` and the Phase E branch with the same blob SHA; no additional binary-icon commit is pending.
-- No automated GitHub Actions status was reported for the current Phase E head. The owner's local Windows test log is the evidence for frontend automation.
-- The final WPF/WebView2 build and owner acceptance remain mandatory before merge.
+- The application icon `EnglishCards/desktop/Assets/clover_icon.ico` was already present on the base branch; no separate icon migration was required.
 
 ## Evidence
 
@@ -81,14 +79,24 @@ Current UI values and behavior:
 - New Card and Card Library errors appear only through the shared floating notification layer. A duplicate filename does not overwrite the existing JSON; the New Card dialog retains its title for correction.
 - A successful new-card creation clears the resolved create error and reports success through a normal notification.
 
-Remaining Windows commands (run from repository root after pulling the latest branch):
+## Final Windows acceptance and merge record (2026-11-10)
 
-```powershell
-dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Release
-npx.cmd tsx docs/skills/article-to-englishcards/scripts/validate-project.ts
-dotnet publish EnglishCards\desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\EnglishCards
-```
+The owner completed the remaining commands successfully on the final Phase E application code:
 
-After publishing, close the running application before replacing files and do not remove `dist/EnglishCards/userdata`. Owner acceptance must verify the actual WPF/WebView2 executable: the 360/240/480 DIP notification width, 320/280/360 DIP settings width, notification visibility above the New Card/Settings modal, duplicate-file error handling, card autosave/switch lock, settings persistence and ZIP export.
+- `dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Release`: **19/19 PASS**.
+- `npx.cmd tsx docs/skills/article-to-englishcards/scripts/validate-project.ts`: **PASS**.
+- `dotnet publish EnglishCards\desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\EnglishCards`: **succeeded**.
+- `dist\EnglishCards\EnglishCards.exe`: launched successfully; owner confirmed the main window displayed normally without a crash or automatic close.
 
-Merge gate: only after the above .NET run and publish succeed and the owner confirms the latest executable behaves correctly. The `clover_icon.ico` binary is already present in the base `main` branch and does not block Phase E.
+Owner's final visual/interaction acceptance:
+- Notification default width is 360 DIP.
+- Design Settings default width is 320 DIP and its content is fully visible.
+- Duplicate-file creation errors appear in the floating notification layer above the New Card modal backdrop.
+- A duplicate JSON filename is not overwritten; the title remains in the dialog, and changing it allows successful creation.
+- Card Library directory-read errors and file-creation errors are shown only through the shared floating notification layer.
+
+GitHub Actions Windows CI for PR #2 / head `70c14cd30d1d21772653ae1df00c392fd475da37`: **success**. The workflow completed dependency installation, Vitest, React production build, Playwright E2E and Windows .NET tests successfully.
+
+Pull Request [#2](https://github.com/chenjing2000/englishcards/pull/2) was merged into `main` on 2026-11-10 using a **merge commit**, preserving the feature branch history. Merge commit: `8e47296dfa484f4f807550578ce9f3b147ad466e`.
+
+Phase E final acceptance is complete. Keep the existing rule that releases/upgrades must not delete `userdata/`; do not remove user-owned legacy draft files.
