@@ -59,9 +59,9 @@ describe('Phase E file-backed desktop bridge client', () => {
     const created = await createCardFile('C:/cards', article);
     expect(created?.path).toBe('C:/cards/new.json');
     expect(requests[0].command).toBe('createCardFile');
-    const payload = requests[0].payload as { directory: string; text: string };
+    const payload = requests[0].payload as { directory: string; fileName: string; text: string };
     expect(payload.directory).toBe('C:/cards');
-    expect((payload as { fileName: string }).fileName).toBe(cardFileName(article.title));
+    expect(payload.fileName).toBe(cardFileName(article.title));
     expect(JSON.parse(payload.text)).toEqual(article);
   });
 
