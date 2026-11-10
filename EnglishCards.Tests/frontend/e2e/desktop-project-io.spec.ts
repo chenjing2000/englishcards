@@ -1,127 +1,106 @@
-import { test, expect, type Page } from './fixtures';
+import { test, expect } from './fixtures';
 import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
 
-type Request = { id: number; command: string; payload: string | null };
-type Response = { id: number; ok: boolean; value?: unknown; error?: string };
-
+type Request = { id: number; command: string; payload: unknown };
 declare global {
   interface Window {
-    fileRequests: Request[];
-    respondToFileRequest: (response: Response) => void;
+    phaseEIO: {
+      requests: Request[];
+      failNextSave: boolean;
+      corruptNextOpen: boolean;
+    };
   }
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    const messages = new EventTarget();
-    window.fileRequests = [];
-    window.respondToFileRequest = response => messages.dispatchEvent(new MessageEvent('message', { data: response }));
+  await page.addInitScript(initial => {
+    const events = new EventTarget();
+    const cards: Record<string, unknown> = {
+      'C:/cards/A.json': { ...initial, title: 'Card A' },
+    };
+    window.phaseEIO = { requests: [], failNextSave: false, corruptNextOpen: false };
+    localStorage.setItem('englishcards.library.root', 'C:/cards');
+    const respond = (id: number, value: unknown, error?: string) =>
+      events.dispatchEvent(new MessageEvent('message', {
+        data: error ? { id, ok: false, error } : { id, ok: true, value },
+      }));
     const chrome = Reflect.get(window, 'chrome') ?? {};
     Object.assign(chrome, { webview: {
-      postMessage: (request: Request) => {
-        if (['openProject', 'saveProject'].includes(request.command)) window.fileRequests.push(request);
-        else queueMicrotask(() => window.respondToFileRequest({ id: request.id, ok: true, value: null }));
+      postMessage({ id, command, payload }: Request) {
+        window.phaseEIO.requests.push({ id, command, payload });
+        let value: unknown = true;
+        let error: string | undefined;
+        if (command === 'loadSettings') value = null;
+        if (command === 'listCardDirectory') value = {
+          path: payload, folders: [],
+          files: Object.keys(cards).map(path => ({ path, name: path.split('/').at(-1)! })),
+        };
+        if (command === 'openCardFile') {
+          value = { path: payload, text: window.phaseEIO.corruptNextOpen
+            ? '{"schemaVersion":5}' : JSON.stringify(cards[payload as string]),
+            fingerprint: 'FAKEHASH' };
+          window.phaseEIO.corruptNextOpen = false;
+        }
+        if (command === 'saveCardFile') {
+          if (window.phaseEIO.failNextSave) {
+            window.phaseEIO.failNextSave = false;
+            error = 'Disk locked';
+          } else {
+            const snapshot = payload as { path: string; text: string };
+            cards[snapshot.path] = JSON.parse(snapshot.text);
+          }
+        }
+        if (command === 'createCardFile') {
+          const contents = (payload as { text: string }).text;
+          const path = 'C:/cards/new.json';
+          cards[path] = JSON.parse(contents);
+          value = { path, text: contents };
+        }
+        queueMicrotask(() => respond(id, value, error));
       },
-      addEventListener: messages.addEventListener.bind(messages),
-      removeEventListener: messages.removeEventListener.bind(messages),
+      addEventListener: events.addEventListener.bind(events),
+      removeEventListener: events.removeEventListener.bind(events),
     } });
     Reflect.set(window, 'chrome', chrome);
-  });
+  }, fixture);
   await page.goto('/');
-  await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'A.json' })).toBeVisible();
 });
 
-const title = (page: Page) => page.getByLabel('英文标题', { exact: true });
-const dirty = (page: Page) => page.evaluate(() => !window.dispatchEvent(new Event('beforeunload', { cancelable: true })));
-
-async function clickRequest(page: Page, command: 'openProject' | 'saveProject') {
-  const count = await page.evaluate(() => window.fileRequests.length);
-  await page.getByRole('button', { name: command === 'openProject' ? '打开文章' : '保存 JSON', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.fileRequests.length)).toBe(count + 1);
-  const request = await page.evaluate(() => window.fileRequests.at(-1)!);
-  expect(request.command).toBe(command);
-  return request;
-}
-
-async function reply(page: Page, response: Response) {
-  await page.evaluate(async response => {
-    window.respondToFileRequest(response);
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  }, response);
-}
-
-test('native cancellation and read or write errors preserve the project and dirty state', async ({ page }) => {
-  await title(page).fill('Unsaved changes');
-  expect(await dirty(page)).toBe(true);
-  for (const command of ['openProject', 'saveProject'] as const) {
-    const canceled = await clickRequest(page, command);
-    await reply(page, { id: canceled.id, ok: true, value: null });
-    await expect(title(page)).toHaveValue('Unsaved changes');
-    await expect(page.getByRole('alert')).toHaveCount(0);
-    expect(await dirty(page)).toBe(true);
-    const failed = await clickRequest(page, command);
-    await reply(page, { id: failed.id, ok: false, error: 'Access denied' });
-    await expect(page.getByRole('alert')).toContainText('Access denied');
-    await expect(title(page)).toHaveValue('Unsaved changes');
-    expect(await dirty(page)).toBe(true);
-    await page.getByRole('button', { name: '关闭', exact: true }).click();
-  }
+test('Phase E invalid Article JSON never replaces the active card', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  const title = page.getByLabel('英文标题', { exact: true });
+  await expect(title).toHaveValue('Card A');
+  await page.evaluate(() => { window.phaseEIO.corruptNextOpen = true; });
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await expect(page.getByRole('alert')).toContainText('卡片打开失败');
+  await expect(title).toHaveValue('Card A');
 });
 
-test('only Article v6 JSON is accepted and the saved snapshot can be opened again', async ({ page }) => {
-  await title(page).fill('Save this snapshot');
-  for (const text of ['{', JSON.stringify({ ...fixture, schemaVersion: 5 })]) {
-    const { id } = await clickRequest(page, 'openProject');
-    await reply(page, { id, ok: true, value: { name: 'broken.json', text } });
-    await expect(page.getByRole('alert')).toContainText('无法打开文章');
-    await expect(title(page)).toHaveValue('Save this snapshot');
-    expect(await dirty(page)).toBe(true);
-  }
-
-  const save = await clickRequest(page, 'saveProject');
-  const saved = JSON.parse(save.payload!);
-  expect(saved).toEqual({ ...fixture, title: 'Save this snapshot' });
-  await title(page).fill('Edited during save');
-  await reply(page, { id: save.id, ok: true, value: true });
-  expect(await dirty(page)).toBe(true);
-  const open = await clickRequest(page, 'openProject');
-  await reply(page, { id: open.id, ok: true, value: { name: 'saved.json', text: save.payload } });
-  await expect(title(page)).toHaveValue('Save this snapshot');
-  await expect(page.getByRole('alert')).toHaveCount(0);
-  expect(await dirty(page)).toBe(false);
+test('Phase E new card creates JSON before activating the editor', async ({ page }) => {
+  await page.getByRole('button', { name: '新建卡片' }).click();
+  await expect(page.getByLabel('英文标题', { exact: true })).toHaveValue('');
+  const requests = await page.evaluate(() => window.phaseEIO.requests);
+  const create = requests.find(item => item.command === 'createCardFile');
+  expect(create).toBeDefined();
+  const payload = create!.payload as { directory: string; text: string };
+  expect(payload.directory).toBe('C:/cards');
+  const document = JSON.parse(payload.text);
+  expect(document.schemaVersion).toBe(6);
+  expect(document.title).toBe('');
+  await expect(page.getByRole('button', { name: 'new.json' })).toBeVisible();
 });
 
-test('a delayed open result cannot replace a newer project', async ({ page }) => {
-  const older = await clickRequest(page, 'openProject');
-  const latest = await clickRequest(page, 'openProject');
-  await reply(page, { id: latest.id, ok: true, value: { name: 'new.json', text: JSON.stringify({ ...fixture, title: 'Newest project' }) } });
-  await reply(page, { id: older.id, ok: true, value: { name: 'old.json', text: JSON.stringify({ ...fixture, title: 'Old project' }) } });
-  await expect(title(page)).toHaveValue('Newest project');
-  expect(await dirty(page)).toBe(false);
-});
-
-
-test('opening a project locks editor fields until cancellation or failure, while allowing another open', async ({ page }) => {
-  await title(page).fill('Protected working edit');
-  const first = await clickRequest(page, 'openProject');
-  await expect(page.locator('.fields')).toHaveAttribute('inert', '');
-  await expect(title(page)).toHaveValue('Protected working edit');
-
-  // Keep the Open action reachable, so a newer selection can supersede a slow one.
-  const latest = await clickRequest(page, 'openProject');
-  await reply(page, { id: latest.id, ok: true, value: null });
-  await expect(page.locator('.fields')).not.toHaveAttribute('inert', '');
-  await expect(title(page)).toHaveValue('Protected working edit');
-
-  // A stale response must not change the working document or relock editing.
-  await reply(page, { id: first.id, ok: true, value: { name: 'older.json', text: JSON.stringify(fixture) } });
-  await expect(title(page)).toHaveValue('Protected working edit');
-  await expect(page.locator('.fields')).not.toHaveAttribute('inert', '');
-
-  const failed = await clickRequest(page, 'openProject');
-  await expect(page.locator('.fields')).toHaveAttribute('inert', '');
-  await reply(page, { id: failed.id, ok: false, error: 'Access denied' });
-  await expect(page.locator('.fields')).not.toHaveAttribute('inert', '');
-  await expect(title(page)).toHaveValue('Protected working edit');
-  await expect(page.getByRole('alert')).toContainText('Access denied');
+test('Phase E save failure retains A and allows explicit retry', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  const title = page.getByLabel('英文标题', { exact: true });
+  await page.evaluate(() => { window.phaseEIO.failNextSave = true; });
+  await title.fill('A cannot save');
+  await expect(page.getByRole('button', { name: '重试保存当前卡片' })).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('Disk locked');
+  await page.getByRole('button', { name: '重试保存当前卡片' }).click();
+  await expect(page.getByRole('button', { name: '重试保存当前卡片' })).toHaveCount(0);
+  const saves = await page.evaluate(() => window.phaseEIO.requests.filter(item => item.command === 'saveCardFile'));
+  expect(saves).toHaveLength(2);
+  expect(JSON.parse((saves[1].payload as { text: string }).text).title).toBe('A cannot save');
 });
