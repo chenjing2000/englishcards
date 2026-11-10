@@ -330,7 +330,7 @@ export function useEditorViewModel() {
     } finally { setOpening(false); }
   }
 
-  async function newCard(directory: string): Promise<boolean> {
+  async function newCard(directory: string, englishTitle: string): Promise<boolean> {
     if (!desktop || !directory || opening || preparingClose.current) return false;
     if (!settingsReady) { showWarning('正在初始化程序设置，请稍后重新新建卡片。'); return false; }
     const current = cardSession.current;
@@ -343,9 +343,10 @@ export function useEditorViewModel() {
     }
     setOpening(true);
     try {
-      const empty = createEmptyArticle();
+      const title = englishTitle.trim();
+      if (!title) { reportError('card-create', '请先填写英文标题。'); return false; }
+      const empty = createEmptyArticle(title);
       const created = await createCardFile(directory, empty);
-      if (!created) return false;
       // File creation has completed. The bridge now owns the new file identity.
       const next = projectDocument(JSON.parse(created.text) as Project);
       const session = createCardSaveCoordinator(created.path, next);
