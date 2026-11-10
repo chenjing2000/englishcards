@@ -673,6 +673,6 @@ export function useEditorViewModel() {
     addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,
     selectedVocabulary, selectedVocabularyIndex, selectVocabulary, moveSelectedVocabulary,
     deleteSelectedVocabulary, insertVocabularyBelow,
-    clearError, downloadRejectedDraft,
+    reportError, clearError, downloadRejectedDraft,
   };
 }
