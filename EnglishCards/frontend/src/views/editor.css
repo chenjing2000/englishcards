@@ -148,3 +148,31 @@
 .editor-panel .phase-c-heading .phase-e-actions svg{width:20px;height:20px;display:block}
 
 .phase-e-create-error{color:#a33131;font-size:13px;margin:0;overflow-wrap:anywhere}
+
+/* Phase E: bottom-center toasts within the preview, stacked from bottom upward. */
+.phase-e-notices{
+  position:absolute;z-index:12;left:50%;bottom:16px;transform:translateX(-50%);
+  display:flex;flex-direction:column-reverse;align-items:center;gap:8px;
+  width:clamp(240px,300px,360px);max-width:calc(100% - 32px);
+  max-height:calc(100% - 32px);overflow-y:auto;pointer-events:none;
+}
+.phase-e-notice{
+  flex:none;display:flex;align-items:flex-start;justify-content:space-between;
+  gap:12px;width:100%;min-height:44px;padding:10px 12px;
+  border:1px solid #cbd9df;border-radius:9px;background:#fff;
+  box-shadow:0 4px 17px #1e35402a;line-height:1.45;font-size:13px;
+  overflow-wrap:anywhere;pointer-events:auto;animation:phase-e-notice-in 250ms ease-out both;
+}
+.phase-e-notice-error{border-color:#b85b5b;color:#893333;background:#fff5f2}
+.phase-e-notice-normal{color:#263e4a}
+.phase-e-notice-ending{opacity:0;transition:opacity 250ms ease-in}
+.phase-e-notice button{
+  flex:none;display:flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border:0;background:transparent;border-radius:5px;
+  padding:0;font-size:19px;line-height:1;color:inherit;
+}
+.phase-e-notice button:hover{background:#e4e9eb;border:0}
+@keyframes phase-e-notice-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){
+  .phase-e-notice{animation:none}.phase-e-notice-ending{transition:none}
+}
