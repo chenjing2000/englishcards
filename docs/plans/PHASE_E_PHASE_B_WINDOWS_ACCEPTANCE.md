@@ -57,3 +57,27 @@ Record command exit codes, all failing test names with stack traces, and the exa
 - Before any card is opened, an explicit empty-state prompt is displayed instead of disabled form controls or a sample preview.
 - Verify left-click editing of title/vocabulary/content and wheel scrolling **after a JSON has actually opened**. The desktop E2E now includes a pointer and wheel check; real WPF behavior still needs owner acceptance.
 - User-managed folders and JSON naming remain independent. No automatic folder deletion or card-directory database.
+
+## Phase E final stabilization (2026-11-10)
+
+After the owner confirmed the four notification-related E2E failures were resolved (16/16 focused tests passed), the stabilization branch adds:
+
+- Preview-pane notices: bottom-center, 300 DIP default (240–360 design range), 5-second normal lifecycle paused on hover, persistent error notifications, explicit close action, upward stacking and independent source dismissal
+- Article v6 Skill full-example validation and relative-import correction; owner independently confirmed the validator PASS
+- Removal of the unused import-settings command/parser from the desktop ViewModel and IO layer
+- Retention of browser-only legacy JSON/TXT import and local draft code until its E2E fixtures and UI entry points can be retired together; do **not** delete user-owned legacy drafts
+- E2E regression for two independent simultaneous errors, visual stack order, individual dismissal, and retained save-retry lock
+
+Validation required for these commits (not yet owner-verified):
+
+```powershell
+npm.cmd test
+npm.cmd run build
+npx.cmd playwright test --config tools/playwright.config.ts desktop-project-io.spec.ts phase-e-card-library.spec.ts
+npm.cmd run test:e2e
+dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Release
+npx.cmd tsx docs/skills/article-to-englishcards/scripts/validate-project.ts
+dotnet publish EnglishCards\desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\EnglishCards
+```
+
+Real Windows acceptance: open valid A.json, edit vocabulary and paragraphs with mouse, verify 300-ms autosave; block B navigation on dirty/pending/error and click B again after success; verify new title-named JSON never overwrites a file; test settings modal, ZIP export, and notification hover/timing/stacking. The GitHub binary icon resource is a separate pending change and **not** included in the commits above.
