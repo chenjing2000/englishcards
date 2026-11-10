@@ -47,3 +47,13 @@ Use a **new test directory**, not an existing valuable collection of JSON cards.
 ## Evidence
 
 Record command exit codes, all failing test names with stack traces, and the exact commit SHA. Distinguish automated tests from actual WPF/WebView2 acceptance.
+
+## Follow-up corrections from November 10 Windows acceptance
+
+- Left side uses the ReadArticles library chooser presentation: only the `选择卡片馆` button, no `卡片馆` heading and no refresh button. Expanding folders uses the same teal circle plus/minus SVG assets as ReadArticles, and a white tree with its muted-beige selected row.
+- By default, the library points to the executable-adjacent `userdata` directory. If a previously chosen folder cannot be read, return to the default. Runtime-only `userdata/cache`, `settings`, `drafts`, `exports`, `temp` and `logs` are hidden from the library view; **they are not deleted from disk**. In particular, the WebView2 cache may still be in use.
+- The design/new-card/export ZIP SVG buttons are directly below the editor heading on a separate, right-aligned row.
+- The design/settings surface and new-card title input are centered in the current application window. Entering a title shows the generated file name; creation remains atomic and never overwrites an existing JSON file.
+- Before any card is opened, an explicit empty-state prompt is displayed instead of disabled form controls or a sample preview.
+- Verify left-click editing of title/vocabulary/content and wheel scrolling **after a JSON has actually opened**. The desktop E2E now includes a pointer and wheel check; real WPF behavior still needs owner acceptance.
+- User-managed folders and JSON naming remain independent. No automatic folder deletion or card-directory database.
