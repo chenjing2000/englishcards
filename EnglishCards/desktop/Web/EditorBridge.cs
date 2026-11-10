@@ -191,7 +191,7 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         var picker = new OpenFolderDialog
         {
             Title = "选择卡片馆目录",
-            InitialDirectory = data.ProjectsPath,
+            InitialDirectory = data.LibraryRootPath,
             Multiselect = false
         };
         return picker.ShowDialog(owner) == true ? picker.FolderName : null;
