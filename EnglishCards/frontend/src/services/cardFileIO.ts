@@ -9,6 +9,11 @@ export type LibraryDirectory = {
   files: LibraryEntry[];
 };
 
+/** Default root is the executable-adjacent userdata folder. */
+export function defaultCardLibrary(): Promise<string> {
+  return desktopRequest<string>('defaultCardLibrary');
+}
+
 /** Ask the Windows host for an explicit library root; cancellation returns null. */
 export function chooseCardLibrary(): Promise<string | null> {
   return desktopRequest<string | null>('chooseCardLibrary');
