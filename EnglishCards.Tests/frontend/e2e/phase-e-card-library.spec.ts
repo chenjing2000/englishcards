@@ -64,6 +64,7 @@ test('Phase E rejects a card switch until A is saved and requires a second click
 
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'A.json' })).toBeVisible();
+  await expect(page.locator('.app-shell')).not.toHaveAttribute('inert', '');
   await page.getByRole('button', { name: 'A.json' }).click();
   const title = page.getByLabel('英文标题', { exact: true });
   await expect(title).toHaveValue('Card A');
