@@ -29,7 +29,9 @@ export function listCardDirectory(path: string): Promise<LibraryDirectory> {
 
 export async function openCardFile(path: string): Promise<{ path: string; article: Project }> {
   const response = await desktopRequest<{ path: string; text: string }>('openCardFile', path);
-  return { path: response.path, article: parseProject(JSON.parse(response.text)) };
+  const article = parseProject(JSON.parse(response.text));
+  await desktopRequest<boolean>('activateCardFile', response.path);
+  return { path: response.path, article };
 }
 
 export function serializedCard(article: Project): string {
