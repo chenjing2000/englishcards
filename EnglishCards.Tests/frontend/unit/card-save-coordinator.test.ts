@@ -19,7 +19,8 @@ describe('Phase E card save coordinator', () => {
     expect(card.requestSwitch()).toBe(false);
     expect(card.status).toBe('saving');
     expect(card.requestSwitch()).toBe(false);
-    expect(write).toHaveBeenCalledExactlyOnceWith('C:/cards/A.json', 'A1');
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(write).toHaveBeenCalledWith('C:/cards/A.json', 'A1');
     gate.resolve();
     expect(await card.flush()).toBe(true);
     expect(card.status).toBe('clean');
