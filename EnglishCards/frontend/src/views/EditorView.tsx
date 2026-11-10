@@ -6,14 +6,26 @@ import CardPreview from './CardPreview';
 import NotificationBar from './NotificationBar';
 import CardLibrary from './CardLibrary';
 import ProjectActions from './ProjectActions';
-import settingsIcon from '../assets/icons/toolbar/settings.svg';
-import newCardIcon from '../assets/icons/toolbar/new-card.svg';
-import exportZipIcon from '../assets/icons/toolbar/export-zip.svg';
 import SplitPane from './SplitPane';
 import AutoSizeTextarea from './AutoSizeTextarea';
 import ContinuousParagraphEditor from './ContinuousParagraphEditor';
 import SettingInput from './SettingInput';
 import { cardFileName } from '../services/cardFileIO';
+
+/**
+ * Match Transcript Studio's native React toolbar drawing:
+ * 24-unit viewBox, 20-DIP vector, 1.8-DIP round line strokes.
+ */
+function ToolbarIcon({ name }: { name: 'design' | 'new-card' | 'export-zip' }) {
+  const paths = {
+    design: <><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="#fff"/><circle cx="16" cy="12" r="2" fill="#fff"/><circle cx="10" cy="18" r="2" fill="#fff"/></>,
+    'new-card': <><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5"/><path d="M12 12v7M8.5 15.5h7"/></>,
+    'export-zip': <><path d="M12 20V7m-4 4 4-4 4 4"/><path d="M4 15v5h16v-5"/></>,
+  };
+  return <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+    stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+    aria-hidden="true">{paths[name]}</svg>;
+}
 
 export default function EditorView() {
   const vm = useEditorViewModel();
@@ -67,14 +79,14 @@ export default function EditorView() {
         </div>);
   const cardActions = <div className="phase-e-actions" role="group" aria-label="卡片操作">
     <button type="button" aria-label={settingsOpen ? '关闭设置' : '设计'} title="设计"
-      onClick={() => setSettingsOpen(value => !value)}><img src={settingsIcon} alt="" /></button>
+      onClick={() => setSettingsOpen(value => !value)}><ToolbarIcon name="design" /></button>
     <button type="button" aria-label="新建卡片" title="新建卡片"
       disabled={!vm.libraryRoot || vm.opening} onClick={() => { setNewCardTitle(''); setCreateError(''); setNewCardOpen(true); }}>
-      <img src={newCardIcon} alt="" />
+      <ToolbarIcon name="new-card" />
     </button>
     <button type="button" aria-label="导出 ZIP" title="导出 ZIP"
       disabled={!ready || exporting || !vm.activeCardPath || vm.cardSaveStatus !== 'clean'}
-      onClick={() => { void vm.exportImages(); }}><img src={exportZipIcon} alt="" />
+      onClick={() => { void vm.exportImages(); }}><ToolbarIcon name="export-zip" />
     </button>
   </div>;
 
