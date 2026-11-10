@@ -34,6 +34,7 @@ async function start(page: import('@playwright/test').Page, initialSettings: str
     Reflect.set(window, 'chrome', chrome);
   }, initialSettings);
   await page.goto('/');
+  await expect(page.locator('.app-shell')).not.toHaveAttribute('inert', '');
 }
 
 const requests = (page: import('@playwright/test').Page, command: string) =>
