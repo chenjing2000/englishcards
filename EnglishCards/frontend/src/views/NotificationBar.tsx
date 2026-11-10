@@ -18,7 +18,7 @@ export default function NotificationBar({ error, warning, closeError }: Props) {
     <div className="notice-clip"><div className={`notice${displayed ? ` notice-${displayed.kind}` : ''}`}>
       {displayed && <div role={open ? displayed.kind === 'error' ? 'alert' : 'status' : undefined}>
         {displayed.kind === 'error' ? 'Error:' : 'Warning:'} {displayed.text}
-        {error && <button onClick={closeError}>关闭</button>}
+        {error && <button type="button" onClick={() => closeError()}>关闭</button>}
       </div>}
     </div></div>
   </div>;

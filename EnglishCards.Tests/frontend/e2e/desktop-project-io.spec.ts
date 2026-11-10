@@ -1,127 +1,270 @@
-import { test, expect, type Page } from './fixtures';
+import { test, expect } from './fixtures';
 import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
 
-type Request = { id: number; command: string; payload: string | null };
-type Response = { id: number; ok: boolean; value?: unknown; error?: string };
-
+type Request = { id: number; command: string; payload: unknown };
 declare global {
   interface Window {
-    fileRequests: Request[];
-    respondToFileRequest: (response: Response) => void;
+    phaseEIO: {
+      requests: Request[];
+      failNextSave: boolean;
+      corruptNextOpen: boolean;
+      failDirectoryRead: boolean;
+    };
   }
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    const messages = new EventTarget();
-    window.fileRequests = [];
-    window.respondToFileRequest = response => messages.dispatchEvent(new MessageEvent('message', { data: response }));
+  await page.addInitScript(initial => {
+    const events = new EventTarget();
+    const cards: Record<string, unknown> = {
+      'C:/cards/A.json': { ...initial, title: 'Card A' },
+    };
+    window.phaseEIO = { requests: [], failNextSave: false, corruptNextOpen: false, failDirectoryRead: false };
+    localStorage.setItem('englishcards.library.root', 'C:/cards');
+    const respond = (id: number, value: unknown, error?: string) =>
+      events.dispatchEvent(new MessageEvent('message', {
+        data: error ? { id, ok: false, error } : { id, ok: true, value },
+      }));
     const chrome = Reflect.get(window, 'chrome') ?? {};
     Object.assign(chrome, { webview: {
-      postMessage: (request: Request) => {
-        if (['openProject', 'saveProject'].includes(request.command)) window.fileRequests.push(request);
-        else queueMicrotask(() => window.respondToFileRequest({ id: request.id, ok: true, value: null }));
+      postMessage({ id, command, payload }: Request) {
+        window.phaseEIO.requests.push({ id, command, payload });
+        let value: unknown = true;
+        let error: string | undefined;
+        if (command === 'loadSettings') value = null;
+        if (command === 'listCardDirectory') value = {
+          path: payload,
+          folders: payload === 'C:/cards' ? [{ path: 'C:/cards/Subfolder', name: 'Subfolder' }] : [],
+          files: payload === 'C:/cards'
+            ? Object.keys(cards).map(path => ({ path, name: path.split('/').at(-1)! })) : [],
+        };
+        if (command === 'listCardDirectory' && window.phaseEIO.failDirectoryRead && payload === 'C:/cards/Subfolder') {
+          error = 'Access denied';
+        }
+        if (command === 'openCardFile') {
+          value = { path: payload, text: window.phaseEIO.corruptNextOpen
+            ? '{"schemaVersion":5}' : JSON.stringify(cards[payload as string]),
+            fingerprint: 'FAKEHASH' };
+          window.phaseEIO.corruptNextOpen = false;
+        }
+        if (command === 'saveCardFile') {
+          if (window.phaseEIO.failNextSave) {
+            window.phaseEIO.failNextSave = false;
+            error = 'Disk locked';
+          } else {
+            const snapshot = payload as { path: string; text: string };
+            cards[snapshot.path] = JSON.parse(snapshot.text);
+          }
+        }
+        if (command === 'createCardFile') {
+          const contents = (payload as { text: string }).text;
+          const path = 'C:/cards/' + (payload as { fileName: string }).fileName;
+          if (Object.hasOwn(cards, path)) error = '同名卡片已存在，请更换标题或文件名。';
+          else {
+            cards[path] = JSON.parse(contents);
+            value = { path, text: contents };
+          }
+        }
+        queueMicrotask(() => respond(id, value, error));
       },
-      addEventListener: messages.addEventListener.bind(messages),
-      removeEventListener: messages.removeEventListener.bind(messages),
+      addEventListener: events.addEventListener.bind(events),
+      removeEventListener: events.removeEventListener.bind(events),
     } });
     Reflect.set(window, 'chrome', chrome);
-  });
+  }, fixture);
   await page.goto('/');
-  await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'A.json' })).toBeVisible();
+  await expect(page.locator('.app-shell')).not.toHaveAttribute('inert', '');
 });
 
-const title = (page: Page) => page.getByLabel('英文标题', { exact: true });
-const dirty = (page: Page) => page.evaluate(() => !window.dispatchEvent(new Event('beforeunload', { cancelable: true })));
+test('library uses ReadArticles-style expander, without heading or refresh', async ({ page }) => {
+  await expect(page.getByRole('button', { name: '选择卡片馆' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '卡片馆', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '刷新卡片馆' })).toHaveCount(0);
+  const folder = page.getByRole('button', { name: '目录 Subfolder' });
+  await expect(folder).toBeVisible();
+  await expect(folder.locator('img.library-expander')).toBeVisible();
+  await expect(folder).toHaveAttribute('aria-expanded', 'false');
+  await folder.click();
+  await expect(folder).toHaveAttribute('aria-expanded', 'true');
+  await expect.poll(() => page.evaluate(() => window.phaseEIO.requests.some(item =>
+    item.command === 'listCardDirectory' && item.payload === 'C:/cards/Subfolder'))).toBe(true);
+});
 
-async function clickRequest(page: Page, command: 'openProject' | 'saveProject') {
-  const count = await page.evaluate(() => window.fileRequests.length);
-  await page.getByRole('button', { name: command === 'openProject' ? '打开文章' : '保存 JSON', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.fileRequests.length)).toBe(count + 1);
-  const request = await page.evaluate(() => window.fileRequests.at(-1)!);
-  expect(request.command).toBe(command);
-  return request;
-}
+test('card-library directory errors use the shared preview notice rather than inline alerts', async ({ page }) => {
+  await page.evaluate(() => { window.phaseEIO.failDirectoryRead = true; });
+  await page.getByRole('button', { name: '目录 Subfolder' }).click();
+  const error = page.locator('.phase-e-notices .phase-e-notice-error');
+  await expect(error).toHaveCount(1);
+  await expect(error).toContainText('Access denied');
+  await expect(page.locator('.card-library [role="alert"]')).toHaveCount(0);
+  await error.getByRole('button', { name: '关闭消息' }).click();
+  await expect(error).toHaveCount(0);
+});
 
-async function reply(page: Page, response: Response) {
-  await page.evaluate(async response => {
-    window.respondToFileRequest(response);
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  }, response);
-}
-
-test('native cancellation and read or write errors preserve the project and dirty state', async ({ page }) => {
-  await title(page).fill('Unsaved changes');
-  expect(await dirty(page)).toBe(true);
-  for (const command of ['openProject', 'saveProject'] as const) {
-    const canceled = await clickRequest(page, command);
-    await reply(page, { id: canceled.id, ok: true, value: null });
-    await expect(title(page)).toHaveValue('Unsaved changes');
-    await expect(page.getByRole('alert')).toHaveCount(0);
-    expect(await dirty(page)).toBe(true);
-    const failed = await clickRequest(page, command);
-    await reply(page, { id: failed.id, ok: false, error: 'Access denied' });
-    await expect(page.getByRole('alert')).toContainText('Access denied');
-    await expect(title(page)).toHaveValue('Unsaved changes');
-    expect(await dirty(page)).toBe(true);
-    await page.getByRole('button', { name: '关闭', exact: true }).click();
+test('right editor title and Transcript Studio-style circular icons share one row', async ({ page }) => {
+  const heading = page.locator('.editor-panel .phase-c-heading');
+  const title = heading.getByRole('heading', { name: '英语阅读卡片编辑器' });
+  const buttons = heading.locator('.phase-e-actions button');
+  await expect(title).toBeVisible();
+  await expect(buttons).toHaveCount(3);
+  await expect(buttons.nth(0)).toHaveAttribute('aria-label', '设计');
+  await expect(buttons.nth(1)).toHaveAttribute('aria-label', '新建卡片');
+  await expect(buttons.nth(2)).toHaveAttribute('aria-label', '导出 ZIP');
+  await expect(buttons.nth(0)).toHaveCSS('border-radius', '50%');
+  await expect(buttons.nth(0)).toHaveCSS('background-color', 'rgb(162, 210, 226)');
+  for (const button of await buttons.all()) {
+    await expect(button.locator('svg')).toHaveAttribute('viewBox', '0 0 24 24');
+    await expect(button.locator('svg')).toHaveAttribute('stroke-width', '1.8');
   }
+  const titleBounds = await title.boundingBox();
+  const firstBounds = await buttons.first().boundingBox();
+  const lastBounds = await buttons.last().boundingBox();
+  expect(titleBounds && firstBounds && lastBounds).toBeTruthy();
+  expect(Math.abs((titleBounds!.y + titleBounds!.height / 2) -
+    (firstBounds!.y + firstBounds!.height / 2))).toBeLessThan(3);
+  expect(firstBounds!.x).toBeGreaterThan(titleBounds!.x);
+  expect(lastBounds!.x).toBeGreaterThan(firstBounds!.x);
 });
 
-test('only Article v6 JSON is accepted and the saved snapshot can be opened again', async ({ page }) => {
-  await title(page).fill('Save this snapshot');
-  for (const text of ['{', JSON.stringify({ ...fixture, schemaVersion: 5 })]) {
-    const { id } = await clickRequest(page, 'openProject');
-    await reply(page, { id, ok: true, value: { name: 'broken.json', text } });
-    await expect(page.getByRole('alert')).toContainText('无法打开文章');
-    await expect(title(page)).toHaveValue('Save this snapshot');
-    expect(await dirty(page)).toBe(true);
-  }
-
-  const save = await clickRequest(page, 'saveProject');
-  const saved = JSON.parse(save.payload!);
-  expect(saved).toEqual({ ...fixture, title: 'Save this snapshot' });
-  await title(page).fill('Edited during save');
-  await reply(page, { id: save.id, ok: true, value: true });
-  expect(await dirty(page)).toBe(true);
-  const open = await clickRequest(page, 'openProject');
-  await reply(page, { id: open.id, ok: true, value: { name: 'saved.json', text: save.payload } });
-  await expect(title(page)).toHaveValue('Save this snapshot');
-  await expect(page.getByRole('alert')).toHaveCount(0);
-  expect(await dirty(page)).toBe(false);
+test('Phase E invalid Article JSON never replaces the active card', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  const title = page.getByLabel('英文标题', { exact: true });
+  await expect(title).toHaveValue('Card A');
+  await page.evaluate(() => { window.phaseEIO.corruptNextOpen = true; });
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await expect(page.getByRole('alert')).toContainText('卡片打开失败');
+  await expect(title).toHaveValue('Card A');
 });
 
-test('a delayed open result cannot replace a newer project', async ({ page }) => {
-  const older = await clickRequest(page, 'openProject');
-  const latest = await clickRequest(page, 'openProject');
-  await reply(page, { id: latest.id, ok: true, value: { name: 'new.json', text: JSON.stringify({ ...fixture, title: 'Newest project' }) } });
-  await reply(page, { id: older.id, ok: true, value: { name: 'old.json', text: JSON.stringify({ ...fixture, title: 'Old project' }) } });
-  await expect(title(page)).toHaveValue('Newest project');
-  expect(await dirty(page)).toBe(false);
+test('independent desktop errors stack upwards and each close clears only its source', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await page.evaluate(() => { window.phaseEIO.corruptNextOpen = true; });
+  await page.getByRole('button', { name: 'A.json' }).click();
+  const notices = page.locator('.phase-e-notices .phase-e-notice-error');
+  await expect(notices).toHaveCount(1);
+  await expect(notices.first()).toContainText('卡片打开失败');
+
+  await page.evaluate(() => { window.phaseEIO.failNextSave = true; });
+  await page.getByLabel('英文标题', { exact: true }).fill('Cannot save after failed open');
+  await expect(notices).toHaveCount(2);
+  const openError = notices.filter({ hasText: '卡片打开失败' });
+  const saveError = notices.filter({ hasText: 'Disk locked' });
+  await expect(openError).toBeVisible();
+  await expect(saveError).toBeVisible();
+  const top = await openError.boundingBox();
+  const bottom = await saveError.boundingBox();
+  expect(top && bottom).toBeTruthy();
+  expect(bottom!.y).toBeLessThan(top!.y);
+
+  await openError.getByRole('button', { name: '关闭消息' }).click();
+  await expect(openError).toHaveCount(0);
+  await expect(saveError).toBeVisible();
+  await saveError.getByRole('button', { name: '关闭消息' }).click();
+  await expect(notices).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '重试保存当前卡片' })).toBeVisible();
 });
 
+test('Phase E new card creates JSON before activating the editor', async ({ page }) => {
+  await page.getByRole('button', { name: '新建卡片' }).click();
+  await expect(page.getByRole('dialog', { name: '新建卡片' })).toBeVisible();
+  await page.getByLabel('英文标题', { exact: true }).fill('My New Card');
+  await expect(page.getByText('默认文件名：My New Card.json')).toBeVisible();
+  await page.getByRole('button', { name: '创建卡片' }).click();
+  await expect(page.getByLabel('英文标题', { exact: true })).toHaveValue('My New Card');
+  const requests = await page.evaluate(() => window.phaseEIO.requests);
+  const create = requests.find(item => item.command === 'createCardFile');
+  expect(create).toBeDefined();
+  const payload = create!.payload as { directory: string; text: string };
+  expect(payload.directory).toBe('C:/cards');
+  const document = JSON.parse(payload.text);
+  expect(document.schemaVersion).toBe(6);
+  expect(document.title).toBe('My New Card');
+  expect(payload).toHaveProperty('fileName', 'My New Card.json');
+  await expect(page.getByRole('button', { name: 'My New Card.json' })).toBeVisible();
+});
 
-test('opening a project locks editor fields until cancellation or failure, while allowing another open', async ({ page }) => {
-  await title(page).fill('Protected working edit');
-  const first = await clickRequest(page, 'openProject');
-  await expect(page.locator('.fields')).toHaveAttribute('inert', '');
-  await expect(title(page)).toHaveValue('Protected working edit');
+test('new-card duplicate errors use one visible preview toast while modal keeps its title', async ({ page }) => {
+  const notices = page.locator('.phase-e-notices');
+  await page.getByRole('button', { name: '新建卡片' }).click();
+  const dialog = page.getByRole('dialog', { name: '新建卡片' });
+  await expect(dialog).toBeVisible();
+  await page.getByLabel('英文标题', { exact: true }).fill('A');
+  await page.getByRole('button', { name: '创建卡片' }).click();
 
-  // Keep the Open action reachable, so a newer selection can supersede a slow one.
-  const latest = await clickRequest(page, 'openProject');
-  await reply(page, { id: latest.id, ok: true, value: null });
-  await expect(page.locator('.fields')).not.toHaveAttribute('inert', '');
-  await expect(title(page)).toHaveValue('Protected working edit');
+  const duplicate = notices.locator('.phase-e-notice-error');
+  await expect(notices).toHaveCSS('width', '360px');
+  await expect(notices).toHaveCSS('min-width', '240px');
+  await expect(duplicate).toHaveCount(1);
+  await expect(duplicate).toContainText('同名卡片已存在');
+  await expect(dialog.getByText('同名卡片已存在')).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  await expect(page.getByLabel('英文标题', { exact: true })).toHaveValue('A');
 
-  // A stale response must not change the working document or relock editing.
-  await reply(page, { id: first.id, ok: true, value: { name: 'older.json', text: JSON.stringify(fixture) } });
-  await expect(title(page)).toHaveValue('Protected working edit');
-  await expect(page.locator('.fields')).not.toHaveAttribute('inert', '');
+  // The toast must be above the modal backdrop and remain in the preview pane.
+  const toast = await duplicate.boundingBox();
+  const preview = await page.locator('#preview-panel').boundingBox();
+  expect(toast && preview).toBeTruthy();
+  expect(Math.abs((toast!.x + toast!.width / 2) - (preview!.x + preview!.width / 2))).toBeLessThan(3);
+  expect(await duplicate.evaluate(node => {
+    const bounds = node.getBoundingClientRect();
+    const hit = document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+    return hit === node || node.contains(hit);
+  })).toBe(true);
 
-  const failed = await clickRequest(page, 'openProject');
-  await expect(page.locator('.fields')).toHaveAttribute('inert', '');
-  await reply(page, { id: failed.id, ok: false, error: 'Access denied' });
-  await expect(page.locator('.fields')).not.toHaveAttribute('inert', '');
-  await expect(title(page)).toHaveValue('Protected working edit');
-  await expect(page.getByRole('alert')).toContainText('Access denied');
+  // Repeating the same failure should not multiply the persistent error.
+  await page.getByRole('button', { name: '创建卡片' }).click();
+  await expect(duplicate).toHaveCount(1);
+  await page.getByLabel('英文标题', { exact: true }).fill('Another Card');
+  await page.getByRole('button', { name: '创建卡片' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(duplicate).toHaveCount(0);
+  await expect(notices.locator('.phase-e-notice-normal')).toContainText('已创建卡片');
+});
+
+test('settings modal has compact 320 DIP default width', async ({ page }) => {
+  await page.getByRole('button', { name: '设计' }).click();
+  const dialog = page.getByRole('dialog', { name: '设计设置' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveCSS('width', '320px');
+  await expect(dialog).toHaveCSS('min-width', '280px');
+  await expect(dialog).toHaveCSS('max-width', '360px');
+  await expect(dialog.locator('.settings-table').first().locator('input').first()).toBeVisible();
+  await dialog.getByRole('button', { name: '关闭设置' }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
+test('opened desktop card is editable with pointer input and mouse-wheel scrolling', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  const fields = page.locator('.fields');
+  await expect(fields).not.toHaveAttribute('inert', '');
+  const title = page.getByLabel('英文标题', { exact: true });
+  await expect(title).toBeEditable();
+  await title.click();
+  await title.fill('A editable with a mouse');
+  await expect(title).toHaveValue('A editable with a mouse');
+  const content = page.getByLabel('英文正文', { exact: true });
+  await expect(content).toBeEditable();
+  await content.fill(Array.from({ length: 90 }, (_, index) => `Paragraph ${index + 1} with reading text.`).join('\n\n'));
+  await expect.poll(() => page.evaluate(() =>
+    window.phaseEIO.requests.some(item => item.command === 'saveCardFile'))).toBe(true);
+  const before = await fields.evaluate(element => element.scrollTop);
+  await page.mouse.move(1000, 600);
+  await page.mouse.wheel(0, 550);
+  await expect.poll(() => fields.evaluate(element => element.scrollTop)).toBeGreaterThan(before);
+});
+
+test('Phase E save failure retains A and allows explicit retry', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  const title = page.getByLabel('英文标题', { exact: true });
+  await page.evaluate(() => { window.phaseEIO.failNextSave = true; });
+  await title.fill('A cannot save');
+  await expect(page.getByRole('button', { name: '重试保存当前卡片' })).toBeVisible();
+  await expect(page.locator('.phase-e-notices .phase-e-notice-error')).toContainText('Disk locked');
+  await expect(page.locator('.phase-e-notices .phase-e-notice-error').getByRole('button', { name: '关闭消息' })).toBeVisible();
+  await page.getByRole('button', { name: '重试保存当前卡片' }).click();
+  await expect(page.getByRole('button', { name: '重试保存当前卡片' })).toHaveCount(0);
+  const saves = await page.evaluate(() => window.phaseEIO.requests.filter(item => item.command === 'saveCardFile'));
+  expect(saves).toHaveLength(2);
+  expect(JSON.parse((saves[1].payload as { text: string }).text).title).toBe('A cannot save');
 });

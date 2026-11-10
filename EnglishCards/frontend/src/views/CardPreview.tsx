@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import type { Layout } from '../services/pagination';
 import { isValidVocabularySelection, type Paragraph } from '../models/project';
 
-type Props = { layout?: Layout; ready: boolean; content: Paragraph[]; onAddSelection: (paragraphId: string, start: number, end: number) => void; actions: ReactNode };
+type Props = { layout?: Layout; ready: boolean; content: Paragraph[]; onAddSelection: (paragraphId: string, start: number, end: number) => void; actions: ReactNode; notices?: ReactNode };
 type ActiveSelection = { paragraphId: string; start: number; end: number; left: number; top: number };
 type ZoomAnchor = { card: HTMLElement; y: number; clientY: number };
 
@@ -46,7 +46,7 @@ function selectionCandidate(selection: Selection | null, content: Paragraph[]): 
   };
 }
 
-export default function CardPreview({ layout, ready, content, onAddSelection, actions }: Props) {
+export default function CardPreview({ layout, ready, content, onAddSelection, actions, notices }: Props) {
   const scroll = useRef<HTMLDivElement>(null), preview = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const [activeSelection, setActiveSelection] = useState<ActiveSelection | null>(null);
@@ -197,5 +197,6 @@ export default function CardPreview({ layout, ready, content, onAddSelection, ac
       </svg>
     </button>}
     {actions}
+    {notices}
   </section>;
 }

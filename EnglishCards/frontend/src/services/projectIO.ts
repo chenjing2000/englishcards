@@ -87,11 +87,8 @@ export function cacheDraft(project: RenderProject) {
   localStorage.setItem(DRAFT, draftText(projectDocument(project)));
 }
 
-export const readSettingsFile = async (file: File) =>
-  settingsSchema.parse(JSON.parse(await file.text()));
-
 async function loadDesktopFile<T>(
-  command: 'loadSettings' | 'loadDraft',
+  command: 'loadSettings',
   parse: (text: string) => T,
   fallback: T,
 ) {
@@ -103,7 +100,7 @@ async function loadDesktopFile<T>(
   }
 }
 
-export type DesktopSaveResult = { pending: boolean; settingsError: string; draftError: string };
+export type DesktopSaveResult = { pending: boolean; settingsError: string };
 
 export class DesktopPersistence {
   private queue = Promise.resolve();
@@ -113,9 +110,7 @@ export class DesktopPersistence {
 
   constructor(
     private savedSettings: string | null,
-    private savedDraft: string,
     private rejectedSettings: boolean,
-    private rejectedDraft: boolean,
   ) {}
 
   replaceSettings() { this.settingsRevision++; }
@@ -124,7 +119,7 @@ export class DesktopPersistence {
     const pending = this.queued++ > 0;
     const settingsRevision = this.settingsRevision;
     const write = this.queue.then(async () => {
-      const result = { pending, settingsError: '', draftError: '' };
+      const result = { pending, settingsError: '' };
       try {
         const settings = settingsSchema.safeParse(project.styles);
         if (!settings.success) {
@@ -142,17 +137,6 @@ export class DesktopPersistence {
         }
       } catch (reason) { result.settingsError = `配置未保存：${String(reason)}`; }
 
-      try {
-        const document = projectDocument(project);
-        const snapshot = JSON.stringify(document);
-        if (snapshot !== this.savedDraft) {
-          result.pending = true;
-          const text = draftText(document);
-          await desktopRequest('saveDraft', { text, preserveOriginal: this.rejectedDraft });
-          this.savedDraft = snapshot;
-          this.rejectedDraft = false;
-        }
-      } catch (reason) { result.draftError = `自动草稿未保存：${String(reason)}`; }
       return result;
     });
     this.queue = write.then(() => { this.queued--; }, () => { this.queued--; });
@@ -161,31 +145,21 @@ export class DesktopPersistence {
 }
 
 export async function loadDesktopData() {
+  // Phase E: the desktop no longer reads or restores a global article draft.
+  // File-backed articles are opened explicitly through the Card Library.
   const sample = sampleDraft();
-  const [settings, draft] = await Promise.all([
-    loadDesktopFile('loadSettings', text => settingsSchema.parse(JSON.parse(text)), defaults),
-    loadDesktopFile('loadDraft', readDraft, sample.project),
-  ]);
-  const notice = [
-    settings.rejected && '配置无法读取，暂用默认值，原文件已保留。',
-    draft.rejected && '自动草稿不是有效的 Article v6，原始草稿已保留。',
-  ].filter(Boolean).join(' ');
+  const settings = await loadDesktopFile(
+    'loadSettings', text => settingsSchema.parse(JSON.parse(text)), defaults,
+  );
   const persistence = new DesktopPersistence(
     settings.missing ? null : JSON.stringify(settings.value),
-    JSON.stringify(draft.value),
     settings.rejected,
-    draft.rejected,
   );
   return {
     settings: settings.value,
-    draft: {
-      ...sample,
-      project: draft.value,
-      notice: draft.missing ? sample.notice : restoredNotice,
-      desktopRejected: draft.rejected,
-    },
+    draft: sample,
     persistence,
-    notice,
+    notice: settings.rejected ? '配置无法读取，原设置文件已保留。' : '',
   };
 }
 

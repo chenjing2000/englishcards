@@ -29,6 +29,7 @@ internal sealed class UserDataStore(string root)
         }
     }
 
+    internal string LibraryRootPath => root;
     internal string ProjectsPath => Path.Combine(root, "projects");
     internal string ExportsPath => Path.Combine(root, "exports");
     internal string TempPath => Path.Combine(root, "temp");

@@ -4,15 +4,17 @@ import {
   appendParagraph, commitEntryHead, defaults, editParagraph, emptySense, parseHighlightInput,
   addVocabulary, isValidVocabularySelection, newId, removeEntrySense, removeVocabulary, renumberVocabulary, replaceArticleParagraphs, setArticleText,
   splitSenseMeaning, toggleHighlight, vocabularyId, type EntryCollection,
-  projectDocument, styleSchema, type RenderProject, type Project, type Sense, type Styles,
+  createEmptyArticle, projectDocument, styleSchema, type RenderProject, type Project, type Sense, type Styles,
 } from '../models/project';
 import { paginate, type Layout } from '../services/pagination';
 import {
-  cacheDraft, download, loadDesktopData, loadSettings, readSettingsFile, saveSettings,
+  cacheDraft, download, loadDesktopData, loadSettings, saveSettings,
   openProject, saveProject, requestExport, restoreDraft, sampleDraft,
   type DesktopPersistence, type DesktopSaveResult,
 } from '../services/projectIO';
 import { desktopRequest, isDesktop } from '../services/desktopBridge';
+import { CardSaveCoordinator, type CardSaveStatus } from '../services/cardSaveCoordinator';
+import { cardFileName, createCardFile, createCardSaveCoordinator, defaultCardLibrary, listCardDirectory, openCardFile, serializedCard } from '../services/cardFileIO';
 
 type ParagraphCollection = 'content' | 'translation';
 const stringify = (project: Project) => JSON.stringify(projectDocument(project), null, 2);
@@ -22,6 +24,7 @@ export function useEditorViewModel() {
   const [boot, setBoot] = useState(desktop ? sampleDraft : restoreDraft);
   const [project, setProject] = useState<RenderProject>({ ...boot.project, styles: { ...defaults } });
   const [wordDrafts, setWordDrafts] = useState<Record<string, string>>({});
+  const wordDraftsRef = useRef<Record<string, string>>({});
   const previewProject = useMemo<RenderProject>(() => {
     let changed = false;
     const vocabulary = project.vocabulary.map(entry => {
@@ -66,18 +69,94 @@ export function useEditorViewModel() {
   const openRequest = useRef(0);
   const openedFile = useRef(0);
   const saving = useRef(false);
-  const importingSettings = useRef(false);
   const desktopStore = useRef<DesktopPersistence | null>(null);
   const desktopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Phase E file sessions are optional until the library UI replaces legacy open.
+  const cardSession = useRef<CardSaveCoordinator | null>(null);
+  const invalidCardSnapshot = useRef(false);
+  const cardTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [cardSaveStatus, setCardSaveStatus] = useState<CardSaveStatus>('clean');
+  const [activeCardPath, setActiveCardPath] = useState<string | null>(null);
+  const [libraryRoot, setLibraryRoot] = useState(() =>
+    desktop ? localStorage.getItem('englishcards.library.root') ?? '' : '');
+  const [libraryRevision, setLibraryRevision] = useState(0);
+  const libraryRootWasChanged = useRef(false);
+  useEffect(() => {
+    if (!desktop) return;
+    let cancelled = false;
+    const initial = libraryRoot;
+    void (async () => {
+      try {
+        if (initial) {
+          await listCardDirectory(initial);
+          return;
+        }
+      } catch { /* Previous folder is unavailable: reset to userdata. */ }
+      try {
+        const fallback = await defaultCardLibrary();
+        if (!cancelled && !libraryRootWasChanged.current && typeof fallback === 'string' && fallback) {
+          setLibraryRoot(current => current === initial ? fallback : current);
+          localStorage.setItem('englishcards.library.root', fallback);
+        }
+      } catch { /* No directory can be selected until the bridge becomes available. */ }
+    })();
+    return () => { cancelled = true; };
+  }, [desktop]);
+
+
+  function changeLibraryRoot(path: string) {
+    libraryRootWasChanged.current = true;
+    setLibraryRoot(path);
+    // Re-selecting the same root refreshes its direct children without a Refresh button.
+    setLibraryRevision(value => value + 1);
+    if (desktop) localStorage.setItem('englishcards.library.root', path);
+  }
   const latest = useRef({ project, opening });
   useLayoutEffect(() => { latest.current = { project, opening }; }, [project, opening]);
+
+  function reportCardStatus(session: CardSaveCoordinator) {
+    if (cardSession.current !== session) return;
+    setCardSaveStatus(session.status);
+    reportError('card-save', session.error ? `当前卡片保存失败：${session.error}` : '');
+  }
+
+  async function flushCardSave(session: CardSaveCoordinator): Promise<boolean> {
+    clearTimeout(cardTimer.current);
+    if (session.status === 'error') { reportCardStatus(session); return false; }
+    const pending = session.flush();
+    reportCardStatus(session);
+    const saved = await pending;
+    reportCardStatus(session);
+    return saved && session.status === 'clean';
+  }
+
+  // Register a strict v6 snapshot before any user can navigate away.
+  useLayoutEffect(() => {
+    const session = cardSession.current;
+    if (!session) return;
+    try {
+      session.edit(serializedCard(project));
+      invalidCardSnapshot.current = false;
+      reportError('card-validation', '');
+      reportCardStatus(session);
+      if (session.status !== 'dirty') return;
+      clearTimeout(cardTimer.current);
+      cardTimer.current = setTimeout(() => {
+        void flushCardSave(session);
+      }, 300);
+    } catch (reason) {
+      invalidCardSnapshot.current = true;
+      reportError('card-validation', `当前输入尚不是有效 Article v6，无法保存：${String(reason)}`);
+    }
+    return () => clearTimeout(cardTimer.current);
+  }, [project]);
   const [settingsReady, setSettingsReady] = useState(false);
   const savedSettings = useRef('');
   const settingsQueue = useRef(Promise.resolve());
   const pendingSettingsSaves = useRef(0);
   const settingsRevision = useRef(0);
   const ready = settingsReady && !opening && rendered?.project === previewProject;
-  const hasFileChanges = lastFile !== stringify(project);
+  const hasFileChanges = cardSession.current ? cardSaveStatus !== 'clean' : lastFile !== stringify(project);
 
   function update(next: Project | ((current: RenderProject) => Project)) {
     setProject(current => {
@@ -95,6 +174,7 @@ export function useEditorViewModel() {
         desktopStore.current = result.persistence;
         setBoot(result.draft);
         setProject({ ...result.draft.project, styles: result.settings });
+        setLastFile(stringify(result.draft.project));
         savedSettings.current = JSON.stringify(result.settings);
         if (result.notice) showWarning(result.notice);
         setSettingsReady(true);
@@ -162,7 +242,7 @@ export function useEditorViewModel() {
 
   function reportDesktopSave(result: DesktopSaveResult) {
     reportError('settings-save', result.settingsError);
-    reportError('draft', result.draftError);
+
   }
   useEffect(() => {
     const store = desktopStore.current;
@@ -185,14 +265,18 @@ export function useEditorViewModel() {
           (document.activeElement as HTMLElement | null)?.blur();
           setClosing(true);
         });
-        if (latest.current.opening || saving.current || importingSettings.current) {
+        if (latest.current.opening || saving.current) {
           return { pending: true, errors: [], busy: true };
         }
         clearTimeout(desktopTimer.current);
+        const card = cardSession.current;
+        if (card && (invalidCardSnapshot.current || Object.keys(wordDraftsRef.current).length > 0 ||
+            !(await flushCardSave(card))))
+          return { pending: true, errors: ['当前卡片仍有未提交的输入或未能成功保存。'] };
         const result = await desktopStore.current?.save(latest.current.project);
         if (!result) return { pending: false, errors: [] };
         reportDesktopSave(result);
-        return { pending: result.pending, errors: [result.settingsError, result.draftError].filter(Boolean) };
+        return { pending: result.pending, errors: [result.settingsError].filter(Boolean) };
       } finally {
         preparingClose.current = false;
         setClosing(false);
@@ -229,7 +313,103 @@ export function useEditorViewModel() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [hasFileChanges, settingsReady, project.styles]);
 
+  /** Phase E directory-tree entry point; a rejected click is never queued. */
+  async function openCardPath(path: string): Promise<boolean> {
+    if (!desktop || opening || preparingClose.current) return false;
+    if (!settingsReady) { showWarning('正在初始化程序设置，请稍后重新选择卡片。'); return false; }
+    const previous = cardSession.current;
+    if (previous && (invalidCardSnapshot.current || Object.keys(wordDraftsRef.current).length > 0)) {
+      showWarning('当前卡片仍有未完成或无效的输入，无法切换。');
+      return false;
+    }
+    if (previous && previous.status !== 'clean') {
+      if (previous.status === 'dirty') void flushCardSave(previous);
+      showWarning(previous.status === 'error'
+        ? '当前卡片保存失败，请重试保存后重新选择卡片。'
+        : '当前卡片正在保存，请保存完成后重新选择卡片。');
+      return false;
+    }
+    // A file session may not replace an uncommitted legacy editor document.
+    if (!previous && hasFileChanges) {
+      showWarning('当前文章有尚未保存的修改，已拒绝打开其他卡片。');
+      return false;
+    }
+    setOpening(true);
+    try {
+      const { path: openedPath, article } = await openCardFile(path);
+      const session = createCardSaveCoordinator(openedPath, article);
+      clearTimeout(cardTimer.current);
+      cardSession.current = session;
+      setActiveCardPath(openedPath);
+      invalidCardSnapshot.current = false;
+      wordDraftsRef.current = {};
+      setWordDrafts({});
+      update(article);
+      setLastFile(stringify(article));
+      setVocabularySelection(null);
+      setCardSaveStatus('clean');
+      reportError('card-open', '');
+      return true;
+    } catch (reason) {
+      reportError('card-open', `卡片打开失败：${String(reason)}`);
+      return false;
+    } finally { setOpening(false); }
+  }
+
+  async function newCard(directory: string, englishTitle: string): Promise<boolean> {
+    if (!desktop || !directory || opening || preparingClose.current) return false;
+    if (!settingsReady) { showWarning('正在初始化程序设置，请稍后重新新建卡片。'); return false; }
+    const current = cardSession.current;
+    if (invalidCardSnapshot.current || Object.keys(wordDraftsRef.current).length > 0 ||
+        (current && current.status !== 'clean') ||
+        (!current && hasFileChanges)) {
+      if (current?.status === 'dirty') void flushCardSave(current);
+      showWarning('当前卡片正在保存或存在未保存内容，请完成后重新点击新建卡片。');
+      return false;
+    }
+    setOpening(true);
+    try {
+      const title = englishTitle.trim();
+      if (!title) { reportError('card-create', '请先填写英文标题。'); return false; }
+      const empty = createEmptyArticle(title);
+      const created = await createCardFile(directory, empty);
+      // File creation has completed. The bridge now owns the new file identity.
+      const next = projectDocument(JSON.parse(created.text) as Project);
+      const session = createCardSaveCoordinator(created.path, next);
+      clearTimeout(cardTimer.current);
+      cardSession.current = session;
+      invalidCardSnapshot.current = false;
+      setActiveCardPath(created.path);
+      wordDraftsRef.current = {};
+      setWordDrafts({});
+      update(next);
+      setLastFile(stringify(next));
+      setVocabularySelection(null);
+      setCardSaveStatus('clean');
+      setLibraryRevision(value => value + 1);
+      reportError('card-open', '');
+      reportError('card-create', '');
+      showWarning(`已创建卡片：${cardFileName(title)}`);
+      return true;
+    } catch (reason) {
+      reportError('card-create', `新建卡片失败：${String(reason)}`);
+      return false;
+    } finally { setOpening(false); }
+  }
+
+  async function retryCardSave(): Promise<boolean> {
+    const session = cardSession.current;
+    if (!session) return false;
+    const saved = await session.retry();
+    reportCardStatus(session);
+    return saved;
+  }
+
   async function open(file?: File) {
+    if (cardSession.current) {
+      showWarning('请通过卡片馆选择 JSON 文件；当前卡片不允许通过旧导入入口切换。');
+      return;
+    }
     if (!file && !isDesktop()) return;
     const request = ++openRequest.current;
     setOpening(true);
@@ -250,6 +430,7 @@ export function useEditorViewModel() {
   }
 
   async function save() {
+    if (cardSession.current) { await flushCardSave(cardSession.current); return; }
     if (saving.current) return;
     saving.current = true;
     const previousOpen = openedFile.current;
@@ -266,6 +447,8 @@ export function useEditorViewModel() {
 
   async function exportImages() {
     if (!ready || exporting) return;
+    if (cardSession.current && (invalidCardSnapshot.current ||
+        Object.keys(wordDraftsRef.current).length > 0 || !(await flushCardSave(cardSession.current)))) return;
     setExporting(true);
     try {
       const outcome = await requestExport(project, rendered!.layout.signature, rendered!.layout.pages.length);
@@ -347,6 +530,10 @@ export function useEditorViewModel() {
     }
   }
   function setWordPreview(id: string, value: string | null) {
+    const next = { ...wordDraftsRef.current };
+    if (value === null) delete next[id];
+    else next[id] = value;
+    wordDraftsRef.current = next;
     setWordDrafts(current => {
       if (value === null) {
         if (!Object.prototype.hasOwnProperty.call(current, id)) return current;
@@ -373,12 +560,16 @@ export function useEditorViewModel() {
         : item),
     }));
   }
-  function commitHead(_key: EntryCollection, id: string, value: string) {
+  function commitHead(_key: EntryCollection, id: string, value: string): boolean {
     try {
       const next = commitEntryHead(project, 'vocabulary', id, value);
       if (next !== project) update(next);
       reportError('entry', '');
-    } catch (reason) { reportError('entry', `词条保存失败：${String(reason)}`); }
+      return true;
+    } catch (reason) {
+      reportError('entry', `词条保存失败：${String(reason)}`);
+      return false;
+    }
   }
   function setSenseField(_key: EntryCollection, id: string, index: number, field: keyof Sense, value: string) {
     update(current => ({
@@ -458,19 +649,9 @@ export function useEditorViewModel() {
     update(current => ({ ...current, styles: { ...styles } } as Project));
   }
   function resetStyles() { replaceStyles(defaults); }
-  async function importSettings(file?: File) {
-    if (!desktop || !file || importingSettings.current) return;
-    importingSettings.current = true;
-    try {
-      replaceStyles(await readSettingsFile(file));
-      reportError('settings-import', '');
-    } catch (reason) {
-      reportError('settings-import', `配置导入失败：${String(reason)}`);
-    } finally { importingSettings.current = false; }
-  }
-  function clearError() {
-    const source = Object.keys(errors)[0];
-    if (source) reportError(source, '');
+  function clearError(source?: string) {
+    const target = source ?? Object.keys(errors)[0];
+    if (target) reportError(target, '');
   }
   async function downloadRejectedDraft() {
     if (boot.desktopRejected) {
@@ -484,13 +665,14 @@ export function useEditorViewModel() {
   }
 
   return {
-    project, warning, error, settingsReady, ready, exporting, opening, desktop, closing,
+    project, warning, error, errors, settingsReady, ready, exporting, opening, desktop, closing,
     layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
-    open, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
+    open, openCardPath, newCard, retryCardSave, cardSaveStatus, activeCardPath,
+    libraryRoot, libraryRevision, changeLibraryRoot, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
     highlightRange, addVocabularyFromSelection, commitHead, setWordPreview, setEntryHighlights, setSenseField, setVocabularyMeaning,
     addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,
     selectedVocabulary, selectedVocabularyIndex, selectVocabulary, moveSelectedVocabulary,
     deleteSelectedVocabulary, insertVocabularyBelow,
-    clearError, downloadRejectedDraft, importSettings,
+    reportError, clearError, downloadRejectedDraft,
   };
 }

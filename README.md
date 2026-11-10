@@ -1,6 +1,12 @@
 # EnglishCards
 
-**EnglishCards** 是面向 Windows x64 的本地英语精读卡片编辑器，采用 **WPF (.NET 10) + WebView2 + React/TypeScript**。Article v6 数据模型、JSON/TXT 导入、WPF 严格校验、连续编辑器和 ZIP 导出已接入生产代码。Phase D 已实现左侧预览选区加号；左侧普通点击不再导航到右侧编辑区，右侧只在用户主动操作编辑控件时获得焦点。Undo/Redo 已移除，整个应用界面禁用鼠标右键菜单；配套图片和最终四按钮工具栏仍属于后续阶段。
+**EnglishCards** 是面向 Windows x64 的本地英语精读卡片编辑器，采用 **WPF (.NET 10) + WebView2 + React/TypeScript**。
+
+**Phase E 实现与前端自动化验证已完成，正在等待最后的 Windows/WPF 实机验收。** 功能包括三栏工作区、文件型 Article v6 自动保存、独立 JSON 新建、导出 ZIP、统一浮动通知和紧凑设置窗口。开发分支为 `feature/phase-e-card-library`，尚未合并到 `main`。
+
+桌面端打开卡片馆里的 JSON 文件并直接保存到原文件。保存尚未完成时，切换卡片请求会被拒绝；保存完成后必须重新点击。旧全局草稿不会自动恢复或迁移，程序也不会自行删除既有草稿文件。
+
+最新规则以 [Phase E 卡片馆规格](docs/specs/PHASE_E_CARD_LIBRARY.md) 为准。当前分支最近一次前端验证为 Vitest 64/64、Playwright 69/69、TypeScript/Vite 构建成功；合并前仍须完成 .NET 桌面测试、正式发布和真实 Windows/WPF/WebView2 验收。
 
 ## 已确认的目标产品规则
 
@@ -8,9 +14,8 @@
 - Article 包含 `id`、`title`、`identityTag`、`content.paragraphs`、`vocabulary` 和 `translation.paragraphs`。
 - 正文和译文各自最多 999 个自然段，分别使用 `p001`–`p999`；Vocabulary 最多 999 项，使用 `v001`–`v999`。
 - Vocabulary 统一管理单词、词组和习语，核心字段为 `word`，保留音标、高亮规则及多义项。
-- TXT 文件名作为默认标题；一个或多个空行分隔自然段，单个换行转换为空格。
-- JSON 优先识别；损坏、旧版本或结构不合法的 JSON 不得静默回退为 TXT。
-- 右侧编辑器最终采用单一 TabPage，顺序为 Vocabulary → Content → Translation；正文和译文各使用连续多段落编辑区域。
+- 正式桌面端直接从卡片馆打开严格的 Article v6 JSON，并自动保存到原文件；TXT 可作为 Skill 的输入资料，不再通过桌面端导入按钮操作。
+- 右侧编辑器采用 Vocabulary → Content → Translation 顺序；正文和译文各使用连续多段落编辑区域。
 - 生词只从左侧卡片预览选择；加号位于选区右下角。只允许同一自然段、同一张卡片内的选择；选区必须含英文字母且不得包含中文字符。
 - 左侧预览用于阅读与提取：普通单击、双击不触发右侧编辑器导航；右侧编辑区独立工作，两侧通过 Article 数据模型同步。
 - 不提供 Undo/Redo；Ctrl+Z、Ctrl+Y、Ctrl+Shift+Z 不执行撤销/重做。鼠标右键在 React 页面与 WPF/WebView2 宿主中均无操作；Ctrl+C、Ctrl+V、Ctrl+A 等正常键盘编辑操作保留。
@@ -80,7 +85,7 @@ dist/EnglishCards/               # 唯一正式发布目录
 
 ## 用户数据
 
-正式程序在 `EnglishCards.exe` 同级创建 `userdata/`，用于项目、设置、草稿、导出、缓存、WebView2 Profile 和日志。发布/升级不得删除 `userdata/`。不要扫描、迁移或删除旧版 `%LOCALAPPDATA%\EnglishCards` 数据。用户数据不得放入源码包、Git 提交或发布构建清理流程。
+正式程序在 `EnglishCards.exe` 同级创建 `userdata/`，用于设置、卡片馆、导出、缓存、WebView2 Profile 和日志。旧版草稿内容不自动恢复，也不主动删除。发布/升级不得删除 `userdata/`。不要扫描、迁移或删除旧版 `%LOCALAPPDATA%\EnglishCards` 数据。用户数据不得放入源码包、Git 提交或发布构建清理流程。
 
 ## 文档与开发代理
 
@@ -90,4 +95,4 @@ dist/EnglishCards/               # 唯一正式发布目录
 - Windows 桌面审查 Skill：[`docs/skills/windows-app-review/SKILL.md`](docs/skills/windows-app-review/SKILL.md)
 - 仓库代理规则：[`AGENTS.md`](AGENTS.md)
 
-当前重构状态和未完成的集成工作以 `docs/implementation-status.md` 为准；本轮新增产品规则以 `docs/specs/PHASE2B_PRODUCT_ADDITIONS.md` 为准。历史审查报告和历史实施计划用于追溯，不覆盖用户后来确认的 Article v6 规则。
+当前 Phase E 的文件工作流以 `docs/specs/PHASE_E_CARD_LIBRARY.md` 为准。旧版阶段记录和审查报告仅用于追溯，不覆盖后续确认的 Phase E 规则。
