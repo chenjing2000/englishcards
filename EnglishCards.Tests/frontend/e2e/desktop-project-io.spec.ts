@@ -84,6 +84,31 @@ test('library uses ReadArticles-style expander, without heading or refresh', asy
     item.command === 'listCardDirectory' && item.payload === 'C:/cards/Subfolder'))).toBe(true);
 });
 
+test('right editor title and Transcript Studio-style circular icons share one row', async ({ page }) => {
+  const heading = page.locator('.editor-panel .phase-c-heading');
+  const title = heading.getByRole('heading', { name: '英语阅读卡片编辑器' });
+  const buttons = heading.locator('.phase-e-actions button');
+  await expect(title).toBeVisible();
+  await expect(buttons).toHaveCount(3);
+  await expect(buttons.nth(0)).toHaveAttribute('aria-label', '设计');
+  await expect(buttons.nth(1)).toHaveAttribute('aria-label', '新建卡片');
+  await expect(buttons.nth(2)).toHaveAttribute('aria-label', '导出 ZIP');
+  await expect(buttons.nth(0)).toHaveCSS('border-radius', '50%');
+  await expect(buttons.nth(0)).toHaveCSS('background-color', 'rgb(162, 210, 226)');
+  for (const button of await buttons.all()) {
+    await expect(button.locator('svg')).toHaveAttribute('viewBox', '0 0 24 24');
+    await expect(button.locator('svg')).toHaveAttribute('stroke-width', '1.8');
+  }
+  const titleBounds = await title.boundingBox();
+  const firstBounds = await buttons.first().boundingBox();
+  const lastBounds = await buttons.last().boundingBox();
+  expect(titleBounds && firstBounds && lastBounds).toBeTruthy();
+  expect(Math.abs((titleBounds!.y + titleBounds!.height / 2) -
+    (firstBounds!.y + firstBounds!.height / 2))).toBeLessThan(3);
+  expect(firstBounds!.x).toBeGreaterThan(titleBounds!.x);
+  expect(lastBounds!.x).toBeGreaterThan(firstBounds!.x);
+});
+
 test('Phase E invalid Article JSON never replaces the active card', async ({ page }) => {
   await page.getByRole('button', { name: 'A.json' }).click();
   const title = page.getByLabel('英文标题', { exact: true });
