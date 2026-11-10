@@ -65,6 +65,7 @@ test.beforeEach(async ({ page }) => {
   }, fixture);
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'A.json' })).toBeVisible();
+  await expect(page.locator('.app-shell')).not.toHaveAttribute('inert', '');
 });
 
 test('Phase E invalid Article JSON never replaces the active card', async ({ page }) => {
