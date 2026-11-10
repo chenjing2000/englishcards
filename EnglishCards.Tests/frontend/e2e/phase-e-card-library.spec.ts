@@ -79,6 +79,12 @@ test('Phase E rejects a card switch until A is saved and requires a second click
     .filter({ hasText: '当前卡片正在保存，请保存完成后重新选择卡片。' });
   await expect(warningNotice).toBeVisible();
   await expect(warningNotice.getByRole('button', { name: '关闭消息' })).toBeVisible();
+  // Hover pauses the five-second expiry. Moving away resumes the remaining time.
+  await warningNotice.hover();
+  await page.waitForTimeout(5200);
+  await expect(warningNotice).toBeVisible();
+  await page.mouse.move(8, 8);
+  await expect(warningNotice).toHaveCount(0, { timeout: 6500 });
 
   await page.evaluate(() => window.phaseETest.releaseSave());
   await expect(page.getByRole('button', { name: '导出 ZIP' })).toBeEnabled();
