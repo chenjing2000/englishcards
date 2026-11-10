@@ -79,3 +79,29 @@
 
 .phase-e-actions img{display:block;width:20px;height:20px;object-fit:contain;pointer-events:none}
 .phase-e-actions button:disabled{opacity:.45;cursor:default}
+
+/* ReadArticles parity: plain white tree, teal circular plus/minus, beige selection. */
+.phase-e-layout{min-height:0;min-width:0;display:grid;grid-template-columns:minmax(0,1fr)}
+.phase-e-layout:has(.card-library){grid-template-columns:310px minmax(0,1fr)}
+.phase-e-layout>.workspace{min-height:0;min-width:0;width:100%;height:100%;overflow:hidden}
+.card-library{background:#fff;border:0;padding:0 7px 0 0;font-family:"Segoe UI","Microsoft YaHei UI",sans-serif}
+.choose-library-button{margin:0 0 12px;width:100%;min-height:34px;flex-shrink:0;text-align:center;font-size:14px}
+.library-tree{padding:0;overflow-y:auto;overflow-x:hidden;background:#fff;min-height:0}
+.library-node{background:#fff}
+.library-folder,.library-file{font-family:"Segoe UI","Microsoft YaHei UI",sans-serif;color:#263332;font-size:14.5px;font-weight:400;border:0;border-radius:0;background:#fff;padding-top:5px;padding-bottom:5px;min-height:31px;gap:0}
+.library-folder:hover,.library-file:hover{background:#f5f5ef;border-color:transparent}
+.library-file[aria-current="page"]{background:#e3e3d6;color:#263332;font-weight:400}
+.library-expander{display:block;width:14px;height:14px;object-fit:contain;margin:0 6px 0 3px;flex:0 0 14px}
+.library-folder-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.library-file{padding-right:4px}
+.phase-e-actions{position:static;display:flex;justify-content:flex-end;gap:10px;margin-top:12px;z-index:auto}
+.phase-e-actions button{width:40px;height:40px;border-radius:8px;background:#f3f7f7;border:1px solid #d9e5e9}
+.phase-e-actions button:hover{background:#e7f1f5;border-color:#b7d4dd}
+.phase-e-actions img{width:22px;height:22px}
+.phase-e-modal-backdrop{position:absolute;inset:0;z-index:100;background:#10233166;display:flex;justify-content:center;align-items:center;padding:24px}
+.phase-e-modal{background:#fcfcfd;width:min(760px,96vw);max-height:min(740px,90vh);display:flex;flex-direction:column;overflow:hidden;border:1px solid #e0e5eb;border-radius:12px;box-shadow:0 16px 56px #182c3455}
+.phase-e-modal-heading{padding:16px 22px;border-bottom:1px solid #e0e5eb;display:flex;justify-content:space-between;align-items:center}
+.phase-e-modal-heading h2{margin:0;font-size:18px}
+.phase-e-modal-heading button{padding:4px 12px}
+.phase-e-modal-scroll{overflow-y:auto;padding:0 24px 20px;min-height:0}
+.phase-e-modal .style-settings{display:block}
