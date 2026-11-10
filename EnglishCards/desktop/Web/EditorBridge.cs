@@ -81,6 +81,7 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
                 "saveCardFile" when payload.ValueKind == JsonValueKind.Object => await SaveCardFileAsync(payload),
                 "listCardDirectory" when payload.ValueKind == JsonValueKind.String => ListCardDirectory(payload.GetString()!),
                 "chooseCardLibrary" when payload.ValueKind == JsonValueKind.Null => ChooseCardLibrary(),
+                "defaultCardLibrary" when payload.ValueKind == JsonValueKind.Null => data.LibraryRootPath,
                 "createCardFile" when payload.ValueKind == JsonValueKind.Object => await CreateCardFileAsync(payload),
                 "saveProject" when payload.ValueKind == JsonValueKind.String => await SaveProjectAsync(payload.GetString()!),
                 "loadSettings" when payload.ValueKind == JsonValueKind.Null => await data.LoadSettingsAsync(),
