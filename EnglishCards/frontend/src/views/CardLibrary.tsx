@@ -48,7 +48,7 @@ function DirectoryNode({
     {loading && <div className="library-muted" style={{ paddingLeft: 20 + depth * 20 }}>正在读取…</div>}
     {error && <div className="library-error" role="alert">{error}</div>}
     {contents && <>
-      {((root && /[\\\\/]userdata$/iu.test(path))
+      {((root && path.replaceAll(String.fromCharCode(92), '/').toLowerCase().endsWith('/userdata'))
         ? contents.folders.filter(folder => !new Set(['cache', 'drafts', 'exports', 'temp', 'logs', 'settings'])
           .has(folder.name.toLowerCase()))
         : contents.folders).map(folder =>
