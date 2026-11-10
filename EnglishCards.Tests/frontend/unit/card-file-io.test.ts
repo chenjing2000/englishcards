@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import fixture from '@fixtures/projects/brainco/project.json';
-import { createCardFile, createCardSaveCoordinator, listCardDirectory, openCardFile, serializedCard } from '@frontend/services/cardFileIO';
+import { cardFileName, createCardFile, createCardSaveCoordinator, listCardDirectory, openCardFile, serializedCard } from '@frontend/services/cardFileIO';
 import { parseProject } from '@frontend/models/project';
 
 function fakeBridge(respond: (command: string, payload: unknown) => unknown) {
@@ -61,7 +61,15 @@ describe('Phase E file-backed desktop bridge client', () => {
     expect(requests[0].command).toBe('createCardFile');
     const payload = requests[0].payload as { directory: string; text: string };
     expect(payload.directory).toBe('C:/cards');
+    expect((payload as { fileName: string }).fileName).toBe(cardFileName(article.title));
     expect(JSON.parse(payload.text)).toEqual(article);
+  });
+
+  it('creates safe title-based filenames and handles invalid Windows path characters', () => {
+    expect(cardFileName('A Short Article')).toBe('A Short Article.json');
+    expect(cardFileName('  What / Why: Today?  ')).toBe('What - Why- Today-.json');
+    expect(cardFileName('CON')).toBe('_CON.json');
+    expect(cardFileName('')).toBe('Untitled.json');
   });
 
   it('saves to the captured card path rather than a newer global selection', async () => {
