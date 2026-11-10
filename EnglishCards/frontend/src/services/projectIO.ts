@@ -161,31 +161,23 @@ export class DesktopPersistence {
 }
 
 export async function loadDesktopData() {
+  // Phase E: the desktop no longer reads or restores a global article draft.
+  // File-backed articles are opened explicitly through the Card Library.
   const sample = sampleDraft();
-  const [settings, draft] = await Promise.all([
-    loadDesktopFile('loadSettings', text => settingsSchema.parse(JSON.parse(text)), defaults),
-    loadDesktopFile('loadDraft', readDraft, sample.project),
-  ]);
-  const notice = [
-    settings.rejected && '配置无法读取，暂用默认值，原文件已保留。',
-    draft.rejected && '自动草稿不是有效的 Article v6，原始草稿已保留。',
-  ].filter(Boolean).join(' ');
+  const settings = await loadDesktopFile(
+    'loadSettings', text => settingsSchema.parse(JSON.parse(text)), defaults,
+  );
   const persistence = new DesktopPersistence(
     settings.missing ? null : JSON.stringify(settings.value),
-    JSON.stringify(draft.value),
+    JSON.stringify(sample.project),
     settings.rejected,
-    draft.rejected,
+    false,
   );
   return {
     settings: settings.value,
-    draft: {
-      ...sample,
-      project: draft.value,
-      notice: draft.missing ? sample.notice : restoredNotice,
-      desktopRejected: draft.rejected,
-    },
+    draft: sample,
     persistence,
-    notice,
+    notice: settings.rejected ? '配置无法读取，原设置文件已保留。' : '',
   };
 }
 
