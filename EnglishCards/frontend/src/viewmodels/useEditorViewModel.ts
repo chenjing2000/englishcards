@@ -14,7 +14,7 @@ import {
 } from '../services/projectIO';
 import { desktopRequest, isDesktop } from '../services/desktopBridge';
 import { CardSaveCoordinator, type CardSaveStatus } from '../services/cardSaveCoordinator';
-import { createCardFile, createCardSaveCoordinator, defaultCardLibrary, listCardDirectory, openCardFile, serializedCard } from '../services/cardFileIO';
+import { cardFileName, createCardFile, createCardSaveCoordinator, defaultCardLibrary, listCardDirectory, openCardFile, serializedCard } from '../services/cardFileIO';
 
 type ParagraphCollection = 'content' | 'translation';
 const stringify = (project: Project) => JSON.stringify(projectDocument(project), null, 2);
@@ -388,6 +388,8 @@ export function useEditorViewModel() {
       setCardSaveStatus('clean');
       setLibraryRevision(value => value + 1);
       reportError('card-open', '');
+      reportError('card-create', '');
+      showWarning(`已创建卡片：${cardFileName(title)}`);
       return true;
     } catch (reason) {
       reportError('card-create', `新建卡片失败：${String(reason)}`);
