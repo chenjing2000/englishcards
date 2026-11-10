@@ -55,8 +55,11 @@ test.beforeEach(async ({ page }) => {
         if (command === 'createCardFile') {
           const contents = (payload as { text: string }).text;
           const path = 'C:/cards/' + (payload as { fileName: string }).fileName;
-          cards[path] = JSON.parse(contents);
-          value = { path, text: contents };
+          if (Object.hasOwn(cards, path)) error = '同名卡片已存在，请更换标题或文件名。';
+          else {
+            cards[path] = JSON.parse(contents);
+            value = { path, text: contents };
+          }
         }
         queueMicrotask(() => respond(id, value, error));
       },
@@ -123,7 +126,7 @@ test('independent desktop errors stack upwards and each close clears only its so
   await page.getByRole('button', { name: 'A.json' }).click();
   await page.evaluate(() => { window.phaseEIO.corruptNextOpen = true; });
   await page.getByRole('button', { name: 'A.json' }).click();
-  const notices = page.locator('.preview-panel .phase-e-notice-error');
+  const notices = page.locator('.phase-e-notices .phase-e-notice-error');
   await expect(notices).toHaveCount(1);
   await expect(notices.first()).toContainText('卡片打开失败');
 
@@ -166,6 +169,54 @@ test('Phase E new card creates JSON before activating the editor', async ({ page
   await expect(page.getByRole('button', { name: 'My New Card.json' })).toBeVisible();
 });
 
+test('new-card duplicate errors use one visible preview toast while modal keeps its title', async ({ page }) => {
+  const notices = page.locator('.phase-e-notices');
+  await page.getByRole('button', { name: '新建卡片' }).click();
+  const dialog = page.getByRole('dialog', { name: '新建卡片' });
+  await expect(dialog).toBeVisible();
+  await page.getByLabel('英文标题', { exact: true }).fill('A');
+  await page.getByRole('button', { name: '创建卡片' }).click();
+
+  const duplicate = notices.locator('.phase-e-notice-error');
+  await expect(duplicate).toHaveCount(1);
+  await expect(duplicate).toContainText('同名卡片已存在');
+  await expect(dialog.getByText('同名卡片已存在')).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  await expect(page.getByLabel('英文标题', { exact: true })).toHaveValue('A');
+
+  // The toast must be above the modal backdrop and remain in the preview pane.
+  const toast = await duplicate.boundingBox();
+  const preview = await page.locator('#preview-panel').boundingBox();
+  expect(toast && preview).toBeTruthy();
+  expect(Math.abs((toast!.x + toast!.width / 2) - (preview!.x + preview!.width / 2))).toBeLessThan(3);
+  expect(await duplicate.evaluate(node => {
+    const bounds = node.getBoundingClientRect();
+    const hit = document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+    return hit === node || node.contains(hit);
+  })).toBe(true);
+
+  // Repeating the same failure should not multiply the persistent error.
+  await page.getByRole('button', { name: '创建卡片' }).click();
+  await expect(duplicate).toHaveCount(1);
+  await page.getByLabel('英文标题', { exact: true }).fill('Another Card');
+  await page.getByRole('button', { name: '创建卡片' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(duplicate).toHaveCount(0);
+  await expect(notices.locator('.phase-e-notice-normal')).toContainText('已创建卡片');
+});
+
+test('settings modal has compact 320 DIP default width', async ({ page }) => {
+  await page.getByRole('button', { name: '设计' }).click();
+  const dialog = page.getByRole('dialog', { name: '设计设置' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveCSS('width', '320px');
+  await expect(dialog).toHaveCSS('min-width', '280px');
+  await expect(dialog).toHaveCSS('max-width', '360px');
+  await expect(dialog.locator('.settings-table').first().locator('input').first()).toBeVisible();
+  await dialog.getByRole('button', { name: '关闭设置' }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
 test('opened desktop card is editable with pointer input and mouse-wheel scrolling', async ({ page }) => {
   await page.getByRole('button', { name: 'A.json' }).click();
   const fields = page.locator('.fields');
@@ -192,8 +243,8 @@ test('Phase E save failure retains A and allows explicit retry', async ({ page }
   await page.evaluate(() => { window.phaseEIO.failNextSave = true; });
   await title.fill('A cannot save');
   await expect(page.getByRole('button', { name: '重试保存当前卡片' })).toBeVisible();
-  await expect(page.locator('.preview-panel .phase-e-notice-error')).toContainText('Disk locked');
-  await expect(page.locator('.preview-panel .phase-e-notice-error').getByRole('button', { name: '关闭消息' })).toBeVisible();
+  await expect(page.locator('.phase-e-notices .phase-e-notice-error')).toContainText('Disk locked');
+  await expect(page.locator('.phase-e-notices .phase-e-notice-error').getByRole('button', { name: '关闭消息' })).toBeVisible();
   await page.getByRole('button', { name: '重试保存当前卡片' }).click();
   await expect(page.getByRole('button', { name: '重试保存当前卡片' })).toHaveCount(0);
   const saves = await page.evaluate(() => window.phaseEIO.requests.filter(item => item.command === 'saveCardFile'));
