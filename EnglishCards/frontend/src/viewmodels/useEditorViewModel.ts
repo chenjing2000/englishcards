@@ -73,6 +73,7 @@ export function useEditorViewModel() {
   const desktopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Phase E file sessions are optional until the library UI replaces legacy open.
   const cardSession = useRef<CardSaveCoordinator | null>(null);
+  const invalidCardSnapshot = useRef(false);
   const cardTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [cardSaveStatus, setCardSaveStatus] = useState<CardSaveStatus>('clean');
   const latest = useRef({ project, opening });
@@ -98,6 +99,8 @@ export function useEditorViewModel() {
     if (!session) return;
     try {
       session.edit(serializedCard(project));
+      invalidCardSnapshot.current = false;
+      reportError('card-validation', '');
       reportCardStatus(session);
       if (session.status !== 'dirty') return;
       clearTimeout(cardTimer.current);
@@ -105,6 +108,7 @@ export function useEditorViewModel() {
         void flushCardSave(session);
       }, 300);
     } catch (reason) {
+      invalidCardSnapshot.current = true;
       reportError('card-validation', `当前输入尚不是有效 Article v6，无法保存：${String(reason)}`);
     }
     return () => clearTimeout(cardTimer.current);
@@ -133,6 +137,7 @@ export function useEditorViewModel() {
         desktopStore.current = result.persistence;
         setBoot(result.draft);
         setProject({ ...result.draft.project, styles: result.settings });
+        setLastFile(stringify(result.draft.project));
         savedSettings.current = JSON.stringify(result.settings);
         if (result.notice) showWarning(result.notice);
         setSettingsReady(true);
@@ -228,7 +233,7 @@ export function useEditorViewModel() {
         }
         clearTimeout(desktopTimer.current);
         const card = cardSession.current;
-        if (card && !(await flushCardSave(card)))
+        if (card && (invalidCardSnapshot.current || !(await flushCardSave(card))))
           return { pending: true, errors: ['当前卡片未能成功保存。'] };
         const result = await desktopStore.current?.save(latest.current.project, card !== null);
         if (!result) return { pending: false, errors: [] };
@@ -274,6 +279,10 @@ export function useEditorViewModel() {
   async function openCardPath(path: string): Promise<boolean> {
     if (!desktop || opening || preparingClose.current) return false;
     const previous = cardSession.current;
+    if (previous && invalidCardSnapshot.current) {
+      showWarning('当前卡片仍有未完成或无效的输入，无法切换。');
+      return false;
+    }
     if (previous && previous.status !== 'clean') {
       if (previous.status === 'dirty') void flushCardSave(previous);
       showWarning(previous.status === 'error'
@@ -292,6 +301,7 @@ export function useEditorViewModel() {
       const session = createCardSaveCoordinator(openedPath, article);
       clearTimeout(cardTimer.current);
       cardSession.current = session;
+      invalidCardSnapshot.current = false;
       setWordDrafts({});
       update(article);
       setLastFile(stringify(article));
@@ -355,7 +365,7 @@ export function useEditorViewModel() {
 
   async function exportImages() {
     if (!ready || exporting) return;
-    if (cardSession.current && !(await flushCardSave(cardSession.current))) return;
+    if (cardSession.current && (invalidCardSnapshot.current || !(await flushCardSave(cardSession.current)))) return;
     setExporting(true);
     try {
       const outcome = await requestExport(project, rendered!.layout.signature, rendered!.layout.pages.length);
