@@ -196,24 +196,29 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         return picker.ShowDialog(owner) == true ? picker.FolderName : null;
     }
 
-    private async Task<object?> CreateCardFileAsync(JsonElement payload)
+    private async Task<object> CreateCardFileAsync(JsonElement payload)
     {
         if (!payload.TryGetProperty("text", out var textValue) || textValue.ValueKind != JsonValueKind.String ||
-            !payload.TryGetProperty("directory", out var folderValue) || folderValue.ValueKind != JsonValueKind.String)
+            !payload.TryGetProperty("directory", out var folderValue) || folderValue.ValueKind != JsonValueKind.String ||
+            !payload.TryGetProperty("fileName", out var fileValue) || fileValue.ValueKind != JsonValueKind.String)
             throw new InvalidDataException("无效的新建卡片请求。");
+
         var folder = Path.GetFullPath(folderValue.GetString()!);
         if (!Directory.Exists(folder)) throw new DirectoryNotFoundException("卡片馆目录不存在。");
         var text = textValue.GetString()!;
         using (var parsed = JsonDocument.Parse(text))
             ArticleContractValidator.Validate(parsed.RootElement);
-        var picker = new SaveFileDialog
-        {
-            Filter = SaveArticleFilter, DefaultExt = ".json", AddExtension = true,
-            FileName = "新建卡片.json", InitialDirectory = folder, OverwritePrompt = false
-        };
-        if (picker.ShowDialog(owner) != true) return null;
-        var destination = ValidateCardPath(picker.FileName);
-        if (File.Exists(destination)) throw new IOException("同名卡片已存在，请更换文件名后重试。");
+
+        var fileName = fileValue.GetString()!;
+        if (string.IsNullOrWhiteSpace(fileName) || fileName is "." or ".." ||
+            !string.Equals(Path.GetFileName(fileName), fileName, StringComparison.Ordinal) ||
+            !string.Equals(Path.GetExtension(fileName), ".json", StringComparison.OrdinalIgnoreCase) ||
+            fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+            fileName.EndsWith(' ') || fileName.EndsWith('.'))
+            throw new InvalidDataException("文件名无效，必须为当前目录下的 JSON 文件。");
+
+        var destination = ValidateCardPath(Path.Combine(folder, fileName));
+        if (File.Exists(destination)) throw new IOException("同名卡片已存在，请更换标题或文件名。");
         await WriteNewCardAsync(destination, text);
         activeCardPath = destination;
         activeFingerprint = Fingerprint(text);
