@@ -658,9 +658,9 @@ export function useEditorViewModel() {
       reportError('settings-import', `配置导入失败：${String(reason)}`);
     } finally { importingSettings.current = false; }
   }
-  function clearError() {
-    const source = Object.keys(errors)[0];
-    if (source) reportError(source, '');
+  function clearError(source?: string) {
+    const target = source ?? Object.keys(errors)[0];
+    if (target) reportError(target, '');
   }
   async function downloadRejectedDraft() {
     if (boot.desktopRejected) {
@@ -674,7 +674,7 @@ export function useEditorViewModel() {
   }
 
   return {
-    project, warning, error, settingsReady, ready, exporting, opening, desktop, closing,
+    project, warning, error, errors, settingsReady, ready, exporting, opening, desktop, closing,
     layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
     open, openCardPath, newCard, retryCardSave, cardSaveStatus, activeCardPath,
     libraryRoot, libraryRevision, changeLibraryRoot, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
