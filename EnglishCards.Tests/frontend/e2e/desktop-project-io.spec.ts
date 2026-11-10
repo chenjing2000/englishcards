@@ -32,8 +32,10 @@ test.beforeEach(async ({ page }) => {
         let error: string | undefined;
         if (command === 'loadSettings') value = null;
         if (command === 'listCardDirectory') value = {
-          path: payload, folders: [],
-          files: Object.keys(cards).map(path => ({ path, name: path.split('/').at(-1)! })),
+          path: payload,
+          folders: payload === 'C:/cards' ? [{ path: 'C:/cards/Subfolder', name: 'Subfolder' }] : [],
+          files: payload === 'C:/cards'
+            ? Object.keys(cards).map(path => ({ path, name: path.split('/').at(-1)! })) : [],
         };
         if (command === 'openCardFile') {
           value = { path: payload, text: window.phaseEIO.corruptNextOpen
@@ -66,6 +68,20 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'A.json' })).toBeVisible();
   await expect(page.locator('.app-shell')).not.toHaveAttribute('inert', '');
+});
+
+test('library uses ReadArticles-style expander, without heading or refresh', async ({ page }) => {
+  await expect(page.getByRole('button', { name: '选择卡片馆' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '卡片馆', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '刷新卡片馆' })).toHaveCount(0);
+  const folder = page.getByRole('button', { name: '目录 Subfolder' });
+  await expect(folder).toBeVisible();
+  await expect(folder.locator('img.library-expander')).toBeVisible();
+  await expect(folder).toHaveAttribute('aria-expanded', 'false');
+  await folder.click();
+  await expect(folder).toHaveAttribute('aria-expanded', 'true');
+  await expect.poll(() => page.evaluate(() => window.phaseEIO.requests.some(item =>
+    item.command === 'listCardDirectory' && item.payload === 'C:/cards/Subfolder'))).toBe(true);
 });
 
 test('Phase E invalid Article JSON never replaces the active card', async ({ page }) => {
