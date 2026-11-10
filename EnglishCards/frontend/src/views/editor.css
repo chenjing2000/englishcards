@@ -105,6 +105,18 @@
 .phase-e-modal-heading button{padding:4px 12px}
 .phase-e-modal-scroll{overflow-y:auto;padding:0 24px 20px;min-height:0}
 .phase-e-modal .style-settings{display:block}
+.phase-e-settings-dialog{
+  width:320px;min-width:280px;max-width:360px;
+  max-height:calc(100vh - 48px);
+}
+.phase-e-settings-dialog .phase-e-modal-heading{padding:14px 16px}
+.phase-e-settings-dialog .phase-e-modal-scroll{padding:0 16px 16px}
+.phase-e-settings-dialog .settings-table{table-layout:fixed}
+.phase-e-settings-dialog .settings-table th:first-child{width:60%}
+.phase-e-settings-dialog .settings-table th:nth-child(2){width:40%}
+.phase-e-settings-dialog .settings-table th,
+.phase-e-settings-dialog .settings-table td{padding:6px 5px}
+.phase-e-settings-dialog .settings-table input{padding:5px 3px}
 
 /* Explicit file-open state and centered new-card modal. */
 .phase-e-empty-editor{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;background:#fff;color:#68767c;padding:32px;line-height:1.8;font-size:14px;min-height:0}
@@ -147,13 +159,12 @@
 }
 .editor-panel .phase-c-heading .phase-e-actions svg{width:20px;height:20px;display:block}
 
-.phase-e-create-error{color:#a33131;font-size:13px;margin:0;overflow-wrap:anywhere}
 
 /* Phase E: bottom-center toasts within the preview, stacked from bottom upward. */
 .phase-e-notices{
-  position:absolute;z-index:12;left:50%;bottom:16px;transform:translateX(-50%);
+  position:fixed;z-index:120;left:50%;bottom:16px;transform:translateX(-50%);
   display:flex;flex-direction:column-reverse;align-items:center;gap:8px;
-  width:clamp(240px,300px,360px);max-width:calc(100% - 32px);
+  width:360px;min-width:240px;max-width:480px;
   max-height:calc(100% - 32px);overflow-y:auto;pointer-events:none;
 }
 .phase-e-notice{
