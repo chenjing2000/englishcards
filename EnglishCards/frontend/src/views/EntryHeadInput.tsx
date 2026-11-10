@@ -3,7 +3,7 @@ import AutoSizeTextarea from './AutoSizeTextarea';
 
 type Props = {
   label: string; value: string; multiline?: boolean;
-  commit: (value: string) => void;
+  commit: (value: string) => boolean | void;
   onDraftChange?: (value: string | null) => void;
   inputRef: (input: HTMLInputElement | HTMLTextAreaElement | null) => void;
 };
@@ -16,7 +16,7 @@ export default function EntryHeadInput({ label, value, multiline, commit, onDraf
     onDraftChange?.(next);
   };
   const finish = () => {
-    if (draft !== value) commit(draft);
+    if (draft !== value && commit(draft) === false) return;
     onDraftChange?.(null);
   };
   if (multiline) return <AutoSizeTextarea label={label} value={draft} onChange={change} onBlur={finish} inputRef={inputRef}
