@@ -4,11 +4,13 @@ import { parseRenderProject } from '@frontend/models/project';
 import { loadDesktopData, requestExport, restoreDraft } from '@frontend/services/projectIO';
 import { defaults } from '@frontend/models/settings';
 
-it('desktop bootstrap restores an Article v6 draft without overwriting it', async () => {
+it('Phase E desktop bootstrap reads settings without restoring a legacy draft', async () => {
   const messages = new EventTarget();
   const writes: { command: string; payload: { text: string } }[] = [];
+  const reads: string[] = [];
   vi.stubGlobal('window', { chrome: { webview: {
     postMessage({ id, command, payload }: { id: number; command: string; payload: { text: string } }) {
+      if (command.startsWith('load')) reads.push(command);
       if (command.startsWith('save')) writes.push({ command, payload });
       const value = command === 'loadSettings' ? null
         : command === 'loadDraft' ? JSON.stringify({ article: { ...fixture, title: 'Disk draft' }, modifiedAt: '2026-11-07T00:00:00.000Z' })
@@ -20,7 +22,8 @@ it('desktop bootstrap restores an Article v6 draft without overwriting it', asyn
   } } });
   try {
     const { settings, draft, persistence } = await loadDesktopData();
-    expect(draft.project.title).toBe('Disk draft');
+    expect(draft.project.title).toBe(fixture.title);
+    expect(reads).toEqual(['loadSettings']);
     expect(draft.project.schemaVersion).toBe(6);
     await persistence.save({ ...draft.project, styles: settings });
     expect(writes.map(write => write.command)).toEqual(['saveSettings']);
