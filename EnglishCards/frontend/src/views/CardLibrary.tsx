@@ -48,7 +48,10 @@ function DirectoryNode({
     {loading && <div className="library-muted" style={{ paddingLeft: 20 + depth * 20 }}>正在读取…</div>}
     {error && <div className="library-error" role="alert">{error}</div>}
     {contents && <>
-      {contents.folders.map(folder =>
+      {((root && /[\\\\/]userdata$/iu.test(path))
+        ? contents.folders.filter(folder => !new Set(['cache', 'drafts', 'exports', 'temp', 'logs', 'settings'])
+          .has(folder.name.toLowerCase()))
+        : contents.folders).map(folder =>
         <DirectoryNode key={folder.path} path={folder.path} name={folder.name}
           depth={depth + (root ? 0 : 1)} activePath={activePath} onOpen={onOpen} revision={revision} />)}
       {contents.files.map(file => <button type="button" key={file.path}
