@@ -18,7 +18,6 @@ export default function EditorView() {
   const vm = useEditorViewModel();
   const { project, warning, error, settingsReady, ready, exporting, layout, rejectedDraft } = vm;
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const settingsFile = useRef<HTMLInputElement>(null);
   const inputs = useRef(new Map<string, HTMLInputElement | HTMLTextAreaElement>());
   function registerInput(id: string, input: HTMLInputElement | HTMLTextAreaElement | null) {
     if (input) inputs.current.set(id, input); else inputs.current.delete(id);
@@ -72,10 +71,7 @@ export default function EditorView() {
           <p className="hint style-settings-hint">字号与页面尺寸单位为 px；有效配置自动保存到 {vm.desktop ? 'userdata/settings/settings.json' : 'config/settings.json'}。</p>
           <div className="style-settings-actions">
             <button type="button" onClick={vm.resetStyles}>默认配置</button>
-            {vm.desktop && <>
-              <input hidden ref={settingsFile} type="file" accept=".json,application/json" aria-label="导入配置 JSON 文件" onChange={event => { void vm.importSettings(event.target.files?.[0]); event.target.value = ''; }} />
-              <button type="button" onClick={() => settingsFile.current?.click()}>导入配置</button>
-            </>}
+
           </div>
         </div> : <div className="article-editor" aria-label="文章编辑">
           <section className="editor-section" aria-label="Vocabulary 编辑区">
