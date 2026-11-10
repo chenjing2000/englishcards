@@ -290,6 +290,7 @@ export function useEditorViewModel() {
   /** Phase E directory-tree entry point; a rejected click is never queued. */
   async function openCardPath(path: string): Promise<boolean> {
     if (!desktop || opening || preparingClose.current) return false;
+    if (!settingsReady) { showWarning('正在初始化程序设置，请稍后重新选择卡片。'); return false; }
     const previous = cardSession.current;
     if (previous && (invalidCardSnapshot.current || Object.keys(wordDraftsRef.current).length > 0)) {
       showWarning('当前卡片仍有未完成或无效的输入，无法切换。');
@@ -331,6 +332,7 @@ export function useEditorViewModel() {
 
   async function newCard(directory: string): Promise<boolean> {
     if (!desktop || !directory || opening || preparingClose.current) return false;
+    if (!settingsReady) { showWarning('正在初始化程序设置，请稍后重新新建卡片。'); return false; }
     const current = cardSession.current;
     if (invalidCardSnapshot.current || Object.keys(wordDraftsRef.current).length > 0 ||
         (current && current.status !== 'clean') ||
