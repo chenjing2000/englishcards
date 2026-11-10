@@ -243,14 +243,14 @@ export function useEditorViewModel() {
 
   function reportDesktopSave(result: DesktopSaveResult) {
     reportError('settings-save', result.settingsError);
-    reportError('draft', result.draftError);
+
   }
   useEffect(() => {
     const store = desktopStore.current;
     if (!settingsReady || !store || preparingClose.current) return;
     let current = true;
     desktopTimer.current = setTimeout(() => {
-      void store.save(project, true).then(result => { if (current) reportDesktopSave(result); });
+      void store.save(project).then(result => { if (current) reportDesktopSave(result); });
     }, 300);
     return () => { current = false; clearTimeout(desktopTimer.current); };
   }, [project, settingsReady]);
@@ -274,10 +274,10 @@ export function useEditorViewModel() {
         if (card && (invalidCardSnapshot.current || Object.keys(wordDraftsRef.current).length > 0 ||
             !(await flushCardSave(card))))
           return { pending: true, errors: ['当前卡片仍有未提交的输入或未能成功保存。'] };
-        const result = await desktopStore.current?.save(latest.current.project, true);
+        const result = await desktopStore.current?.save(latest.current.project);
         if (!result) return { pending: false, errors: [] };
         reportDesktopSave(result);
-        return { pending: result.pending, errors: [result.settingsError, result.draftError].filter(Boolean) };
+        return { pending: result.pending, errors: [result.settingsError].filter(Boolean) };
       } finally {
         preparingClose.current = false;
         setClosing(false);
