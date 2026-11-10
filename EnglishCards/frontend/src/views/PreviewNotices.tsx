@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 type Notice = { id: number; kind: 'normal' | 'error'; text: string; source?: string };
 type Props = {
@@ -12,6 +13,36 @@ export default function PreviewNotices({ errors, warning, closeError }: Props) {
   const [items, setItems] = useState<Notice[]>([]);
   const nextId = useRef(0);
   const seenWarning = useRef<typeof warning>(null);
+  const [placement, setPlacement] = useState({ left: 0, bottom: 16, availableWidth: 360 });
+
+  // A body-level portal stays visible above modal backdrops without losing
+  // the preview pane as its visual positioning anchor.
+  useLayoutEffect(() => {
+    const preview = document.getElementById('preview-panel');
+    if (!preview) return;
+    const update = () => {
+      const rect = preview.getBoundingClientRect();
+      const next = {
+        left: rect.left + rect.width / 2,
+        bottom: Math.max(16, window.innerHeight - rect.bottom + 16),
+        availableWidth: Math.max(0, rect.width - 32),
+      };
+      setPlacement(previous => previous.left === next.left
+        && previous.bottom === next.bottom && previous.availableWidth === next.availableWidth
+        ? previous : next);
+    };
+    const observer = new ResizeObserver(update);
+    observer.observe(preview);
+    window.addEventListener('resize', update);
+    window.addEventListener('editor-pane-resize-end', update);
+    update();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+      window.removeEventListener('editor-pane-resize-end', update);
+    };
+  }, []);
+
 
   useEffect(() => {
     if (!warning || seenWarning.current === warning) return;
@@ -38,9 +69,11 @@ export default function PreviewNotices({ errors, warning, closeError }: Props) {
     if (item.kind === 'error' && item.source) closeError(item.source);
   }
 
-  return <div className="phase-e-notices" aria-label="消息通知" aria-live="polite">
+  return createPortal(<div className="phase-e-notices" aria-label="消息通知" aria-live="polite"
+    style={{ left: placement.left, bottom: placement.bottom, maxWidth: placement.availableWidth }}>
+
     {items.map(item => <NoticeItem key={item.id} item={item} onClose={() => remove(item)} />)}
-  </div>;
+  </div>, document.body);
 }
 
 function NoticeItem({ item, onClose }: { item: Notice; onClose: () => void }) {
