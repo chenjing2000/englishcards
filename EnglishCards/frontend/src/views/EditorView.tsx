@@ -35,7 +35,7 @@ export default function EditorView() {
   const [newCardOpen, setNewCardOpen] = useState(false);
   const [newCardTitle, setNewCardTitle] = useState('');
   const [creatingCard, setCreatingCard] = useState(false);
-  const [createError, setCreateError] = useState('');
+
   const inputs = useRef(new Map<string, HTMLInputElement | HTMLTextAreaElement>());
   function registerInput(id: string, input: HTMLInputElement | HTMLTextAreaElement | null) {
     if (input) inputs.current.set(id, input); else inputs.current.delete(id);
@@ -82,7 +82,7 @@ export default function EditorView() {
     <button type="button" aria-label={settingsOpen ? '关闭设置' : '设计'} title="设计"
       onClick={() => setSettingsOpen(value => !value)}><ToolbarIcon name="design" /></button>
     <button type="button" aria-label="新建卡片" title="新建卡片"
-      disabled={!vm.libraryRoot || vm.opening} onClick={() => { setNewCardTitle(''); setCreateError(''); setNewCardOpen(true); }}>
+      disabled={!vm.libraryRoot || vm.opening} onClick={() => { setNewCardTitle(''); setNewCardOpen(true); }}>
       <ToolbarIcon name="new-card" />
     </button>
     <button type="button" aria-label="导出 ZIP" title="导出 ZIP"
@@ -154,12 +154,10 @@ export default function EditorView() {
           event.preventDefault();
           if (!newCardTitle.trim() || creatingCard) return;
           setCreatingCard(true);
-          setCreateError('');
+
           void vm.newCard(vm.libraryRoot, newCardTitle).then(created => {
             if (created) setNewCardOpen(false);
-            else setCreateError('未能创建卡片。请确认当前文件已经保存，且目录内不存在同名 JSON。');
-          }).catch(reason => {
-            setCreateError(`新建卡片失败：${String(reason)}`);
+
           }).finally(() => setCreatingCard(false));
         }}>
           <label htmlFor="phase-e-new-card-title">英文标题</label>
@@ -168,7 +166,7 @@ export default function EditorView() {
             placeholder="输入新卡片的英文标题" maxLength={150} />
           <p className="hint">默认文件名：{cardFileName(newCardTitle)}</p>
           <p className="hint">保存目录：{vm.libraryRoot}</p>
-          {createError && <p className="phase-e-create-error" role="alert">{createError}</p>}
+
           <div className="phase-e-create-actions">
             <button type="button" disabled={creatingCard} onClick={() => setNewCardOpen(false)}>取消</button>
             <button type="submit" disabled={!newCardTitle.trim() || creatingCard}>创建卡片</button>
@@ -178,7 +176,7 @@ export default function EditorView() {
     </div>}
     {vm.desktop && settingsOpen && <div className="phase-e-modal-backdrop" role="presentation"
       onMouseDown={event => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
-      <section role="dialog" aria-modal="true" aria-label="设计设置" className="phase-e-modal">
+      <section role="dialog" aria-modal="true" aria-label="设计设置" className="phase-e-modal phase-e-settings-dialog">
         <div className="phase-e-modal-heading"><h2>设计设置</h2>
           <button type="button" aria-label="关闭设置" onClick={() => setSettingsOpen(false)}>关闭</button></div>
         <div className="phase-e-modal-scroll">{settingsContents}</div>
