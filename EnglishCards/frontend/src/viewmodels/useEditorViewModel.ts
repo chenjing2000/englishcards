@@ -222,7 +222,7 @@ export function useEditorViewModel() {
     if (!settingsReady || !store || preparingClose.current) return;
     let current = true;
     desktopTimer.current = setTimeout(() => {
-      void store.save(project, cardSession.current !== null).then(result => { if (current) reportDesktopSave(result); });
+      void store.save(project, true).then(result => { if (current) reportDesktopSave(result); });
     }, 300);
     return () => { current = false; clearTimeout(desktopTimer.current); };
   }, [project, settingsReady]);
@@ -245,7 +245,7 @@ export function useEditorViewModel() {
         const card = cardSession.current;
         if (card && (invalidCardSnapshot.current || !(await flushCardSave(card))))
           return { pending: true, errors: ['当前卡片未能成功保存。'] };
-        const result = await desktopStore.current?.save(latest.current.project, card !== null);
+        const result = await desktopStore.current?.save(latest.current.project, true);
         if (!result) return { pending: false, errors: [] };
         reportDesktopSave(result);
         return { pending: result.pending, errors: [result.settingsError, result.draftError].filter(Boolean) };
