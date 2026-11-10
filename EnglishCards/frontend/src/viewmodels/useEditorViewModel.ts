@@ -115,7 +115,7 @@ export function useEditorViewModel() {
   const pendingSettingsSaves = useRef(0);
   const settingsRevision = useRef(0);
   const ready = settingsReady && !opening && rendered?.project === previewProject;
-  const hasFileChanges = lastFile !== stringify(project);
+  const hasFileChanges = cardSession.current ? cardSaveStatus !== 'clean' : lastFile !== stringify(project);
 
   function update(next: Project | ((current: RenderProject) => Project)) {
     setProject(current => {
@@ -314,6 +314,10 @@ export function useEditorViewModel() {
   }
 
   async function open(file?: File) {
+    if (cardSession.current) {
+      showWarning('请通过卡片馆选择 JSON 文件；当前卡片不允许通过旧导入入口切换。');
+      return;
+    }
     if (!file && !isDesktop()) return;
     const request = ++openRequest.current;
     setOpening(true);
@@ -334,6 +338,7 @@ export function useEditorViewModel() {
   }
 
   async function save() {
+    if (cardSession.current) { await flushCardSave(cardSession.current); return; }
     if (saving.current) return;
     saving.current = true;
     const previousOpen = openedFile.current;
