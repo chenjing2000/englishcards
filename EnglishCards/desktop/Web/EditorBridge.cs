@@ -13,6 +13,7 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
 {
     private const string OpenArticleFilter = "EnglishCards 文章 (*.json;*.txt)|*.json;*.txt|Article JSON (*.json)|*.json|Plain Text (*.txt)|*.txt";
     private const string SaveArticleFilter = "Article JSON (*.json)|*.json";
+    private string? activeCardPath;
     private long navigation;
     private Task fileCommandTail = Task.CompletedTask;
 
@@ -72,6 +73,9 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
             object? value = command.GetString() switch
             {
                 "openProject" when payload.ValueKind == JsonValueKind.Null => await OpenProjectAsync(),
+                "openCardFile" when payload.ValueKind == JsonValueKind.String => await OpenCardFileAsync(payload.GetString()!),
+                "saveCardFile" when payload.ValueKind == JsonValueKind.Object => await SaveCardFileAsync(payload),
+                "listCardDirectory" when payload.ValueKind == JsonValueKind.String => ListCardDirectory(payload.GetString()!),
                 "saveProject" when payload.ValueKind == JsonValueKind.String => await SaveProjectAsync(payload.GetString()!),
                 "loadSettings" when payload.ValueKind == JsonValueKind.Null => await data.LoadSettingsAsync(),
                 "loadDraft" when payload.ValueKind == JsonValueKind.Null => await data.LoadDraftAsync(),
@@ -115,6 +119,57 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         var path = ChooseFile(new OpenFileDialog { Filter = OpenArticleFilter, CheckFileExists = true, InitialDirectory = data.ProjectsPath });
         if (path is null) return null;
         return new { name = Path.GetFileName(path), text = await File.ReadAllTextAsync(path) };
+    }
+
+    // Phase E: a file-backed card has an explicit identity; no save dialog or draft fallback.
+    private static string ValidateCardPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path) ||
+            !string.Equals(Path.GetExtension(path), ".json", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("请选择有效的 JSON 卡片文件。");
+        return Path.GetFullPath(path);
+    }
+
+    private async Task<object> OpenCardFileAsync(string requestedPath)
+    {
+        var path = ValidateCardPath(requestedPath);
+        var text = await File.ReadAllTextAsync(path);
+        using var parsed = JsonDocument.Parse(text);
+        ArticleContractValidator.Validate(parsed.RootElement);
+        // Switch file identity only after successful loading and strict validation.
+        activeCardPath = path;
+        return new { path, text };
+    }
+
+    private async Task<bool> SaveCardFileAsync(JsonElement payload)
+    {
+        if (!payload.TryGetProperty("path", out var pathValue) || pathValue.ValueKind != JsonValueKind.String ||
+            !payload.TryGetProperty("text", out var textValue) || textValue.ValueKind != JsonValueKind.String)
+            throw new InvalidDataException("无效的卡片保存请求。");
+        var path = ValidateCardPath(pathValue.GetString()!);
+        if (activeCardPath is null || !string.Equals(activeCardPath, path, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("当前卡片文件身份不匹配，已拒绝保存。");
+        var text = textValue.GetString()!;
+        using var parsed = JsonDocument.Parse(text);
+        ArticleContractValidator.Validate(parsed.RootElement);
+        if (!File.Exists(path)) throw new FileNotFoundException("卡片文件已被删除，已拒绝自动重新创建。", path);
+        await UserDataStore.WriteAtomicallyAsync(path, text);
+        return true;
+    }
+
+    private static object ListCardDirectory(string directory)
+    {
+        if (string.IsNullOrWhiteSpace(directory) || !Path.IsPathFullyQualified(directory))
+            throw new InvalidDataException("无效的卡片目录。");
+        var path = Path.GetFullPath(directory);
+        var folders = Directory.EnumerateDirectories(path)
+            .Select(folder => new { path = folder, name = Path.GetFileName(folder) })
+            .OrderBy(item => item.name, StringComparer.OrdinalIgnoreCase).ToArray();
+        var files = Directory.EnumerateFiles(path, "*.json")
+            .Where(file => string.Equals(Path.GetExtension(file), ".json", StringComparison.OrdinalIgnoreCase))
+            .Select(file => new { path = file, name = Path.GetFileName(file) })
+            .OrderBy(item => item.name, StringComparer.OrdinalIgnoreCase).ToArray();
+        return new { path, folders, files };
     }
 
     private async Task<bool?> SaveProjectAsync(string text)
