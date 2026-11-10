@@ -83,7 +83,7 @@ export default function EditorView() {
           </div>
         </div>);
   const cardActions = <div className="phase-e-actions" role="group" aria-label="卡片操作">
-    <button type="button" aria-label={settingsOpen ? '关闭设置' : '设计'} title="设计"
+    <button type="button" aria-label={settingsOpen ? '关闭设置' : '设置'} title="设置"
       onClick={() => setSettingsOpen(value => !value)}><ToolbarIcon name="design" /></button>
     <button type="button" aria-label="新建卡片" title="新建卡片"
       disabled={!vm.libraryRoot || vm.opening} onClick={() => {
@@ -196,7 +196,7 @@ export default function EditorView() {
     {vm.desktop && settingsOpen && <div className="phase-e-modal-backdrop" role="presentation"
       onMouseDown={event => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
       <section role="dialog" aria-modal="true" aria-label="设计设置" className="phase-e-modal phase-e-settings-dialog">
-        <div className="phase-e-modal-heading"><h2>设计设置</h2>
+        <div className="phase-e-modal-heading"><h2>设置</h2>
           <button type="button" aria-label="关闭设置" onClick={() => setSettingsOpen(false)}>关闭</button></div>
         <div className="phase-e-modal-scroll">{settingsContents}</div>
       </section>

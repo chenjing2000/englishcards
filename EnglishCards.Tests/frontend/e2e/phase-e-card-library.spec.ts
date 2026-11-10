@@ -127,8 +127,8 @@ test('Settings uses a two-column 640 DIP dialog and New Card supports a custom f
 
   await page.goto('/');
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
-  await page.getByRole('button', { name: '设计' }).click();
-  const settings = page.getByRole('dialog', { name: '设计设置' });
+  await page.getByRole('button', { name: '设置' }).click();
+  const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings).toBeVisible();
   await expect.poll(() => settings.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(640);
   await expect(settings.locator('.settings-columns')).toHaveCSS('grid-template-columns', /\d+px \d+px/);
