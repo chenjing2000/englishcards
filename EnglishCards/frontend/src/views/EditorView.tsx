@@ -52,6 +52,27 @@ export default function EditorView() {
     </tbody></table></>;
   }
 
+  const settingsContents = (<div className="style-settings" aria-label="设置面板">
+          {settingsTable('字号设置', fontFields)}{settingsTable('其余设置', otherFields)}
+          <p className="hint style-settings-hint">字号与页面尺寸单位为 px；有效配置自动保存到 {vm.desktop ? 'userdata/settings/settings.json' : 'config/settings.json'}。</p>
+          <div className="style-settings-actions">
+            <button type="button" onClick={vm.resetStyles}>默认配置</button>
+
+          </div>
+        </div>);
+  const cardActions = <div className="phase-e-actions" role="group" aria-label="卡片操作">
+    <button type="button" aria-label={settingsOpen ? '关闭设置' : '设计'} title="设计"
+      onClick={() => setSettingsOpen(value => !value)}><img src={settingsIcon} alt="" /></button>
+    <button type="button" aria-label="新建卡片" title="新建卡片"
+      disabled={!vm.libraryRoot || vm.opening} onClick={() => { void vm.newCard(vm.libraryRoot); }}>
+      <img src={newCardIcon} alt="" />
+    </button>
+    <button type="button" aria-label="导出 ZIP" title="导出 ZIP"
+      disabled={!ready || exporting || !vm.activeCardPath || vm.cardSaveStatus !== 'clean'}
+      onClick={() => { void vm.exportImages(); }}><img src={exportZipIcon} alt="" />
+    </button>
+  </div>;
+
   return <div className="app-shell" inert={vm.desktop && (!settingsReady || vm.closing)}>
     <div className="phase-e-layout">
       {vm.desktop && <CardLibrary root={vm.libraryRoot} activePath={vm.activeCardPath}
@@ -63,17 +84,11 @@ export default function EditorView() {
         {!vm.desktop && <button type="button" aria-label={settingsOpen ? '返回文章编辑' : '打开设置'} onClick={() => setSettingsOpen(value => !value)}>
           {settingsOpen ? '返回编辑' : '设置'}
         </button>}
+        {vm.desktop && cardActions}
       </div>
       {rejectedDraft && <div className="draft-recovery"><button type="button" onClick={vm.downloadRejectedDraft}>下载原始草稿</button></div>}
       <div inert={!settingsReady || vm.opening || (vm.desktop && !vm.activeCardPath && !settingsOpen)} className="fields phase-c-fields">
-        {settingsOpen ? <div className="style-settings" aria-label="设置面板">
-          {settingsTable('字号设置', fontFields)}{settingsTable('其余设置', otherFields)}
-          <p className="hint style-settings-hint">字号与页面尺寸单位为 px；有效配置自动保存到 {vm.desktop ? 'userdata/settings/settings.json' : 'config/settings.json'}。</p>
-          <div className="style-settings-actions">
-            <button type="button" onClick={vm.resetStyles}>默认配置</button>
-
-          </div>
-        </div> : <div className="article-editor" aria-label="文章编辑">
+        {settingsOpen && !vm.desktop ? settingsContents : <div className="article-editor" aria-label="文章编辑">
           <section className="editor-section" aria-label="Vocabulary 编辑区">
             <h2>Vocabulary</h2>
             <VocabularyTable viewModel={vm} registerInput={registerInput} />
@@ -106,16 +121,15 @@ export default function EditorView() {
         <NotificationBar error={error} warning={warning} closeError={vm.clearError} />
       </div>
     </aside>} left={<CardPreview layout={layout} ready={ready} content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection}
-      actions={vm.desktop ? <div className="phase-e-actions" role="group" aria-label="卡片操作">
-        <button type="button" aria-label="设置" title="设置"
-          onClick={() => setSettingsOpen(value => !value)}><img src={settingsIcon} alt="" /></button>
-        <button type="button" aria-label="新建卡片" title="新建卡片"
-          disabled={!vm.libraryRoot || vm.opening}
-          onClick={() => { void vm.newCard(vm.libraryRoot); }}><img src={newCardIcon} alt="" /></button>
-        <button type="button" aria-label="导出 ZIP" title="导出 ZIP"
-          disabled={!ready || exporting || !vm.activeCardPath || vm.cardSaveStatus !== 'clean'}
-          onClick={() => { void vm.exportImages(); }}><img src={exportZipIcon} alt="" /></button>
-      </div> : <ProjectActions open={vm.open} save={vm.save} exportImages={vm.exportImages} ready={ready} exporting={exporting} />} />} />
+      actions={vm.desktop ? null : <ProjectActions open={vm.open} save={vm.save} exportImages={vm.exportImages} ready={ready} exporting={exporting} />} />} />
     </div>
+    {vm.desktop && settingsOpen && <div className="phase-e-modal-backdrop" role="presentation"
+      onMouseDown={event => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
+      <section role="dialog" aria-modal="true" aria-label="设计设置" className="phase-e-modal">
+        <div className="phase-e-modal-heading"><h2>设计设置</h2>
+          <button type="button" aria-label="关闭设置" onClick={() => setSettingsOpen(false)}>关闭</button></div>
+        <div className="phase-e-modal-scroll">{settingsContents}</div>
+      </section>
+    </div>}
   </div>;
 }
