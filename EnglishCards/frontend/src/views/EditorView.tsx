@@ -4,6 +4,7 @@ import { useEditorViewModel } from '../viewmodels/useEditorViewModel';
 import VocabularyTable, { VocabularyActions } from './VocabularyTable';
 import CardPreview from './CardPreview';
 import NotificationBar from './NotificationBar';
+import PreviewNotices from './PreviewNotices';
 import CardLibrary from './CardLibrary';
 import ProjectActions from './ProjectActions';
 import SplitPane from './SplitPane';
@@ -137,11 +138,12 @@ export default function EditorView() {
       <div className="editor-bottom">
         {vm.cardSaveStatus === 'error' && <button type="button" className="retry-card-save" onClick={() => void vm.retryCardSave()}>重试保存当前卡片</button>}
         {!settingsOpen && <VocabularyActions viewModel={vm} focusField={setFocusId} />}
-        <NotificationBar error={error} warning={warning} closeError={vm.clearError} />
+        {!vm.desktop && <NotificationBar error={error} warning={warning} closeError={vm.clearError} />}
       </div>
     </aside>} left={<CardPreview layout={vm.desktop && !vm.activeCardPath ? undefined : layout}
       ready={ready && (!vm.desktop || !!vm.activeCardPath)} content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection}
-      actions={vm.desktop ? null : <ProjectActions open={vm.open} save={vm.save} exportImages={vm.exportImages} ready={ready} exporting={exporting} />} />} />
+      actions={vm.desktop ? null : <ProjectActions open={vm.open} save={vm.save} exportImages={vm.exportImages} ready={ready} exporting={exporting} />}
+      notices={vm.desktop ? <PreviewNotices errors={vm.errors} warning={warning} closeError={vm.clearError} /> : null} />} />
     </div>
     {vm.desktop && newCardOpen && <div className="phase-e-modal-backdrop" role="presentation">
       <section role="dialog" aria-modal="true" aria-label="新建卡片" className="phase-e-modal phase-e-create-dialog">
