@@ -119,6 +119,34 @@ test('Phase E invalid Article JSON never replaces the active card', async ({ pag
   await expect(title).toHaveValue('Card A');
 });
 
+test('independent desktop errors stack upwards and each close clears only its source', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await page.evaluate(() => { window.phaseEIO.corruptNextOpen = true; });
+  await page.getByRole('button', { name: 'A.json' }).click();
+  const notices = page.locator('.preview-panel .phase-e-notice-error');
+  await expect(notices).toHaveCount(1);
+  await expect(notices.first()).toContainText('卡片打开失败');
+
+  await page.evaluate(() => { window.phaseEIO.failNextSave = true; });
+  await page.getByLabel('英文标题', { exact: true }).fill('Cannot save after failed open');
+  await expect(notices).toHaveCount(2);
+  const openError = notices.filter({ hasText: '卡片打开失败' });
+  const saveError = notices.filter({ hasText: 'Disk locked' });
+  await expect(openError).toBeVisible();
+  await expect(saveError).toBeVisible();
+  const top = await openError.boundingBox();
+  const bottom = await saveError.boundingBox();
+  expect(top && bottom).toBeTruthy();
+  expect(bottom!.y).toBeLessThan(top!.y);
+
+  await openError.getByRole('button', { name: '关闭消息' }).click();
+  await expect(openError).toHaveCount(0);
+  await expect(saveError).toBeVisible();
+  await saveError.getByRole('button', { name: '关闭消息' }).click();
+  await expect(notices).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '重试保存当前卡片' })).toBeVisible();
+});
+
 test('Phase E new card creates JSON before activating the editor', async ({ page }) => {
   await page.getByRole('button', { name: '新建卡片' }).click();
   await expect(page.getByRole('dialog', { name: '新建卡片' })).toBeVisible();
