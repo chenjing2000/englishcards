@@ -209,10 +209,11 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         var picker = new SaveFileDialog
         {
             Filter = SaveArticleFilter, DefaultExt = ".json", AddExtension = true,
-            FileName = "新建卡片.json", InitialDirectory = folder, OverwritePrompt = true
+            FileName = "新建卡片.json", InitialDirectory = folder, OverwritePrompt = false
         };
         if (picker.ShowDialog(owner) != true) return null;
         var destination = ValidateCardPath(picker.FileName);
+        if (File.Exists(destination)) throw new IOException("同名卡片已存在，请更换文件名后重试。");
         await WriteNewCardAsync(destination, text);
         activeCardPath = destination;
         activeFingerprint = Fingerprint(text);
