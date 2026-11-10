@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import fixture from '@fixtures/projects/brainco/project.json';
-import { createCardSaveCoordinator, listCardDirectory, openCardFile, serializedCard } from '@frontend/services/cardFileIO';
+import { createCardFile, createCardSaveCoordinator, listCardDirectory, openCardFile, serializedCard } from '@frontend/services/cardFileIO';
 import { parseProject } from '@frontend/models/project';
 
 function fakeBridge(respond: (command: string, payload: unknown) => unknown) {
@@ -41,10 +41,27 @@ describe('Phase E file-backed desktop bridge client', () => {
   });
 
   it('opens and validates an Article v6 from a specific path', async () => {
-    const requests = fakeBridge(() => ({ path: 'C:/cards/A.json', text: JSON.stringify(fixture) }));
+    const requests = fakeBridge(() => ({ path: 'C:/cards/A.json', text: JSON.stringify(fixture), fingerprint: 'ABC123' }));
     const result = await openCardFile('C:/cards/A.json');
     expect(result.article).toEqual(parseProject(fixture));
     expect(requests[0]).toEqual({ command: 'openCardFile', payload: 'C:/cards/A.json' });
+    expect(requests[1]).toEqual({
+      command: 'activateCardFile',
+      payload: { path: 'C:/cards/A.json', fingerprint: 'ABC123' },
+    });
+  });
+
+  it('requests exclusive creation with a validated empty Article v6 document', async () => {
+    const requests = fakeBridge((_command, payload) => ({
+      path: 'C:/cards/new.json', text: (payload as { text: string }).text,
+    }));
+    const article = parseProject(fixture);
+    const created = await createCardFile('C:/cards', article);
+    expect(created?.path).toBe('C:/cards/new.json');
+    expect(requests[0].command).toBe('createCardFile');
+    const payload = requests[0].payload as { directory: string; text: string };
+    expect(payload.directory).toBe('C:/cards');
+    expect(JSON.parse(payload.text)).toEqual(article);
   });
 
   it('saves to the captured card path rather than a newer global selection', async () => {
