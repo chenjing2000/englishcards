@@ -11,7 +11,7 @@ import SplitPane from './SplitPane';
 import AutoSizeTextarea from './AutoSizeTextarea';
 import ContinuousParagraphEditor from './ContinuousParagraphEditor';
 import SettingInput from './SettingInput';
-import { cardFileName } from '../services/cardFileIO';
+import { chooseCardFolder, defaultCardLibrary } from '../services/cardFileIO';
 
 /**
  * Match Transcript Studio's native React toolbar drawing:
@@ -34,6 +34,7 @@ export default function EditorView() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newCardOpen, setNewCardOpen] = useState(false);
   const [newCardTitle, setNewCardTitle] = useState('');
+  const [newCardFolder, setNewCardFolder] = useState('');
   const [creatingCard, setCreatingCard] = useState(false);
 
   const inputs = useRef(new Map<string, HTMLInputElement | HTMLTextAreaElement>());
@@ -71,7 +72,10 @@ export default function EditorView() {
   }
 
   const settingsContents = (<div className="style-settings" aria-label="设置面板">
-          {settingsTable('字号设置', fontFields)}{settingsTable('其余设置', otherFields)}
+          <div className="settings-columns">
+            <section className="settings-column" aria-label="字号设置区域">{settingsTable('字号设置', fontFields)}</section>
+            <section className="settings-column" aria-label="其余设置区域">{settingsTable('其余设置', otherFields)}</section>
+          </div>
           <p className="hint style-settings-hint">字号与页面尺寸单位为 px；有效配置自动保存到 {vm.desktop ? 'userdata/settings/settings.json' : 'config/settings.json'}。</p>
           <div className="style-settings-actions">
             <button type="button" onClick={vm.resetStyles}>默认配置</button>
@@ -82,7 +86,12 @@ export default function EditorView() {
     <button type="button" aria-label={settingsOpen ? '关闭设置' : '设计'} title="设计"
       onClick={() => setSettingsOpen(value => !value)}><ToolbarIcon name="design" /></button>
     <button type="button" aria-label="新建卡片" title="新建卡片"
-      disabled={!vm.libraryRoot || vm.opening} onClick={() => { setNewCardTitle(''); setNewCardOpen(true); }}>
+      disabled={!vm.libraryRoot || vm.opening} onClick={() => {
+        setNewCardTitle('');
+        void defaultCardLibrary().then(setNewCardFolder).catch(reason =>
+          vm.reportError('card-folder', `无法读取默认卡片目录：${String(reason)}`));
+        setNewCardOpen(true);
+      }}>
       <ToolbarIcon name="new-card" />
     </button>
     <button type="button" aria-label="导出 ZIP" title="导出 ZIP"
@@ -147,29 +156,39 @@ export default function EditorView() {
     </div>
     {vm.desktop && newCardOpen && <div className="phase-e-modal-backdrop" role="presentation">
       <section role="dialog" aria-modal="true" aria-label="新建卡片" className="phase-e-modal phase-e-create-dialog">
-        <div className="phase-e-modal-heading"><h2>新建卡片</h2>
-          <button type="button" aria-label="取消新建" disabled={creatingCard}
-            onClick={() => setNewCardOpen(false)}>取消</button></div>
+        <div className="phase-e-modal-heading"><h2>新建卡片</h2></div>
         <form className="phase-e-create-form" onSubmit={event => {
           event.preventDefault();
-          if (!newCardTitle.trim() || creatingCard) return;
+          if (!newCardFolder.trim() || !newCardTitle.trim() || creatingCard) return;
           setCreatingCard(true);
 
-          void vm.newCard(vm.libraryRoot, newCardTitle).then(created => {
+          void vm.newCard(newCardFolder, newCardTitle).then(created => {
             if (created) setNewCardOpen(false);
 
           }).finally(() => setCreatingCard(false));
         }}>
-          <label htmlFor="phase-e-new-card-title">英文标题</label>
+          <label htmlFor="phase-e-new-card-folder">文件夹</label>
+          <div className="phase-e-folder-row">
+            <input id="phase-e-new-card-folder" type="text" value={newCardFolder}
+              onChange={event => setNewCardFolder(event.target.value)} spellCheck={false} />
+            <button type="button" aria-label="选择文件夹" title="选择文件夹" disabled={creatingCard}
+              onClick={() => { void chooseCardFolder(newCardFolder).then(selected => {
+                if (selected) setNewCardFolder(selected);
+              }).catch(reason => vm.reportError('card-folder', `选择文件夹失败：${String(reason)}`)); }}>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2" />
+                <path d="M3 10h18l-2 10H5L3 10Z" />
+              </svg>
+            </button>
+          </div>
+          <label htmlFor="phase-e-new-card-title">卡片名称</label>
           <input id="phase-e-new-card-title" type="text" autoFocus
             value={newCardTitle} onChange={event => setNewCardTitle(event.target.value)}
-            placeholder="输入新卡片的英文标题" maxLength={150} />
-          <p className="hint">默认文件名：{cardFileName(newCardTitle)}</p>
-          <p className="hint">保存目录：{vm.libraryRoot}</p>
-
+            placeholder="输入卡片名称" maxLength={150} />
           <div className="phase-e-create-actions">
+            <button type="submit" disabled={!newCardFolder.trim() || !newCardTitle.trim() || creatingCard}>创建</button>
             <button type="button" disabled={creatingCard} onClick={() => setNewCardOpen(false)}>取消</button>
-            <button type="submit" disabled={!newCardTitle.trim() || creatingCard}>创建卡片</button>
           </div>
         </form>
       </section>

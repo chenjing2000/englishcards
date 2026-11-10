@@ -8,7 +8,6 @@ using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
-using Microsoft.Win32;
 
 namespace EnglishCards;
 
@@ -25,7 +24,7 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
         else cancellation?.Cancel();
     }
 
-    internal async Task<bool?> ExportAsync(JsonElement request)
+    internal async Task<bool?> ExportAsync(JsonElement request, string activeCardPath)
     {
         if (IsRunning) throw new InvalidOperationException("已有导出任务正在运行。");
         if (request.ValueKind != JsonValueKind.Object ||
@@ -45,16 +44,9 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
         if (width is < 400 or > 4000 || height is < 400 or > 4000)
             throw new InvalidDataException("页面尺寸超出允许范围。");
 
-        var name = document.TryGetProperty("title", out var title) ? title.GetString() ?? "EnglishCards" : "EnglishCards";
-        name = string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) || char.IsControl(c) ? '_' : c)).Trim().TrimEnd('.');
-        if (name.Length > 80) name = name[..80];
-        if (name.Length == 0) name = "EnglishCards";
-        var selected = new SaveFileDialog
-        {
-            Filter = "ZIP 压缩包 (*.zip)|*.zip", DefaultExt = ".zip", AddExtension = true,
-            FileName = name + ".zip", InitialDirectory = data.ExportsPath, OverwritePrompt = true
-        };
-        if (selected.ShowDialog(owner) != true) return null;
+        var destination = GetDestinationPath(activeCardPath);
+        if (!File.Exists(activeCardPath))
+            throw new FileNotFoundException("当前 JSON 卡片文件不存在，无法导出。", activeCardPath);
 
         using var cts = new CancellationTokenSource();
         cancellation = cts;
@@ -63,7 +55,7 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
         try
         {
             progressWindow.Show();
-            await GenerateAsync(selected.FileName, project.GetRawText(), document.GetRawText(), signature,
+            await GenerateAsync(destination, project.GetRawText(), document.GetRawText(), signature,
                 pages, width, height, progressWindow, cts.Token);
             return true;
         }
@@ -77,6 +69,16 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
             cancellation = null;
             progressWindow.CloseAfterOperation();
         }
+    }
+
+    internal static string GetDestinationPath(string activeCardPath)
+    {
+        if (string.IsNullOrWhiteSpace(activeCardPath))
+            throw new InvalidDataException("当前卡片路径为空，无法确定 ZIP 保存位置。");
+        var fullPath = Path.GetFullPath(activeCardPath);
+        if (!string.Equals(Path.GetExtension(fullPath), ".json", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("当前卡片不是 JSON 文件，无法导出 ZIP。");
+        return Path.ChangeExtension(fullPath, ".zip");
     }
 
     private async Task GenerateAsync(string destination, string projectJson, string documentJson,

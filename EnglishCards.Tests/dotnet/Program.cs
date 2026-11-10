@@ -350,6 +350,24 @@ Console.WriteLine("PASS exported article JSON is pretty-printed UTF-8 without BO
 
 // Validate the staged ZIP before the final destination is replaced.
 var exportType = bridgeType.Assembly.GetType("EnglishCards.ZipExportService", throwOnError: true)!;
+var getExportDestination = exportType.GetMethod("GetDestinationPath", BindingFlags.Static | BindingFlags.NonPublic)
+    ?? throw new Exception("Card-relative ZIP destination resolution is missing.");
+var exportPathTestDirectory = Directory.CreateTempSubdirectory("EnglishCards-export-path-test-");
+try
+{
+    var sourceJson = Path.Combine(exportPathTestDirectory.FullName, "Nested", "My Article.json");
+    var expectedZip = Path.Combine(exportPathTestDirectory.FullName, "Nested", "My Article.zip");
+    var actualZip = (string)getExportDestination.Invoke(null, [sourceJson])!;
+    if (!string.Equals(actualZip, expectedZip, StringComparison.OrdinalIgnoreCase))
+        throw new Exception("ZIP export must use the active JSON directory and basename.");
+    bool invalidExtensionRejected = false;
+    try { getExportDestination.Invoke(null, [Path.Combine(exportPathTestDirectory.FullName, "article.txt")]); }
+    catch (TargetInvocationException error) when (error.InnerException is InvalidDataException) { invalidExtensionRejected = true; }
+    if (!invalidExtensionRejected) throw new Exception("Card-relative ZIP export must reject non-JSON paths.");
+    Console.WriteLine("PASS ZIP destination uses the active JSON directory and basename");
+}
+finally { exportPathTestDirectory.Delete(recursive: true); }
+
 var validateArchive = exportType.GetMethod("ValidateArchiveAsync", BindingFlags.Static | BindingFlags.NonPublic)!;
 Task ValidateArchive(string path, int pages, int width, int height) =>
     (Task)validateArchive.Invoke(null, [path, pages, width, height, CancellationToken.None])!;

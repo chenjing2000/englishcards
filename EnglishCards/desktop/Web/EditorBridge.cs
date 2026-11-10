@@ -81,6 +81,7 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
                 "saveCardFile" when payload.ValueKind == JsonValueKind.Object => await SaveCardFileAsync(payload),
                 "listCardDirectory" when payload.ValueKind == JsonValueKind.String => ListCardDirectory(payload.GetString()!),
                 "chooseCardLibrary" when payload.ValueKind == JsonValueKind.Null => ChooseCardLibrary(),
+                "chooseCardFolder" when payload.ValueKind == JsonValueKind.String => ChooseCardFolder(payload.GetString()!),
                 "defaultCardLibrary" when payload.ValueKind == JsonValueKind.Null => data.LibraryRootPath,
                 "createCardFile" when payload.ValueKind == JsonValueKind.Object => await CreateCardFileAsync(payload),
                 "saveProject" when payload.ValueKind == JsonValueKind.String => await SaveProjectAsync(payload.GetString()!),
@@ -89,7 +90,7 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
                 "saveSettings" => await SaveUserDataAsync(payload, data.SaveSettingsAsync),
                 "saveDraft" => await SaveUserDataAsync(payload, data.SaveDraftAsync),
                 "saveRejectedDraft" when payload.ValueKind == JsonValueKind.Null => await SaveRejectedDraftAsync(),
-                "exportAllZip" when payload.ValueKind == JsonValueKind.Object => await exporter.ExportAsync(payload),
+                "exportAllZip" when payload.ValueKind == JsonValueKind.Object => await exporter.ExportAsync(payload, activeCardPath ?? throw new InvalidOperationException("请先打开并保存一张 JSON 卡片。")),
                 _ => throw new InvalidDataException("不支持的桌面文件请求。")
             };
             response = new { id, ok = true, value };
@@ -192,6 +193,30 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         {
             Title = "选择卡片馆目录",
             InitialDirectory = data.LibraryRootPath,
+            Multiselect = false
+        };
+        return picker.ShowDialog(owner) == true ? picker.FolderName : null;
+    }
+
+    private string? ChooseCardFolder(string requestedInitialDirectory)
+    {
+        string initialDirectory = data.LibraryRootPath;
+        if (!string.IsNullOrWhiteSpace(requestedInitialDirectory))
+        {
+            try
+            {
+                var candidate = Path.GetFullPath(requestedInitialDirectory);
+                if (Directory.Exists(candidate)) initialDirectory = candidate;
+            }
+            catch (Exception error) when (error is ArgumentException or IOException or NotSupportedException)
+            {
+                // Fall back to the executable-adjacent userdata directory.
+            }
+        }
+        var picker = new OpenFolderDialog
+        {
+            Title = "选择新卡片保存文件夹",
+            InitialDirectory = initialDirectory,
             Multiselect = false
         };
         return picker.ShowDialog(owner) == true ? picker.FolderName : null;

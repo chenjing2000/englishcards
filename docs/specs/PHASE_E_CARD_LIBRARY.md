@@ -62,6 +62,13 @@ D. Integrate ZIP export and close flows, regression tests, owner Windows accepta
 
 Each phase must pass relevant unit/E2E/.NET tests and, where applicable, real Windows/WPF/WebView2 acceptance. Do not claim local Windows validation when unavailable.
 
+## Follow-up UI and export refinements (2026-11-10)
+
+- Design Settings modal width is 640 DIP, split into two equal columns with a vertical divider: font settings on the left and all remaining settings on the right. Preserve the existing setting fields, defaults and persistence behavior.
+- New Card modal has an editable absolute folder path defaulting to the executable-adjacent `userdata/` directory, plus a folder-picker button. The user may type any existing writable directory or choose one. The card name is a separate input; do not display filename-generation or save-directory hint text. The Create and Cancel actions are right-aligned.
+- The New Card folder picker and Card Library chooser are owned by the main window and use owner-relative placement. New-card creation remains exclusive and never overwrites an existing JSON file.
+- ZIP export uses the active card's JSON path. The destination is the same directory and basename with a `.zip` extension. Do not show a Save As dialog. Existing ZIP files are replaced only after the staged archive has been completely written and validated. Keep the existing progress/cancel lifecycle and ZIP contents.
+
 ## 5. Explicit non-goals
 
 No database, autosync, automatic file renames/deletions, FileSystemWatcher, alternative document schema, undo/redo, complex compatibility logic, or new export format.

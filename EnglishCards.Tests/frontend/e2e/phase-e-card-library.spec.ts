@@ -95,3 +95,55 @@ test('Phase E rejects a card switch until A is saved and requires a second click
   expect(await page.evaluate(() => window.phaseETest.requests.filter(item =>
     item.command === 'activateCardFile').length)).toBe(2);
 });
+
+
+test('Settings uses a two-column 640 DIP dialog and New Card supports a custom folder', async ({ page }) => {
+  await page.addInitScript(initial => {
+    const messages = new EventTarget();
+    const requests: NativeMessage[] = [];
+    const respond = (reply: NativeReply) => messages.dispatchEvent(new MessageEvent('message', { data: reply }));
+    const chrome = Reflect.get(window, 'chrome') ?? {};
+    Object.assign(chrome, { webview: {
+      postMessage(request: NativeMessage) {
+        requests.push(request);
+        const { id, command, payload } = request;
+        let value: unknown = true;
+        if (command === 'loadSettings') value = null;
+        if (command === 'defaultCardLibrary') value = 'C:/EnglishCards/userdata';
+        if (command === 'listCardDirectory') value = { path: payload, folders: [], files: [] };
+        if (command === 'chooseCardFolder') value = 'D:/My Cards';
+        if (command === 'createCardFile') value = {
+          path: 'D:/My Cards/Custom Card.json',
+          text: JSON.stringify({ ...initial, title: 'Custom Card' }),
+        };
+        queueMicrotask(() => respond({ id, ok: true, value }));
+      },
+      addEventListener: messages.addEventListener.bind(messages),
+      removeEventListener: messages.removeEventListener.bind(messages),
+    } });
+    Reflect.set(window, 'chrome', chrome);
+    Object.defineProperty(window, 'phaseENewCardRequests', { value: requests });
+  }, fixture);
+
+  await page.goto('/');
+  await expect(page.locator('[data-ready="true"]')).toBeVisible();
+  await page.getByRole('button', { name: '设计' }).click();
+  const settings = page.getByRole('dialog', { name: '设计设置' });
+  await expect(settings).toBeVisible();
+  await expect.poll(() => settings.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(640);
+  await expect(settings.locator('.settings-columns')).toHaveCSS('grid-template-columns', /\d+px \d+px/);
+  await settings.getByRole('button', { name: '关闭设置' }).click();
+
+  await page.getByRole('button', { name: '新建卡片' }).click();
+  const dialog = page.getByRole('dialog', { name: '新建卡片' });
+  const folder = dialog.getByLabel('文件夹', { exact: true });
+  await expect(folder).toHaveValue('C:/EnglishCards/userdata');
+  await expect(dialog.getByText(/默认文件名|保存目录/)).toHaveCount(0);
+  await dialog.getByRole('button', { name: '选择文件夹' }).click();
+  await expect(folder).toHaveValue('D:/My Cards');
+  await dialog.getByLabel('卡片名称', { exact: true }).fill('Custom Card');
+  await dialog.getByRole('button', { name: '创建', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  const createRequest = await page.evaluate(() => (window as any).phaseENewCardRequests.find((item: NativeMessage) => item.command === 'createCardFile'));
+  expect(createRequest.payload).toMatchObject({ directory: 'D:/My Cards', fileName: 'Custom Card.json' });
+});

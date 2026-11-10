@@ -19,6 +19,11 @@ export function chooseCardLibrary(): Promise<string | null> {
   return desktopRequest<string | null>('chooseCardLibrary');
 }
 
+/** Ask the Windows host to choose the destination folder for a new card. */
+export function chooseCardFolder(initialDirectory: string): Promise<string | null> {
+  return desktopRequest<string | null>('chooseCardFolder', initialDirectory);
+}
+
 /** Create an independent new Article v6 file, never overwriting an existing path. */
 export function cardFileName(title: string): string {
   const name = Array.from(title.normalize('NFC'), char =>
