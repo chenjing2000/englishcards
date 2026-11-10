@@ -74,6 +74,7 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
             {
                 "openProject" when payload.ValueKind == JsonValueKind.Null => await OpenProjectAsync(),
                 "openCardFile" when payload.ValueKind == JsonValueKind.String => await OpenCardFileAsync(payload.GetString()!),
+                "activateCardFile" when payload.ValueKind == JsonValueKind.String => ActivateCardFile(payload.GetString()!),
                 "saveCardFile" when payload.ValueKind == JsonValueKind.Object => await SaveCardFileAsync(payload),
                 "listCardDirectory" when payload.ValueKind == JsonValueKind.String => ListCardDirectory(payload.GetString()!),
                 "chooseCardLibrary" when payload.ValueKind == JsonValueKind.Null => ChooseCardLibrary(),
@@ -138,9 +139,16 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         var text = await File.ReadAllTextAsync(path);
         using var parsed = JsonDocument.Parse(text);
         ArticleContractValidator.Validate(parsed.RootElement);
-        // Switch file identity only after successful loading and strict validation.
-        activeCardPath = path;
+        // Do not change activeCardPath until the React side also validates this document.
         return new { path, text };
+    }
+
+    private bool ActivateCardFile(string requestedPath)
+    {
+        var path = ValidateCardPath(requestedPath);
+        if (!File.Exists(path)) throw new FileNotFoundException("卡片文件不存在。", path);
+        activeCardPath = path;
+        return true;
     }
 
     private async Task<bool> SaveCardFileAsync(JsonElement payload)
