@@ -13,11 +13,15 @@ import SplitPane from './SplitPane';
 import AutoSizeTextarea from './AutoSizeTextarea';
 import ContinuousParagraphEditor from './ContinuousParagraphEditor';
 import SettingInput from './SettingInput';
+import { cardFileName } from '../services/cardFileIO';
 
 export default function EditorView() {
   const vm = useEditorViewModel();
   const { project, warning, error, settingsReady, ready, exporting, layout, rejectedDraft } = vm;
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [newCardOpen, setNewCardOpen] = useState(false);
+  const [newCardTitle, setNewCardTitle] = useState('');
+  const [creatingCard, setCreatingCard] = useState(false);
   const inputs = useRef(new Map<string, HTMLInputElement | HTMLTextAreaElement>());
   function registerInput(id: string, input: HTMLInputElement | HTMLTextAreaElement | null) {
     if (input) inputs.current.set(id, input); else inputs.current.delete(id);
@@ -64,7 +68,7 @@ export default function EditorView() {
     <button type="button" aria-label={settingsOpen ? '关闭设置' : '设计'} title="设计"
       onClick={() => setSettingsOpen(value => !value)}><img src={settingsIcon} alt="" /></button>
     <button type="button" aria-label="新建卡片" title="新建卡片"
-      disabled={!vm.libraryRoot || vm.opening} onClick={() => { void vm.newCard(vm.libraryRoot); }}>
+      disabled={!vm.libraryRoot || vm.opening} onClick={() => { setNewCardTitle(''); setNewCardOpen(true); }}>
       <img src={newCardIcon} alt="" />
     </button>
     <button type="button" aria-label="导出 ZIP" title="导出 ZIP"
@@ -125,6 +129,32 @@ export default function EditorView() {
     </aside>} left={<CardPreview layout={layout} ready={ready} content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection}
       actions={vm.desktop ? null : <ProjectActions open={vm.open} save={vm.save} exportImages={vm.exportImages} ready={ready} exporting={exporting} />} />} />
     </div>
+    {vm.desktop && newCardOpen && <div className="phase-e-modal-backdrop" role="presentation">
+      <section role="dialog" aria-modal="true" aria-label="新建卡片" className="phase-e-modal phase-e-create-dialog">
+        <div className="phase-e-modal-heading"><h2>新建卡片</h2>
+          <button type="button" aria-label="取消新建" disabled={creatingCard}
+            onClick={() => setNewCardOpen(false)}>取消</button></div>
+        <form className="phase-e-create-form" onSubmit={event => {
+          event.preventDefault();
+          if (!newCardTitle.trim() || creatingCard) return;
+          setCreatingCard(true);
+          void vm.newCard(vm.libraryRoot, newCardTitle).then(created => {
+            if (created) setNewCardOpen(false);
+          }).finally(() => setCreatingCard(false));
+        }}>
+          <label htmlFor="phase-e-new-card-title">英文标题</label>
+          <input id="phase-e-new-card-title" type="text" autoFocus
+            value={newCardTitle} onChange={event => setNewCardTitle(event.target.value)}
+            placeholder="输入新卡片的英文标题" maxLength={150} />
+          <p className="hint">默认文件名：{cardFileName(newCardTitle)}</p>
+          <p className="hint">保存目录：{vm.libraryRoot}</p>
+          <div className="phase-e-create-actions">
+            <button type="button" disabled={creatingCard} onClick={() => setNewCardOpen(false)}>取消</button>
+            <button type="submit" disabled={!newCardTitle.trim() || creatingCard}>创建卡片</button>
+          </div>
+        </form>
+      </section>
+    </div>}
     {vm.desktop && settingsOpen && <div className="phase-e-modal-backdrop" role="presentation"
       onMouseDown={event => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
       <section role="dialog" aria-modal="true" aria-label="设计设置" className="phase-e-modal">
