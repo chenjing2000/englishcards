@@ -80,9 +80,12 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
                 "activateCardFile" when payload.ValueKind == JsonValueKind.Object => await ActivateCardFileAsync(payload),
                 "saveCardFile" when payload.ValueKind == JsonValueKind.Object => await SaveCardFileAsync(payload),
                 "listCardDirectory" when payload.ValueKind == JsonValueKind.String => ListCardDirectory(payload.GetString()!),
-                "chooseCardLibrary" when payload.ValueKind == JsonValueKind.Null => ChooseCardLibrary(),
-                "chooseCardFolder" when payload.ValueKind == JsonValueKind.String => ChooseCardFolder(payload.GetString()!),
+                "chooseCardLibrary" when payload.ValueKind == JsonValueKind.Null => await ChooseCardLibraryAsync(),
+                "chooseCardFolder" when payload.ValueKind == JsonValueKind.String => await ChooseCardFolderAsync(payload.GetString()!),
                 "defaultCardLibrary" when payload.ValueKind == JsonValueKind.Null => data.LibraryRootPath,
+                "lastNewCardFolder" when payload.ValueKind == JsonValueKind.Null => await data.LoadLastNewCardFolderAsync(),
+                "lastCardLibrary" when payload.ValueKind == JsonValueKind.Null => await data.LoadLastLibraryFolderAsync(),
+                "saveLastCardLibrary" when payload.ValueKind == JsonValueKind.String => await SaveLastCardLibraryAsync(payload.GetString()!),
                 "createCardFile" when payload.ValueKind == JsonValueKind.Object => await CreateCardFileAsync(payload),
                 "saveProject" when payload.ValueKind == JsonValueKind.String => await SaveProjectAsync(payload.GetString()!),
                 "loadSettings" when payload.ValueKind == JsonValueKind.Null => await data.LoadSettingsAsync(),
@@ -187,20 +190,20 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         return true;
     }
 
-    private string? ChooseCardLibrary()
+    private async Task<string?> ChooseCardLibraryAsync()
     {
         var picker = new OpenFolderDialog
         {
             Title = "选择卡片馆目录",
-            InitialDirectory = data.LibraryRootPath,
+            InitialDirectory = await data.LoadLastLibraryFolderAsync(),
             Multiselect = false
         };
-        return picker.ShowDialog(owner) == true ? picker.FolderName : null;
+        return FolderDialogPositioning.ShowDialog(picker, owner) == true ? picker.FolderName : null;
     }
 
-    private string? ChooseCardFolder(string requestedInitialDirectory)
+    private async Task<string?> ChooseCardFolderAsync(string requestedInitialDirectory)
     {
-        string initialDirectory = data.LibraryRootPath;
+        string initialDirectory = await data.LoadLastNewCardFolderAsync();
         if (!string.IsNullOrWhiteSpace(requestedInitialDirectory))
         {
             try
@@ -210,7 +213,7 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
             }
             catch (Exception error) when (error is ArgumentException or IOException or NotSupportedException)
             {
-                // Fall back to the executable-adjacent userdata directory.
+                // Keep the last successfully used destination, or userdata on first use.
             }
         }
         var picker = new OpenFolderDialog
@@ -219,7 +222,13 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
             InitialDirectory = initialDirectory,
             Multiselect = false
         };
-        return picker.ShowDialog(owner) == true ? picker.FolderName : null;
+        return FolderDialogPositioning.ShowDialog(picker, owner) == true ? picker.FolderName : null;
+    }
+
+    private async Task<bool> SaveLastCardLibraryAsync(string directory)
+    {
+        await data.SaveLastLibraryFolderAsync(directory);
+        return true;
     }
 
     private async Task<object> CreateCardFileAsync(JsonElement payload)
@@ -246,9 +255,20 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         var destination = ValidateCardPath(Path.Combine(folder, fileName));
         if (File.Exists(destination)) throw new IOException("同名卡片已存在，请更换标题或文件名。");
         await WriteNewCardAsync(destination, text);
+        bool folderPreferenceSaved = true;
+        try
+        {
+            // Only a successfully created card may update the remembered destination.
+            await data.SaveLastSuccessfulNewCardFolderAsync(folder);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            folderPreferenceSaved = false;
+            Trace.TraceWarning("EnglishCards could not remember the last successful new-card folder: {0}", error);
+        }
         activeCardPath = destination;
         activeFingerprint = Fingerprint(text);
-        return new { path = destination, text };
+        return new { path = destination, text, folderPreferenceSaved };
     }
 
     // Testable exclusive creation primitive shared by the new-card dialog.

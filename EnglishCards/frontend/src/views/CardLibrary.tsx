@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { chooseCardLibrary, listCardDirectory, type LibraryDirectory } from '../services/cardFileIO';
+import { chooseCardLibrary, listCardDirectory, saveLastCardLibrary, type LibraryDirectory } from '../services/cardFileIO';
 import plusIcon from '../assets/icons/tree/plus.svg';
 import minusIcon from '../assets/icons/tree/minus.svg';
 
@@ -80,7 +80,13 @@ export default function CardLibrary({ root, activePath, revision, onRootChange, 
   async function pick() {
     try {
       const selected = await chooseCardLibrary();
-      if (selected) { onRootChange(selected); onError('library-picker', ''); }
+      if (selected) {
+        // Remember the library only after its directory can actually be opened.
+        await listCardDirectory(selected);
+        await saveLastCardLibrary(selected);
+        onRootChange(selected);
+        onError('library-picker', '');
+      }
     } catch (reason) { onError('library-picker', `选择目录失败：${String(reason)}`); }
   }
 

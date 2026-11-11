@@ -151,6 +151,66 @@ void Dispose(object store) => disposeStore.Invoke(store, null);
 Task SaveSettings(object store, string text) => (Task)saveSettings.Invoke(store, [text, true])!;
 Task SaveDraft(object store, string text) => (Task)saveDraft.Invoke(store, [text, true])!;
 
+var loadNewCardFolder = storeType.GetMethod("LoadLastNewCardFolderAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+var loadLibraryFolder = storeType.GetMethod("LoadLastLibraryFolderAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+var saveNewCardFolder = storeType.GetMethod("SaveLastSuccessfulNewCardFolderAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+var saveLibraryFolder = storeType.GetMethod("SaveLastLibraryFolderAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+Task<string> LoadPath(object store, System.Reflection.MethodInfo method) => (Task<string>)method.Invoke(store, null)!;
+Task SavePath(object store, System.Reflection.MethodInfo method, string path) => (Task)method.Invoke(store, [path])!;
+
+var preferenceRoot = Directory.CreateTempSubdirectory("EnglishCards-path-preferences-");
+var newCardFolderOne = Directory.CreateDirectory(Path.Combine(preferenceRoot.FullName, "cards-one"));
+var newCardFolderTwo = Directory.CreateDirectory(Path.Combine(preferenceRoot.FullName, "cards-two"));
+var libraryFolder = Directory.CreateDirectory(Path.Combine(preferenceRoot.FullName, "library"));
+var preferenceStore = NewStore(preferenceRoot.FullName);
+try
+{
+    if (await LoadPath(preferenceStore, loadNewCardFolder) != preferenceRoot.FullName ||
+        await LoadPath(preferenceStore, loadLibraryFolder) != preferenceRoot.FullName)
+        throw new Exception("Both remembered folder preferences must initially fall back to userdata.");
+
+    await SavePath(preferenceStore, saveNewCardFolder, newCardFolderOne.FullName);
+    await SavePath(preferenceStore, saveLibraryFolder, libraryFolder.FullName);
+    if (await LoadPath(preferenceStore, loadNewCardFolder) != newCardFolderOne.FullName ||
+        await LoadPath(preferenceStore, loadLibraryFolder) != libraryFolder.FullName)
+        throw new Exception("New-card and library folders must be persisted independently.");
+
+    Dispose(preferenceStore);
+    preferenceStore = NewStore(preferenceRoot.FullName);
+    if (await LoadPath(preferenceStore, loadNewCardFolder) != newCardFolderOne.FullName ||
+        await LoadPath(preferenceStore, loadLibraryFolder) != libraryFolder.FullName)
+        throw new Exception("Remembered folder preferences must survive a new store instance.");
+
+    await SavePath(preferenceStore, saveNewCardFolder, newCardFolderTwo.FullName);
+    Directory.Delete(newCardFolderTwo.FullName);
+    if (await LoadPath(preferenceStore, loadNewCardFolder) != preferenceRoot.FullName)
+        throw new Exception("A missing remembered destination must fall back to userdata.");
+    Console.WriteLine("PASS last successful new-card folder and last library folder persist independently and recover from missing paths");
+}
+finally
+{
+    Dispose(preferenceStore);
+    preferenceRoot.Delete(recursive: true);
+}
+
+var positioningType = bridgeType.Assembly.GetType("EnglishCards.FolderDialogPositioning", throwOnError: true)!;
+var calculatePosition = positioningType.GetMethod("CalculatePosition", BindingFlags.Static | BindingFlags.NonPublic)!;
+var centered = (System.Windows.Point)calculatePosition.Invoke(null, [
+    new System.Windows.Rect(100, 100, 800, 600),
+    new System.Windows.Size(400, 300),
+    new System.Windows.Rect(0, 0, 1920, 1080)
+])!;
+if (centered != new System.Windows.Point(300, 250))
+    throw new Exception("The folder picker must be centered over its owner.");
+var clamped = (System.Windows.Point)calculatePosition.Invoke(null, [
+    new System.Windows.Rect(1600, 850, 300, 180),
+    new System.Windows.Size(500, 400),
+    new System.Windows.Rect(0, 0, 1920, 1080)
+])!;
+if (clamped != new System.Windows.Point(1420, 680))
+    throw new Exception("The centered folder picker must remain within the monitor work area.");
+Console.WriteLine("PASS native folder picker positioning centers over its owner and clamps to the monitor work area");
+
 var leaseDirectory = Directory.CreateTempSubdirectory("EnglishCards-lease-test-");
 var firstStore = NewStore(leaseDirectory.FullName);
 var secondStore = NewStore(leaseDirectory.FullName);

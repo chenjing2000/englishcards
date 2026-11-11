@@ -24,9 +24,12 @@ async function start(page: import('@playwright/test').Page, initialSettings: str
       postMessage(request: Request) {
         host.phaseESettingsRequests.push(request);
         if (request.command === 'saveSettings' && host.phaseESettingsHold) return;
-        queueMicrotask(() => host.phaseESettingsReply(
-          request.id, request.command === 'loadSettings' ? settings : true,
-        ));
+        let value: unknown = request.command === 'loadSettings' ? settings : true;
+        if (request.command === 'lastCardLibrary' || request.command === 'lastNewCardFolder')
+          value = 'C:/EnglishCards/userdata';
+        if (request.command === 'listCardDirectory')
+          value = { path: request.payload, folders: [], files: [] };
+        queueMicrotask(() => host.phaseESettingsReply(request.id, value));
       },
       addEventListener: events.addEventListener.bind(events),
       removeEventListener: events.removeEventListener.bind(events),

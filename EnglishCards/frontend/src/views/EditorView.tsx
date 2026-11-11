@@ -11,7 +11,7 @@ import SplitPane from './SplitPane';
 import AutoSizeTextarea from './AutoSizeTextarea';
 import ContinuousParagraphEditor from './ContinuousParagraphEditor';
 import SettingInput from './SettingInput';
-import { chooseCardFolder, defaultCardLibrary } from '../services/cardFileIO';
+import { chooseCardFolder, lastNewCardFolder } from '../services/cardFileIO';
 
 /**
  * Match Transcript Studio's native React toolbar drawing:
@@ -88,8 +88,8 @@ export default function EditorView() {
     <button type="button" aria-label="新建卡片" title="新建卡片"
       disabled={!vm.libraryRoot || vm.opening} onClick={() => {
         setNewCardTitle('');
-        void defaultCardLibrary().then(setNewCardFolder).catch(reason =>
-          vm.reportError('card-folder', `无法读取默认卡片目录：${String(reason)}`));
+        void lastNewCardFolder().then(setNewCardFolder).catch(reason =>
+          vm.reportError('card-folder', `无法读取上次成功使用的目录：${String(reason)}`));
         setNewCardOpen(true);
       }}>
       <ToolbarIcon name="new-card" />
@@ -156,21 +156,28 @@ export default function EditorView() {
     </div>
     {vm.desktop && newCardOpen && <div className="phase-e-modal-backdrop" role="presentation">
       <section role="dialog" aria-modal="true" aria-label="新建卡片" className="phase-e-modal phase-e-create-dialog">
-        <div className="phase-e-modal-heading"><h2>新建卡片</h2></div>
-        <form className="phase-e-create-form" onSubmit={event => {
+        <div className="phase-e-modal-heading">
+          <h2>新建卡片</h2>
+          <button type="button" className="phase-e-create-close" aria-label="关闭新建卡片" title="关闭"
+            disabled={creatingCard} onClick={() => setNewCardOpen(false)}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+              strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+        <form className="phase-e-create-form" autoComplete="off" onSubmit={event => {
           event.preventDefault();
           if (!newCardFolder.trim() || !newCardTitle.trim() || creatingCard) return;
           setCreatingCard(true);
-
           void vm.newCard(newCardFolder, newCardTitle).then(created => {
             if (created) setNewCardOpen(false);
-
           }).finally(() => setCreatingCard(false));
         }}>
-          <label htmlFor="phase-e-new-card-folder">文件夹</label>
-          <div className="phase-e-folder-row">
-            <input id="phase-e-new-card-folder" type="text" value={newCardFolder}
-              onChange={event => setNewCardFolder(event.target.value)} spellCheck={false} />
+          <div className="phase-e-create-row">
+            <label htmlFor="phase-e-new-card-folder">文件夹</label>
+            <input id="phase-e-new-card-folder" name="new-card-folder" type="text" autoComplete="off"
+              value={newCardFolder} onChange={event => setNewCardFolder(event.target.value)} spellCheck={false} />
             <button type="button" aria-label="选择文件夹" title="选择文件夹" disabled={creatingCard}
               onClick={() => { void chooseCardFolder(newCardFolder).then(selected => {
                 if (selected) setNewCardFolder(selected);
@@ -182,13 +189,18 @@ export default function EditorView() {
               </svg>
             </button>
           </div>
-          <label htmlFor="phase-e-new-card-title">卡片名称</label>
-          <input id="phase-e-new-card-title" type="text" autoFocus
-            value={newCardTitle} onChange={event => setNewCardTitle(event.target.value)}
-            placeholder="输入卡片名称" maxLength={150} />
-          <div className="phase-e-create-actions">
-            <button type="submit" disabled={!newCardFolder.trim() || !newCardTitle.trim() || creatingCard}>创建</button>
-            <button type="button" disabled={creatingCard} onClick={() => setNewCardOpen(false)}>取消</button>
+          <div className="phase-e-create-row">
+            <label htmlFor="phase-e-new-card-title">卡片名</label>
+            <input id="phase-e-new-card-title" name="new-card-name" type="text" autoComplete="off" autoFocus
+              value={newCardTitle} onChange={event => setNewCardTitle(event.target.value)}
+              placeholder="输入卡片名称" maxLength={150} />
+            <button type="submit" aria-label="创建" title="创建"
+              disabled={!newCardFolder.trim() || !newCardTitle.trim() || creatingCard}>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
           </div>
         </form>
       </section>

@@ -87,6 +87,8 @@ public partial class MainWindow : Window
                 await content.LoadAsync(Editor, "index.html", ct, web =>
                 {
                     web.Settings.AreDefaultContextMenusEnabled = false;
+                    web.Settings.IsGeneralAutofillEnabled = false;
+                    web.Settings.IsPasswordAutosaveEnabled = false;
                     web.ContextMenuRequested += (_, args) => args.Handled = true;
                     new EditorBridge(this, web, userData, exporter).Attach();
                 });
