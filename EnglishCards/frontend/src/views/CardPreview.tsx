@@ -111,7 +111,15 @@ export default function CardPreview({ layout, ready, content, onAddSelection, ac
   }
 
   useLayoutEffect(() => {
-    if (!layout) return;
+    // The preview DOM is populated imperatively rather than by React. When
+    // clearing a card, dropping the layout must also remove the old DOM pages.
+    if (!layout || !ready) {
+      preview.current?.replaceChildren();
+      anchor.current = null;
+      setActiveSelection(null);
+      if (scroll.current) scroll.current.scrollTop = 0;
+      return;
+    }
     const wrappers = layout.pages.map(card => {
       const wrapper = document.createElement('div'); wrapper.className = 'card-wrapper';
       wrapper.style.setProperty('--page-width', card.style.width); wrapper.style.setProperty('--page-height', card.style.height);
@@ -119,7 +127,7 @@ export default function CardPreview({ layout, ready, content, onAddSelection, ac
     });
     preview.current!.replaceChildren(...wrappers);
     clampZoomToAvailableWidth();
-  }, [layout]);
+  }, [layout, ready]);
 
   useLayoutEffect(() => {
     const element = scroll.current;
