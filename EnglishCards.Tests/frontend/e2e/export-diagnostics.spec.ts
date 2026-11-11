@@ -6,7 +6,7 @@ test('export endpoint diagnoses project and line differences', async ({ page, re
   const changed = await request.post('/api/render-page', { data: { ...snapshot, project: { ...snapshot.project, title: 'Changed title' }, page: 1 } });
   expect(changed.status()).toBe(400);
   expect(await changed.text()).toContain('项目数据不同');
-  const row = structuredClone(snapshot); row.signature = 'stale'; row.diagnostics.records[0][5] += 1;
+  const row = { ...structuredClone(snapshot), page: 1 }; row.signature = 'stale'; row.diagnostics.records[0][5] += 1;
   const mismatch = await request.post('/api/render-page', { data: row });
   expect(mismatch.status()).toBe(400);
   const detail = await mismatch.text();
