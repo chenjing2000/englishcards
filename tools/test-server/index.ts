@@ -23,7 +23,7 @@ app.put('/api/settings', async (request, response) => {
   response.json(await settingsStore.save(request.body));
 });
 app.post('/api/render-page', async (request, response) => {
-  if (request.headers.origin && request.headers.origin !== baseURL) { response.status(403).send('只允许本机编辑器发起导出。'); return; }
+  if (request.headers.origin && request.headers.origin !== baseURL) { response.status(403).send('只允许本机编辑器请求页面渲染。'); return; }
   if (busy) { response.status(409).send('正在渲染另一个页面，请稍后重试。'); return; }
   busy = true;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
@@ -36,7 +36,7 @@ app.post('/api/render-page', async (request, response) => {
     try { browser = await chromium.launch(); }
     catch (reason) {
       const message = reason instanceof Error ? reason.message : String(reason);
-      if (/Executable doesn't exist at/i.test(message)) throw new Error('导出用的 Playwright Chromium 未安装或已被移除。请在项目目录运行 npx.cmd playwright install chromium，然后重试；已安装的 Chrome 和 Node.js 不能代替此组件。');
+      if (/Executable doesn't exist at/i.test(message)) throw new Error('页面渲染用的 Playwright Chromium 未安装或已被移除。请在项目目录运行 npx.cmd playwright install chromium，然后重试；已安装的 Chrome 和 Node.js 不能代替此组件。');
       throw reason;
     }
     const page = await browser.newPage({ viewport: { width: 1440, height: 1800 }, deviceScaleFactor: 1 });
@@ -45,8 +45,8 @@ app.post('/api/render-page', async (request, response) => {
     const signature = await page.evaluate(input => window.renderProject(input), project);
     if (signature !== request.body.signature) {
       const diagnostics = await page.evaluate(() => window.renderDiagnostics);
-      const detail = diagnostics ? describeLayoutMismatch(request.body.diagnostics, diagnostics as LayoutDiagnostics) : '导出页面缺少诊断信息，请重新构建、重启服务并刷新页面后重试。';
-      throw new Error(`导出与预览分页不一致：${detail}`);
+      const detail = diagnostics ? describeLayoutMismatch(request.body.diagnostics, diagnostics as LayoutDiagnostics) : '渲染页面缺少诊断信息，请重新构建、重启服务并刷新页面后重试。';
+      throw new Error(`渲染与预览分页不一致：${detail}`);
     }
     const count = await page.locator('.card').count();
     if (requested! > count) throw new Error('页码无效。');
