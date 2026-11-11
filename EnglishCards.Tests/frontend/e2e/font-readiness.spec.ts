@@ -18,6 +18,6 @@ test('cold font loading preserves the first layout with Latin Extended character
   expect(signatures.cardFont).toContain('Microsoft YaHei UI');
   expect(signatures.cardFont).toContain('Microsoft YaHei');
   expect(signatures.cardFont).toContain('DengXian');
-  const exported = await page.request.post('/api/export', { data: { project, signature: signatures.first, diagnostics: signatures.diagnostics, page: 1 } });
+  const exported = await page.request.post('/api/render-page', { data: { project, signature: signatures.first, diagnostics: signatures.diagnostics, page: 1 } });
   expect(exported.ok(), exported.ok() ? '' : await exported.text()).toBe(true);
 });
