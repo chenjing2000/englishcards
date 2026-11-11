@@ -44,7 +44,7 @@ test('shared settings persist independently of articles and determine exact expo
   await page.getByLabel('页面宽度', { exact: true }).fill('400');
   await page.getByLabel('左右边距', { exact: true }).fill('200');
   await expect(page.getByText(/配置无效，未保存/)).toBeVisible();
-  await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toHaveCount(0);
   expect((await (await request.get('/api/settings')).json()).settings.pageWidth).toBe(1000);
   await page.getByRole('button', { name: '默认配置', exact: true }).click();
   await expect.poll(async () => (await (await request.get('/api/settings')).json()).settings).toEqual(defaults);
