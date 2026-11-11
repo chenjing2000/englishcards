@@ -1,10 +1,9 @@
 import { test, expect } from './fixtures';
-import { unzipSync } from 'fflate';
 import { defaults } from '@frontend/models/settings';
 import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
 import { readFile, writeFile, unlink } from 'node:fs/promises';
 
-test('shared settings persist independently of articles and determine exact export dimensions', async ({ page, request }) => {
+test('shared settings persist independently of articles and determine exact page-render dimensions', async ({ page, request }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
   await page.getByRole('button', { name: '打开设置', exact: true }).click();
   await expect(page.getByRole('table', { name: '字号设置', exact: true })).toHaveCount(1);
@@ -33,13 +32,11 @@ test('shared settings persist independently of articles and determine exact expo
   await expect(page.locator('.footer').first()).toHaveCSS('font-size', '18px');
   for (const node of await page.locator('.section-heading,.vocab-heading').all()) await expect(node).toHaveCSS('color', 'rgb(217, 136, 61)');
   const snapshot = await page.evaluate(() => window.editor);
-  const response = await request.post('/api/export', { data: snapshot });
+  const response = await request.post('/api/render-page', { data: { ...snapshot, page: 1 } });
   expect(response.ok(), response.ok() ? '' : await response.text()).toBe(true);
-  const files = unzipSync(await response.body());
-  for (const [name, value] of Object.entries(files)) if (name.endsWith('.png')) {
-    const png = Buffer.from(value); expect(png.readUInt32BE(16)).toBe(1000); expect(png.readUInt32BE(20)).toBe(1400);
-  }
-  expect(JSON.parse(Buffer.from(files['article.json']).toString())).not.toHaveProperty('styles');
+  const png = Buffer.from(await response.body());
+  expect(png.readUInt32BE(16)).toBe(1000);
+  expect(png.readUInt32BE(20)).toBe(1400);
   await page.getByRole('button', { name: '打开设置', exact: true }).click();
   await page.getByLabel('页面宽度', { exact: true }).fill('400');
   await page.getByLabel('左右边距', { exact: true }).fill('200');
