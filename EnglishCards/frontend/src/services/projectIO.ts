@@ -4,7 +4,7 @@ import {
 } from '../models/project';
 import { settingsSchema, defaults, type Styles } from '../models/settings';
 import { ArticleImportCoordinator, type ImportResult } from '../v6/importers';
-import { desktopRequest, isDesktop } from './desktopBridge';
+import { desktopRequest } from './desktopBridge';
 
 const DRAFT = 'article-editor.draft.v6';
 const LEGACY_DRAFT = 'reading-editor.draft.v2';
@@ -16,7 +16,6 @@ type RestoredDraft = {
   notice: string;
   cacheBlocked: boolean;
   rejected?: string;
-  desktopRejected?: boolean;
 };
 
 const readDraft = (text: string) => {
@@ -173,17 +172,12 @@ export async function readProject(file: File): Promise<Project> {
 }
 
 export async function openProject(file?: File): Promise<Project | null> {
-  if (file) return readProject(file);
-  if (!isDesktop()) return null;
-  const selected = await desktopRequest<{ name: string; text: string } | null>('openProject');
-  if (selected === null) return null;
-  return new ArticleImportCoordinator().import(selected).article;
+  return file ? readProject(file) : null;
 }
 
 export function saveProject(project: Project) {
   const contents = JSON.stringify(parseProject(projectDocument(project)), null, 2);
-  if (isDesktop()) return desktopRequest<true | null>('saveProject', contents).then(saved => saved === true ? contents : null);
-  download(new Blob([contents], { type: 'application/json' }), 'article.json');
+    download(new Blob([contents], { type: 'application/json' }), 'article.json');
   return contents;
 }
 
@@ -194,16 +188,6 @@ export function download(data: Blob, filename: string) {
   anchor.download = filename;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
-}
-
-export async function requestExport(project: RenderProject, signature: string, pages: number): Promise<boolean | null> {
-  if (!isDesktop()) throw new Error('ZIP 导出仅在 Windows 桌面版中可用。');
-  return desktopRequest<boolean | null>('exportAllZip', {
-    project,
-    document: projectDocument(project),
-    signature,
-    pages,
-  });
 }
 
 export async function loadSettings() {
