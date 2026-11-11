@@ -13,7 +13,7 @@ test('export endpoint diagnoses project and line differences', async ({ page, re
   expect(detail).toContain('第 1 条'); expect(detail).toContain('行高');
   expect(detail).not.toContain('安装');
   const old = await request.post('/api/render-page', { data: { project: snapshot.project, signature: 'stale', diagnostics: snapshot.diagnostics, page: 1 } });
-  expect(await old.text()).toContain('导出与预览分页不一致');
+  expect(await old.text()).toContain('渲染与预览分页不一致');
 });
 
 for (const scale of [1, 1.25, 1.5, 2]) test(`installed Chrome at ${scale * 100}% device scale exports through bundled Chromium`, async ({ baseURL }) => {
