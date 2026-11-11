@@ -170,7 +170,7 @@ test('Settings keep 560 DIP layout and Clear / Save replace new-card creation', 
   await expect(overwrite).toBeVisible();
   await expect(overwrite.getByText('D:/Saved Cards/New Article.json')).toBeVisible();
   await expect(overwrite.getByText('D:/Saved Cards/New Article.zip')).toHaveCount(0);
-  await overwrite.getByRole('button', { name: '覆盖' }).click();
+  await overwrite.getByRole('button', { name: '覆盖', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).phaseEWorkflowRequests.some(
     (item: NativeMessage) => item.command === 'saveArticlePair'))).toBe(true);
   await expect(page.getByRole('button', { name: 'New Article.json' })).toBeVisible();

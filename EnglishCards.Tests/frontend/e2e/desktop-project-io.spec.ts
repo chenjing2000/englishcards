@@ -59,6 +59,9 @@ test.beforeEach(async ({ page }) => {
             cards[snapshot.path] = JSON.parse(snapshot.text);
           }
         }
+        if (command === 'chooseArticlePairTarget') {
+          value = { path: 'D:/Saved Cards/' + String(payload), folder: 'D:/Saved Cards', existingFiles: [] };
+        }
         if (command === 'saveArticlePair') {
           if (window.phaseEIO.failNextPair) {
             window.phaseEIO.failNextPair = false;
