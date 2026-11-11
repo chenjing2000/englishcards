@@ -97,10 +97,9 @@ test('preview scrolls normally and Ctrl plus wheel alone changes the stored zoom
   await expect(page.locator('.zoom-toolbar')).toHaveCount(0);
   await expect(preview).toHaveCSS('overflow-x', 'hidden');
   const actions = page.getByRole('group', { name: '项目文件操作' });
-  await expect(actions.getByRole('button')).toHaveCount(3);
+  await expect(actions.getByRole('button')).toHaveCount(2);
   await expect(actions.getByRole('button').nth(0)).toHaveAttribute('title', '打开文章');
   await expect(actions.getByRole('button').nth(1)).toHaveAttribute('title', '保存 JSON');
-  await expect(actions.getByRole('button').nth(2)).toHaveAttribute('title', '导出全部 ZIP');
   expect(await page.locator('.card button').count()).toBe(0);
 });
 
@@ -177,7 +176,7 @@ test('desktop target layout places preview on the left at 55%, editor on the rig
   expect(preview && editor && workspace).toBeTruthy();
   expect(preview!.x + preview!.width).toBeLessThan(editor!.x);
   expect(Math.abs(preview!.width / (workspace!.width - 8) - 0.55)).toBeLessThan(0.02);
-  await expect(page.getByRole('button', { name: '导出全部 ZIP' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '导出全部 ZIP' })).toHaveCount(0);
 });
 
 
