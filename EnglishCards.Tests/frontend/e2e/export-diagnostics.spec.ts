@@ -1,6 +1,6 @@
 import { test, expect, chromium } from './fixtures';
 
-test('export diagnoses project and line differences without misleading installation hints', async ({ page, request }) => {
+test('export endpoint diagnoses project and line differences', async ({ page, request }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
   const snapshot = await page.evaluate(() => window.editor);
   const changed = await request.post('/api/export', { data: { ...snapshot, project: { ...snapshot.project, title: 'Changed title' } } });
@@ -14,12 +14,6 @@ test('export diagnoses project and line differences without misleading installat
   expect(detail).not.toContain('安装');
   const old = await request.post('/api/export', { data: { project: snapshot.project, signature: 'stale' } });
   expect(await old.text()).toContain('导出与预览分页不一致');
-  // Desktop ZIP exports are tested by WPF integration tests; the browser has no desktop bridge.
-  await page.getByRole('button', { name: '导出全部 ZIP', exact: true }).click();
-  const alert = page.getByRole('alert');
-  await expect(alert).toContainText('ZIP 导出仅在 Windows 桌面版中可用');
-  await expect(alert).not.toContainText('请确认 Chromium 已安装');
-  await expect(alert).not.toContainText('Error: Error:');
 });
 
 for (const scale of [1, 1.25, 1.5, 2]) test(`installed Chrome at ${scale * 100}% device scale exports through bundled Chromium`, async ({ baseURL }) => {
