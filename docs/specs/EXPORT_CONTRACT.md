@@ -4,7 +4,7 @@
 
 This document specifies ZIP generation, rendering, validation and safe file handling only. It does **not** define a standalone user-facing export action.
 
-The user-facing operation is **Save JSON + ZIP**, which creates a same-basename JSON/ZIP pair from one immutable Article v6 snapshot. See [COMBINED_ARTICLE_SAVE.md](COMBINED_ARTICLE_SAVE.md) for folder selection, overwrite confirmation, paired commit, clear behavior and Card Library path updates.
+The Windows desktop user-facing operation is **Save JSON + ZIP**, which creates a same-basename JSON/ZIP pair from one immutable Article v6 snapshot. The browser editor saves Article JSON only and does not provide ZIP export. Its local test server exposes a test-only single-page PNG rendering endpoint; that endpoint does not create ZIP archives or package Article JSON. See [COMBINED_ARTICLE_SAVE.md](COMBINED_ARTICLE_SAVE.md) for folder selection, overwrite confirmation, paired commit, clear behavior and Card Library path updates.
 
 ## Archive format
 
