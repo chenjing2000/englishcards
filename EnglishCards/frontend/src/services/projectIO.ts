@@ -177,7 +177,7 @@ export async function openProject(file?: File): Promise<Project | null> {
 
 export function saveProject(project: Project) {
   const contents = JSON.stringify(parseProject(projectDocument(project)), null, 2);
-    download(new Blob([contents], { type: 'application/json' }), 'article.json');
+  download(new Blob([contents], { type: 'application/json' }), 'article.json');
   return contents;
 }
 
