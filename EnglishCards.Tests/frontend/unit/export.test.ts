@@ -49,7 +49,7 @@ it('reports cleanup failures and releases the page-render slot for the next requ
   const next = response();
   await renderPage(request, next as unknown as Response);
   expect(next.statusCode).toBe(400);
-  expect(next.body).toContain('导出与预览分页不一致');
+  expect(next.body).toContain('渲染与预览分页不一致');
 });
 
 it('does not send a successful PNG when browser cleanup fails', async () => {
