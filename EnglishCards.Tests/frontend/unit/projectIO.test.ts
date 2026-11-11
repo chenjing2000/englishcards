@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import fixture from '@fixtures/projects/brainco/project.json';
-import { createEmptyArticle, parseRenderProject } from '@frontend/models/project';
+import { createEmptyArticle } from '@frontend/models/project';
 import { loadDesktopData, restoreDraft } from '@frontend/services/projectIO';
 import { defaults } from '@frontend/models/settings';
 
