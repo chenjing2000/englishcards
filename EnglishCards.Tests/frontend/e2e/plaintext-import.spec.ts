@@ -11,6 +11,7 @@ test('plain-text import uses the filename as title and splits natural paragraphs
   await expect(page.locator('[data-ready="true"]')).toBeVisible();
   await expect(page.getByLabel('英文标题', { exact: true })).toHaveValue('The Big Era');
   await expect(page.getByLabel('IdentityTag', { exact: true })).toHaveValue('');
+  await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toHaveCount(0);
   await expect(page.getByLabel('英文正文', { exact: true })).toHaveValue('The first line continues on this line.\n\nThe second paragraph.\n\nThe third paragraph.');
   const snapshot = await page.evaluate(() => window.editor.project);
   expect(snapshot.schemaVersion).toBe(6);
