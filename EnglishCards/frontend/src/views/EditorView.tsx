@@ -154,7 +154,7 @@ export default function EditorView() {
       </div>
     </aside>} left={<CardPreview layout={vm.desktop && vm.emptyArticle ? undefined : layout}
       ready={ready && (!vm.desktop || !vm.emptyArticle)} content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection}
-      actions={vm.desktop ? null : <ProjectActions open={vm.open} save={vm.save} exportImages={vm.exportImages} ready={ready} exporting={exporting} />}
+      actions={vm.desktop ? null : <ProjectActions open={vm.open} save={vm.save} />}
       notices={vm.desktop ? <PreviewNotices errors={vm.errors} warning={warning} closeError={vm.clearError} /> : null} />} />
     </div>
     {vm.desktop && clearOpen && <div className="phase-e-modal-backdrop" role="presentation">
