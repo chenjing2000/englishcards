@@ -337,6 +337,7 @@ if ((prettyBytes.Length >= 3 && prettyBytes[0] == 0xEF && prettyBytes[1] == 0xBB
     throw new Exception("Exported article JSON must use readable two-space indentation without changing its data.");
 Console.WriteLine("PASS exported article JSON is pretty-printed UTF-8 without BOM and preserves its data");
 
+var exportType = bridgeType.Assembly.GetType("EnglishCards.ZipExportService", throwOnError: true)!;
 var validateArchive = exportType.GetMethod("ValidateArchiveAsync", BindingFlags.Static | BindingFlags.NonPublic)!;
 Task ValidateArchive(string path, int pages, int width, int height) =>
     (Task)validateArchive.Invoke(null, [path, pages, width, height, CancellationToken.None])!;
