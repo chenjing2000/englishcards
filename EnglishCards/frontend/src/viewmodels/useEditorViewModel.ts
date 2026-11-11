@@ -21,7 +21,7 @@ const stringify = (project: Project) => JSON.stringify(projectDocument(project),
 
 export function useEditorViewModel() {
   const desktop = isDesktop();
-  const [boot, setBoot] = useState(desktop
+  const [boot, setBoot] = useState<ReturnType<typeof restoreDraft>>(desktop
     ? () => ({ project: createEmptyArticle(), notice: '', cacheBlocked: false })
     : restoreDraft);
   const [project, setProject] = useState<RenderProject>({ ...boot.project, styles: { ...defaults } });
