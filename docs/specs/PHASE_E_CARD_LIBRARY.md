@@ -62,6 +62,24 @@ D. Integrate ZIP export and close flows, regression tests, owner Windows accepta
 
 Each phase must pass relevant unit/E2E/.NET tests and, where applicable, real Windows/WPF/WebView2 acceptance. Do not claim local Windows validation when unavailable.
 
+## Follow-up UI and export refinements (2026-11-10)
+
+- Design Settings modal width is 640 DIP, split into two equal columns with a vertical divider: font settings on the left and all remaining settings on the right. Preserve the existing setting fields, defaults and persistence behavior.
+- New Card modal has an editable absolute folder path defaulting to the executable-adjacent `userdata/` directory, plus a folder-picker button. The user may type any existing writable directory or choose one. The card name is a separate input; do not display filename-generation or save-directory hint text. The Create and Cancel actions are right-aligned.
+- The New Card folder picker and Card Library chooser are owned by the main window and use owner-relative placement. New-card creation remains exclusive and never overwrites an existing JSON file.
+- ZIP export uses the active card's JSON path. The destination is the same directory and basename with a `.zip` extension. Do not show a Save As dialog. Existing ZIP files are replaced only after the staged archive has been completely written and validated. Keep the existing progress/cancel lifecycle and ZIP contents.
+
 ## 5. Explicit non-goals
 
 No database, autosync, automatic file renames/deletions, FileSystemWatcher, alternative document schema, undo/redo, complex compatibility logic, or new export format.
+
+
+## Final UI, path-memory and native-dialog refinements (2026-11-11)
+
+- Settings modal width is **560 DIP**. Keep the two settings tables side by side with a **20 DIP gap**, remove the vertical divider, and center each table heading over its own table.
+- New Card modal defaults to **560 DIP** width with a 400 DIP minimum and 600 DIP maximum. The modal is not user-resizable. It uses exactly two rows: Folder label + single-line folder path input + folder-picker icon; Card Name label + single-line name input + Create icon. Keep 20 DIP vertical spacing between rows. The title bar has a close icon; there are no footer Create/Cancel buttons.
+- Inputs use standard single-line text controls. They do not wrap and show no horizontal scrollbar. Long values may be clipped while unfocused; when focused, native HTML caret-following behavior remains available. Disable browser autofill and saved-entry suggestion UI in WebView2 and on the form inputs.
+- Remember the new-card destination only after a card has been successfully created. A typed or selected folder that is later cancelled or fails to create a card must not update the preference. On first use, fall back to the executable-adjacent userdata directory. Persist across application restarts.
+- Remember the Card Library root independently. Its preference is saved only after the selected directory has been successfully listed/opened. The next library picker starts at that last successful root. If the remembered directory is unavailable, fall back to userdata.
+- Both native folder pickers remain Windows shell dialogs, are owned by the WPF main window, and are explicitly centered over that owner. Positioning must clamp to the current monitor work area and use native HWND coordinates so mixed-DPI monitor layouts are handled without manually mixing DIP and pixel values.
+- ZIP export behavior is unchanged: export beside the active JSON using the same basename, replacing an existing ZIP only after the staged archive is validated.

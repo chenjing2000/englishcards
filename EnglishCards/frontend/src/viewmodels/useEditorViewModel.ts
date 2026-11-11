@@ -14,7 +14,7 @@ import {
 } from '../services/projectIO';
 import { desktopRequest, isDesktop } from '../services/desktopBridge';
 import { CardSaveCoordinator, type CardSaveStatus } from '../services/cardSaveCoordinator';
-import { cardFileName, createCardFile, createCardSaveCoordinator, defaultCardLibrary, listCardDirectory, openCardFile, serializedCard } from '../services/cardFileIO';
+import { cardFileName, createCardFile, createCardSaveCoordinator, defaultCardLibrary, lastCardLibrary, listCardDirectory, openCardFile, serializedCard } from '../services/cardFileIO';
 
 type ParagraphCollection = 'content' | 'translation';
 const stringify = (project: Project) => JSON.stringify(projectDocument(project), null, 2);
@@ -77,27 +77,25 @@ export function useEditorViewModel() {
   const cardTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [cardSaveStatus, setCardSaveStatus] = useState<CardSaveStatus>('clean');
   const [activeCardPath, setActiveCardPath] = useState<string | null>(null);
-  const [libraryRoot, setLibraryRoot] = useState(() =>
-    desktop ? localStorage.getItem('englishcards.library.root') ?? '' : '');
+  const [libraryRoot, setLibraryRoot] = useState('');
   const [libraryRevision, setLibraryRevision] = useState(0);
   const libraryRootWasChanged = useRef(false);
   useEffect(() => {
     if (!desktop) return;
     let cancelled = false;
-    const initial = libraryRoot;
     void (async () => {
       try {
-        if (initial) {
-          await listCardDirectory(initial);
+        const remembered = await lastCardLibrary();
+        if (typeof remembered === 'string' && remembered) {
+          await listCardDirectory(remembered);
+          if (!cancelled && !libraryRootWasChanged.current) setLibraryRoot(remembered);
           return;
         }
-      } catch { /* Previous folder is unavailable: reset to userdata. */ }
+      } catch { /* The remembered library is unavailable: fall back to userdata. */ }
       try {
         const fallback = await defaultCardLibrary();
-        if (!cancelled && !libraryRootWasChanged.current && typeof fallback === 'string' && fallback) {
-          setLibraryRoot(current => current === initial ? fallback : current);
-          localStorage.setItem('englishcards.library.root', fallback);
-        }
+        if (!cancelled && !libraryRootWasChanged.current && typeof fallback === 'string' && fallback)
+          setLibraryRoot(fallback);
       } catch { /* No directory can be selected until the bridge becomes available. */ }
     })();
     return () => { cancelled = true; };
@@ -109,7 +107,6 @@ export function useEditorViewModel() {
     setLibraryRoot(path);
     // Re-selecting the same root refreshes its direct children without a Refresh button.
     setLibraryRevision(value => value + 1);
-    if (desktop) localStorage.setItem('englishcards.library.root', path);
   }
   const latest = useRef({ project, opening });
   useLayoutEffect(() => { latest.current = { project, opening }; }, [project, opening]);
@@ -389,7 +386,9 @@ export function useEditorViewModel() {
       setLibraryRevision(value => value + 1);
       reportError('card-open', '');
       reportError('card-create', '');
-      showWarning(`已创建卡片：${cardFileName(title)}`);
+      showWarning(created.folderPreferenceSaved === false
+        ? `已创建卡片：${cardFileName(title)}，但无法保存最近使用的文件夹。`
+        : `已创建卡片：${cardFileName(title)}`);
       return true;
     } catch (reason) {
       reportError('card-create', `新建卡片失败：${String(reason)}`);

@@ -20,7 +20,6 @@ test.beforeEach(async ({ page }) => {
       'C:/cards/A.json': { ...initial, title: 'Card A' },
     };
     window.phaseEIO = { requests: [], failNextSave: false, corruptNextOpen: false, failDirectoryRead: false };
-    localStorage.setItem('englishcards.library.root', 'C:/cards');
     const respond = (id: number, value: unknown, error?: string) =>
       events.dispatchEvent(new MessageEvent('message', {
         data: error ? { id, ok: false, error } : { id, ok: true, value },
@@ -32,6 +31,9 @@ test.beforeEach(async ({ page }) => {
         let value: unknown = true;
         let error: string | undefined;
         if (command === 'loadSettings') value = null;
+        if (command === 'defaultCardLibrary' || command === 'lastCardLibrary' || command === 'lastNewCardFolder')
+          value = 'C:/cards';
+        if (command === 'saveLastCardLibrary') value = true;
         if (command === 'listCardDirectory') value = {
           path: payload,
           folders: payload === 'C:/cards' ? [{ path: 'C:/cards/Subfolder', name: 'Subfolder' }] : [],
@@ -58,7 +60,7 @@ test.beforeEach(async ({ page }) => {
         }
         if (command === 'createCardFile') {
           const contents = (payload as { text: string }).text;
-          const path = 'C:/cards/' + (payload as { fileName: string }).fileName;
+          const path = (payload as { directory: string }).directory + '/' + (payload as { fileName: string }).fileName;
           if (Object.hasOwn(cards, path)) error = '同名卡片已存在，请更换标题或文件名。';
           else {
             cards[path] = JSON.parse(contents);
@@ -108,7 +110,7 @@ test('right editor title and Transcript Studio-style circular icons share one ro
   const buttons = heading.locator('.phase-e-actions button');
   await expect(title).toBeVisible();
   await expect(buttons).toHaveCount(3);
-  await expect(buttons.nth(0)).toHaveAttribute('aria-label', '设计');
+  await expect(buttons.nth(0)).toHaveAttribute('aria-label', '设置');
   await expect(buttons.nth(1)).toHaveAttribute('aria-label', '新建卡片');
   await expect(buttons.nth(2)).toHaveAttribute('aria-label', '导出 ZIP');
   await expect(buttons.nth(0)).toHaveCSS('border-radius', '50%');
@@ -168,9 +170,10 @@ test('independent desktop errors stack upwards and each close clears only its so
 test('Phase E new card creates JSON before activating the editor', async ({ page }) => {
   await page.getByRole('button', { name: '新建卡片' }).click();
   await expect(page.getByRole('dialog', { name: '新建卡片' })).toBeVisible();
-  await page.getByLabel('英文标题', { exact: true }).fill('My New Card');
-  await expect(page.getByText('默认文件名：My New Card.json')).toBeVisible();
-  await page.getByRole('button', { name: '创建卡片' }).click();
+  await page.getByLabel('卡片名', { exact: true }).fill('My New Card');
+  await expect(page.getByLabel('文件夹', { exact: true })).toHaveValue('C:/cards');
+  await expect(page.getByText('默认文件名：My New Card.json')).toHaveCount(0);
+  await page.getByRole('button', { name: '创建', exact: true }).click();
   await expect(page.getByLabel('英文标题', { exact: true })).toHaveValue('My New Card');
   const requests = await page.evaluate(() => window.phaseEIO.requests);
   const create = requests.find(item => item.command === 'createCardFile');
@@ -189,8 +192,8 @@ test('new-card duplicate errors use one visible preview toast while modal keeps 
   await page.getByRole('button', { name: '新建卡片' }).click();
   const dialog = page.getByRole('dialog', { name: '新建卡片' });
   await expect(dialog).toBeVisible();
-  await page.getByLabel('英文标题', { exact: true }).fill('A');
-  await page.getByRole('button', { name: '创建卡片' }).click();
+  await page.getByLabel('卡片名', { exact: true }).fill('A');
+  await page.getByRole('button', { name: '创建', exact: true }).click();
 
   const duplicate = notices.locator('.phase-e-notice-error');
   await expect(notices).toHaveCSS('width', '360px');
@@ -199,7 +202,7 @@ test('new-card duplicate errors use one visible preview toast while modal keeps 
   await expect(duplicate).toContainText('同名卡片已存在');
   await expect(dialog.getByText('同名卡片已存在')).toHaveCount(0);
   await expect(dialog).toBeVisible();
-  await expect(page.getByLabel('英文标题', { exact: true })).toHaveValue('A');
+  await expect(page.getByLabel('卡片名', { exact: true })).toHaveValue('A');
 
   // The toast must be above the modal backdrop and remain in the preview pane.
   const toast = await duplicate.boundingBox();
@@ -213,22 +216,26 @@ test('new-card duplicate errors use one visible preview toast while modal keeps 
   })).toBe(true);
 
   // Repeating the same failure should not multiply the persistent error.
-  await page.getByRole('button', { name: '创建卡片' }).click();
+  await page.getByRole('button', { name: '创建', exact: true }).click();
   await expect(duplicate).toHaveCount(1);
-  await page.getByLabel('英文标题', { exact: true }).fill('Another Card');
-  await page.getByRole('button', { name: '创建卡片' }).click();
+  await page.getByLabel('卡片名', { exact: true }).fill('Another Card');
+  await page.getByRole('button', { name: '创建', exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(duplicate).toHaveCount(0);
   await expect(notices.locator('.phase-e-notice-normal')).toContainText('已创建卡片');
 });
 
-test('settings modal has compact 320 DIP default width', async ({ page }) => {
-  await page.getByRole('button', { name: '设计' }).click();
-  const dialog = page.getByRole('dialog', { name: '设计设置' });
+test('settings modal has 560 DIP two-column layout without a divider', async ({ page }) => {
+  await page.getByRole('button', { name: '设置' }).click();
+  const dialog = page.getByRole('dialog', { name: '设置' });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toHaveCSS('width', '320px');
-  await expect(dialog).toHaveCSS('min-width', '280px');
-  await expect(dialog).toHaveCSS('max-width', '360px');
+  await expect(dialog).toHaveCSS('width', '560px');
+  await expect(dialog).toHaveCSS('max-width', '560px');
+  await expect(dialog.locator('.settings-columns > .settings-column')).toHaveCount(2);
+  await expect(dialog.locator('.settings-columns')).toHaveCSS('column-gap', '20px');
+  await expect(dialog.locator('.settings-column').nth(1)).toHaveCSS('border-left-style', 'none');
+  await expect(dialog.getByRole('heading', { name: '字号设置' })).toHaveCSS('text-align', 'center');
+  await expect(dialog.getByRole('heading', { name: '其余设置' })).toHaveCSS('text-align', 'center');
   await expect(dialog.locator('.settings-table').first().locator('input').first()).toBeVisible();
   await dialog.getByRole('button', { name: '关闭设置' }).click();
   await expect(dialog).toHaveCount(0);
