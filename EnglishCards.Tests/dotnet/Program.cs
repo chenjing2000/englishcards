@@ -614,7 +614,7 @@ try
     await File.WriteAllTextAsync(stagedZip, "new ZIP");
     bool permissionRejected = false;
     try { await CommitPair(stagedJson, stagedZip, json, zip, false); }
-    catch (TargetInvocationException error) when (error.InnerException is IOException) { permissionRejected = true; }
+    catch (IOException) { permissionRejected = true; }
     if (!permissionRejected || File.ReadAllText(json) != "old JSON" || File.ReadAllText(zip) != "old ZIP")
         throw new Exception("Paired save must not overwrite any file without approval.");
 
@@ -624,7 +624,7 @@ try
     using (var locked = File.Open(zip, FileMode.Open, FileAccess.Read, FileShare.Read))
     {
         try { await CommitPair(stagedJson, stagedZip, json, zip, true); }
-        catch (TargetInvocationException error) when (error.InnerException is IOException or UnauthorizedAccessException)
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
         { rolledBack = true; }
     }
     if (!rolledBack || File.ReadAllText(json) != "old JSON" || File.ReadAllText(zip) != "old ZIP")
