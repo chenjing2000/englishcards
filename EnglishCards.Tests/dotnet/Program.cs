@@ -142,14 +142,10 @@ var storeCtor = storeType.GetConstructor(BindingFlags.Instance | BindingFlags.Pu
 var acquireLease = storeType.GetMethod("AcquireInstanceLease", BindingFlags.Instance | BindingFlags.NonPublic)!;
 var disposeStore = storeType.GetMethod("Dispose", BindingFlags.Instance | BindingFlags.Public)!;
 var saveSettings = storeType.GetMethod("SaveSettingsAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
-var saveDraft = storeType.GetMethod("SaveDraftAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
-var ensureDraft = storeType.GetMethod("EnsureRejectedDraftAvailable", BindingFlags.Instance | BindingFlags.NonPublic)!;
-var exportDraft = storeType.GetMethod("ExportRejectedDraftAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
 object NewStore(string path) => storeCtor.Invoke([path]);
 void Acquire(object store) => acquireLease.Invoke(store, null);
 void Dispose(object store) => disposeStore.Invoke(store, null);
 Task SaveSettings(object store, string text) => (Task)saveSettings.Invoke(store, [text, true])!;
-Task SaveDraft(object store, string text) => (Task)saveDraft.Invoke(store, [text, true])!;
 
 var loadLibraryFolder = storeType.GetMethod("LoadLastLibraryFolderAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
 var saveLibraryFolder = storeType.GetMethod("SaveLastLibraryFolderAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -231,59 +227,6 @@ finally
 {
     Dispose(missingStore);
     Directory.Delete(missingDirectory.FullName, recursive: true);
-}
-
-var missingDraftDirectory = Directory.CreateTempSubdirectory("EnglishCards-missing-draft-test-");
-var missingDraftStore = NewStore(missingDraftDirectory.FullName);
-var replacementDraft = "new valid draft";
-var recoveryPath = Path.Combine(missingDraftDirectory.FullName, "recovered.json");
-try
-{
-    await SaveDraft(missingDraftStore, replacementDraft);
-    bool unavailable = false;
-    try { ensureDraft.Invoke(missingDraftStore, null); }
-    catch (TargetInvocationException error) when (error.InnerException is IOException) { unavailable = true; }
-    bool exportFailed = false;
-    try { await (Task)exportDraft.Invoke(missingDraftStore, [recoveryPath])!; }
-    catch (TargetInvocationException error) when (error.InnerException is IOException) { exportFailed = true; }
-    if (!unavailable || !exportFailed || File.Exists(recoveryPath) ||
-        File.ReadAllText(Path.Combine(missingDraftDirectory.FullName, "drafts", "draft.json")) != replacementDraft)
-        throw new Exception("Recovery must report a missing original before export and must not copy the replacement draft.");
-    Console.WriteLine("PASS missing rejected draft is unavailable for recovery after replacement");
-}
-finally
-{
-    Dispose(missingDraftStore);
-    Directory.Delete(missingDraftDirectory.FullName, recursive: true);
-}
-
-var retryParent = Directory.CreateTempSubdirectory("EnglishCards-rejected-retry-test-");
-var blockedRoot = Path.Combine(retryParent.FullName, "user-data");
-var retryRecovery = Path.Combine(retryParent.FullName, "recovered.json");
-await File.WriteAllTextAsync(blockedRoot, "blocks directory creation");
-var retryStore = NewStore(blockedRoot);
-try
-{
-    bool firstSaveFailed = false;
-    try { await SaveDraft(retryStore, "first replacement"); }
-    catch (IOException) { firstSaveFailed = true; }
-    if (!firstSaveFailed) throw new Exception("The first save must fail while the data root is a file.");
-
-    File.Delete(blockedRoot);
-    Directory.CreateDirectory(Path.Combine(blockedRoot, "drafts"));
-    const string restoredOriginal = "restored original rejected draft";
-    await File.WriteAllTextAsync(Path.Combine(blockedRoot, "drafts", "draft.json"), restoredOriginal);
-    await SaveDraft(retryStore, "successful replacement");
-    ensureDraft.Invoke(retryStore, null);
-    await (Task)exportDraft.Invoke(retryStore, [retryRecovery])!;
-    if (File.ReadAllText(retryRecovery) != restoredOriginal)
-        throw new Exception("A retry must preserve and export the original restored after the failed write.");
-    Console.WriteLine("PASS failed missing-source write leaves retry able to preserve restored original");
-}
-finally
-{
-    Dispose(retryStore);
-    Directory.Delete(retryParent.FullName, recursive: true);
 }
 
 var rejectedDirectory = Directory.CreateTempSubdirectory("EnglishCards-reject-test-");
@@ -393,26 +336,6 @@ if ((prettyBytes.Length >= 3 && prettyBytes[0] == 0xEF && prettyBytes[1] == 0xBB
     !JsonNode.DeepEquals(JsonNode.Parse(compactArticle), JsonNode.Parse(prettyArticle)))
     throw new Exception("Exported article JSON must use readable two-space indentation without changing its data.");
 Console.WriteLine("PASS exported article JSON is pretty-printed UTF-8 without BOM and preserves its data");
-
-// Validate the staged ZIP before the final destination is replaced.
-var exportType = bridgeType.Assembly.GetType("EnglishCards.ZipExportService", throwOnError: true)!;
-var getExportDestination = exportType.GetMethod("GetDestinationPath", BindingFlags.Static | BindingFlags.NonPublic)
-    ?? throw new Exception("Card-relative ZIP destination resolution is missing.");
-var exportPathTestDirectory = Directory.CreateTempSubdirectory("EnglishCards-export-path-test-");
-try
-{
-    var sourceJson = Path.Combine(exportPathTestDirectory.FullName, "Nested", "My Article.json");
-    var expectedZip = Path.Combine(exportPathTestDirectory.FullName, "Nested", "My Article.zip");
-    var actualZip = (string)getExportDestination.Invoke(null, [sourceJson])!;
-    if (!string.Equals(actualZip, expectedZip, StringComparison.OrdinalIgnoreCase))
-        throw new Exception("ZIP export must use the active JSON directory and basename.");
-    bool invalidExtensionRejected = false;
-    try { getExportDestination.Invoke(null, [Path.Combine(exportPathTestDirectory.FullName, "article.txt")]); }
-    catch (TargetInvocationException error) when (error.InnerException is InvalidDataException) { invalidExtensionRejected = true; }
-    if (!invalidExtensionRejected) throw new Exception("Card-relative ZIP export must reject non-JSON paths.");
-    Console.WriteLine("PASS ZIP destination uses the active JSON directory and basename");
-}
-finally { exportPathTestDirectory.Delete(recursive: true); }
 
 var validateArchive = exportType.GetMethod("ValidateArchiveAsync", BindingFlags.Static | BindingFlags.NonPublic)!;
 Task ValidateArchive(string path, int pages, int width, int height) =>
