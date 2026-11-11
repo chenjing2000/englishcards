@@ -9,7 +9,7 @@ import {
 import { paginate, type Layout } from '../services/pagination';
 import {
   cacheDraft, download, loadDesktopData, loadSettings, saveSettings,
-  openProject, saveProject, requestExport, restoreDraft,
+  openProject, saveProject, restoreDraft,
   type DesktopPersistence, type DesktopSaveResult,
 } from '../services/projectIO';
 import { desktopRequest, isDesktop } from '../services/desktopBridge';
@@ -472,7 +472,7 @@ export function useEditorViewModel() {
       showWarning('请通过卡片馆选择 JSON 文件；当前卡片不允许通过旧导入入口切换。');
       return;
     }
-    if (!file && !isDesktop()) return;
+    if (!file) return;
     const request = ++openRequest.current;
     setOpening(true);
     try {
@@ -505,20 +505,6 @@ export function useEditorViewModel() {
     } catch (reason) {
       if (previousOpen === openedFile.current) reportError('save', `文章保存失败：${String(reason)}`);
     } finally { saving.current = false; }
-  }
-
-  async function exportImages() {
-    if (!ready || exporting) return;
-    if (cardSession.current && (invalidCardSnapshot.current ||
-        Object.keys(wordDraftsRef.current).length > 0 || !(await flushCardSave(cardSession.current)))) return;
-    setExporting(true);
-    try {
-      const outcome = await requestExport(project, rendered!.layout.signature, rendered!.layout.pages.length);
-      if (outcome === false) showWarning('导出已取消。');
-      reportError('export', '');
-    } catch (reason) {
-      reportError('export', `导出失败：${reason instanceof Error ? reason.message : String(reason)}`);
-    } finally { setExporting(false); }
   }
 
   function setProjectText(key: 'title' | 'identityTag', value: string) {
@@ -715,23 +701,16 @@ export function useEditorViewModel() {
     const target = source ?? Object.keys(errors)[0];
     if (target) reportError(target, '');
   }
-  async function downloadRejectedDraft() {
-    if (boot.desktopRejected) {
-      try {
-        await desktopRequest('saveRejectedDraft');
-        reportError('draft-recovery', '');
-      } catch (reason) { reportError('draft-recovery', `原始草稿另存失败：${String(reason)}`); }
-    } else if (boot.rejected) {
-      download(new Blob([boot.rejected], { type: 'text/plain' }), 'rejected-draft.txt');
-    }
+  function downloadRejectedDraft() {
+    if (boot.rejected) download(new Blob([boot.rejected], { type: 'text/plain' }), 'rejected-draft.txt');
   }
 
   return {
     project, warning, error, errors, settingsReady, ready, exporting, opening, desktop, closing,
-    layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
+    layout: rendered?.layout, rejectedDraft: boot.rejected,
     open, openCardPath, retryCardSave, cardSaveStatus, activeCardPath,
     clearArticle, savePair, needsClearConfirmation, emptyArticle,
-    libraryRoot, libraryRevision, changeLibraryRoot, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
+    libraryRoot, libraryRevision, changeLibraryRoot, save, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
     highlightRange, addVocabularyFromSelection, commitHead, setWordPreview, setEntryHighlights, setSenseField, setVocabularyMeaning,
     addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,
     selectedVocabulary, selectedVocabularyIndex, selectVocabulary, moveSelectedVocabulary,
