@@ -5,7 +5,7 @@ import fixture from '@fixtures/projects/brainco/project.json';
 const { launch, post } = vi.hoisted(() => ({ launch: vi.fn(), post: vi.fn() }));
 vi.mock('@playwright/test', () => ({ chromium: { launch } }));
 vi.mock('@test-server/settingsStore', () => ({ SettingsStore: class { async load() { return { settings: {} }; } } }));
-// Capture the real export handler without starting a listening server or Vite.
+// Capture the real page-render handler without starting a listening server or Vite.
 vi.mock('express', () => {
   const app = { post, use() {}, get() {}, put() {}, listen() {} };
   return { default: Object.assign(() => app, { json() {}, static() {} }) };
