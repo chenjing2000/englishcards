@@ -35,7 +35,8 @@ internal sealed class UserDataStore(string root)
     {
         try
         {
-                Path.Combine(root, "logs"), Path.GetDirectoryName(ProfilePath)! })
+            foreach (var path in new[] { root, Path.GetDirectoryName(SettingsPath)!,
+                ExportsPath, TempPath, Path.Combine(root, "logs"), Path.GetDirectoryName(ProfilePath)! })
                 Directory.CreateDirectory(path);
             var probe = Path.Combine(root, $".write-test-{Guid.NewGuid():N}");
             using (File.Create(probe)) { }
