@@ -92,19 +92,18 @@ test('preview selection plus adds vocabulary while ordinary preview clicks never
   await expect(translation).not.toBeFocused();
 });
 
-test('failed import cannot re-enable export after pagination fails', async ({ page }) => {
+test('failed import preserves the current article after pagination fails', async ({ page }) => {
   await page.goto('/'); await ready(page);
   await page.evaluate(() => { crypto.subtle.digest = async () => { throw new Error('Simulated layout failure'); }; });
   await page.getByLabel('英文标题', { exact: true }).fill('A changed article');
   await expect(page.getByRole('alert')).toContainText('分页失败');
-  const exportButton = page.getByRole('button', { name: '导出全部 ZIP', exact: true });
-  await expect(exportButton).toBeDisabled();
+  await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toHaveCount(0);
   await page.getByLabel('导入 Article JSON 或 TXT').setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from('{') });
   await expect(page.getByRole('alert')).toContainText('分页失败');
   await page.getByLabel('信息提示栏').getByRole('button', { name: '关闭', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('无法打开文章');
   await expect(page.getByLabel('英文标题', { exact: true })).toHaveValue('A changed article');
-  await expect(exportButton).toBeDisabled();
+  await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toHaveCount(0);
 });
 
 test('long content and translation paginate without gaps; vocabulary is a single column', async ({ page }) => {
