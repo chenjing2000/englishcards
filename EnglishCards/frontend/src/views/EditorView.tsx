@@ -11,17 +11,16 @@ import SplitPane from './SplitPane';
 import AutoSizeTextarea from './AutoSizeTextarea';
 import ContinuousParagraphEditor from './ContinuousParagraphEditor';
 import SettingInput from './SettingInput';
-import { chooseCardFolder, lastNewCardFolder } from '../services/cardFileIO';
 
 /**
  * Match Transcript Studio's native React toolbar drawing:
  * 24-unit viewBox, 20-DIP vector, 1.8-DIP round line strokes.
  */
-function ToolbarIcon({ name }: { name: 'design' | 'new-card' | 'export-zip' }) {
+function ToolbarIcon({ name }: { name: 'design' | 'clear' | 'save' }) {
   const paths = {
     design: <><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="#fff"/><circle cx="16" cy="12" r="2" fill="#fff"/><circle cx="10" cy="18" r="2" fill="#fff"/></>,
-    'new-card': <><path d="M5 3h9l5 5v13H5z"/><path d="M14 3v5h5"/><path d="M12 12v7M8.5 15.5h7"/></>,
-    'export-zip': <><path d="M12 20V7m-4 4 4-4 4 4"/><path d="M4 15v5h16v-5"/></>,
+    clear: <><path d="m4 16 10-11 7 7-8 9H7z"/><path d="M13 21h8"/></>,
+    save: <><path d="M4 4h14l3 3v13H4z"/><path d="M8 4v7h9V4"/><path d="M8 20v-7h9v7"/></>,
   };
   return <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
     stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
@@ -32,10 +31,8 @@ export default function EditorView() {
   const vm = useEditorViewModel();
   const { project, warning, error, settingsReady, ready, exporting, layout, rejectedDraft } = vm;
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [newCardOpen, setNewCardOpen] = useState(false);
-  const [newCardTitle, setNewCardTitle] = useState('');
-  const [newCardFolder, setNewCardFolder] = useState('');
-  const [creatingCard, setCreatingCard] = useState(false);
+  const [clearOpen, setClearOpen] = useState(false);
+  const [clearBusy, setClearBusy] = useState(false);
 
   const inputs = useRef(new Map<string, HTMLInputElement | HTMLTextAreaElement>());
   function registerInput(id: string, input: HTMLInputElement | HTMLTextAreaElement | null) {
@@ -85,19 +82,14 @@ export default function EditorView() {
   const cardActions = <div className="phase-e-actions" role="group" aria-label="卡片操作">
     <button type="button" aria-label={settingsOpen ? '关闭设置' : '设置'} title="设置"
       onClick={() => setSettingsOpen(value => !value)}><ToolbarIcon name="design" /></button>
-    <button type="button" aria-label="新建卡片" title="新建卡片"
-      disabled={!vm.libraryRoot || vm.opening} onClick={() => {
-        setNewCardTitle('');
-        void lastNewCardFolder().then(setNewCardFolder).catch(reason =>
-          vm.reportError('card-folder', `无法读取上次成功使用的目录：${String(reason)}`));
-        setNewCardOpen(true);
-      }}>
-      <ToolbarIcon name="new-card" />
-    </button>
-    <button type="button" aria-label="导出 ZIP" title="导出 ZIP"
-      disabled={!ready || exporting || !vm.activeCardPath || vm.cardSaveStatus !== 'clean'}
-      onClick={() => { void vm.exportImages(); }}><ToolbarIcon name="export-zip" />
-    </button>
+    <button type="button" aria-label="清空" title="清空"
+      disabled={vm.opening || exporting || clearBusy} onClick={() => {
+        if (vm.needsClearConfirmation) setClearOpen(true);
+        else void vm.clearArticle();
+      }}><ToolbarIcon name="clear" /></button>
+    <button type="button" aria-label="保存" title="保存 JSON 与 ZIP"
+      disabled={!ready || exporting || vm.opening || clearBusy}
+      onClick={() => { void vm.savePair(); }}><ToolbarIcon name="save" /></button>
   </div>;
 
   return <div className="app-shell" inert={vm.desktop && (!settingsReady || vm.closing)}>
@@ -114,9 +106,7 @@ export default function EditorView() {
         {vm.desktop && cardActions}
       </div>
       {rejectedDraft && <div className="draft-recovery"><button type="button" onClick={vm.downloadRejectedDraft}>下载原始草稿</button></div>}
-      {vm.desktop && !vm.activeCardPath
-        ? <div className="phase-e-empty-editor" role="status">请选择卡片馆中的 JSON 文件，或点击上方「新建卡片」开始编辑。</div>
-        : <div inert={!settingsReady || vm.opening} className="fields phase-c-fields">
+      <div inert={!settingsReady || vm.opening} className="fields phase-c-fields">
         {settingsOpen && !vm.desktop ? settingsContents : <div className="article-editor" aria-label="文章编辑">
           <section className="editor-section" aria-label="Vocabulary 编辑区">
             <h2>Vocabulary</h2>
@@ -143,66 +133,36 @@ export default function EditorView() {
             <p className="hint">自然段之间用空行分隔；最多 999 段。</p>
           </section>
         </div>}
-      </div>}
+      </div>
       <div className="editor-bottom">
         {vm.cardSaveStatus === 'error' && <button type="button" className="retry-card-save" onClick={() => void vm.retryCardSave()}>重试保存当前卡片</button>}
         {!settingsOpen && <VocabularyActions viewModel={vm} focusField={setFocusId} />}
         {!vm.desktop && <NotificationBar error={error} warning={warning} closeError={vm.clearError} />}
       </div>
-    </aside>} left={<CardPreview layout={vm.desktop && !vm.activeCardPath ? undefined : layout}
-      ready={ready && (!vm.desktop || !!vm.activeCardPath)} content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection}
+    </aside>} left={<CardPreview layout={vm.desktop && vm.emptyArticle ? undefined : layout}
+      ready={ready && (!vm.desktop || !vm.emptyArticle)} content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection}
       actions={vm.desktop ? null : <ProjectActions open={vm.open} save={vm.save} exportImages={vm.exportImages} ready={ready} exporting={exporting} />}
       notices={vm.desktop ? <PreviewNotices errors={vm.errors} warning={warning} closeError={vm.clearError} /> : null} />} />
     </div>
-    {vm.desktop && newCardOpen && <div className="phase-e-modal-backdrop" role="presentation">
-      <section role="dialog" aria-modal="true" aria-label="新建卡片" className="phase-e-modal phase-e-create-dialog">
-        <div className="phase-e-modal-heading">
-          <h2>新建卡片</h2>
-          <button type="button" className="phase-e-create-close" aria-label="关闭新建卡片" title="关闭"
-            disabled={creatingCard} onClick={() => setNewCardOpen(false)}>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
-              strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-              <path d="m6 6 12 12M18 6 6 18" />
-            </svg>
-          </button>
+    {vm.desktop && clearOpen && <div className="phase-e-modal-backdrop" role="presentation">
+      <section role="dialog" aria-modal="true" aria-label="清空当前文章" className="phase-e-modal phase-e-clear-dialog">
+        <div className="phase-e-modal-heading"><h2>清空当前文章？</h2></div>
+        <p className="phase-e-clear-description">当前文章存在尚未完成的联合保存。请选择保存、放弃或取消。</p>
+        <div className="phase-e-clear-actions">
+          <button type="button" disabled={clearBusy} onClick={() => {
+            setClearBusy(true);
+            void vm.savePair().then(async saved => {
+              if (saved && await vm.clearArticle()) setClearOpen(false);
+            }).finally(() => setClearBusy(false));
+          }}>保存</button>
+          <button type="button" disabled={clearBusy} onClick={() => {
+            setClearBusy(true);
+            void vm.clearArticle().then(cleared => {
+              if (cleared) setClearOpen(false);
+            }).finally(() => setClearBusy(false));
+          }}>放弃</button>
+          <button type="button" disabled={clearBusy} onClick={() => setClearOpen(false)}>取消</button>
         </div>
-        <form className="phase-e-create-form" autoComplete="off" onSubmit={event => {
-          event.preventDefault();
-          if (!newCardFolder.trim() || !newCardTitle.trim() || creatingCard) return;
-          setCreatingCard(true);
-          void vm.newCard(newCardFolder, newCardTitle).then(created => {
-            if (created) setNewCardOpen(false);
-          }).finally(() => setCreatingCard(false));
-        }}>
-          <div className="phase-e-create-row">
-            <label htmlFor="phase-e-new-card-folder">文件夹</label>
-            <input id="phase-e-new-card-folder" name="new-card-folder" type="text" autoComplete="off"
-              value={newCardFolder} onChange={event => setNewCardFolder(event.target.value)} spellCheck={false} />
-            <button type="button" aria-label="选择文件夹" title="选择文件夹" disabled={creatingCard}
-              onClick={() => { void chooseCardFolder(newCardFolder).then(selected => {
-                if (selected) setNewCardFolder(selected);
-              }).catch(reason => vm.reportError('card-folder', `选择文件夹失败：${String(reason)}`)); }}>
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
-                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2" />
-                <path d="M3 10h18l-2 10H5L3 10Z" />
-              </svg>
-            </button>
-          </div>
-          <div className="phase-e-create-row">
-            <label htmlFor="phase-e-new-card-title">卡片名</label>
-            <input id="phase-e-new-card-title" name="new-card-name" type="text" autoComplete="off" autoFocus
-              value={newCardTitle} onChange={event => setNewCardTitle(event.target.value)}
-              placeholder="输入卡片名称" maxLength={150} />
-            <button type="submit" aria-label="创建" title="创建"
-              disabled={!newCardFolder.trim() || !newCardTitle.trim() || creatingCard}>
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
-                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </button>
-          </div>
-        </form>
       </section>
     </div>}
     {vm.desktop && settingsOpen && <div className="phase-e-modal-backdrop" role="presentation"

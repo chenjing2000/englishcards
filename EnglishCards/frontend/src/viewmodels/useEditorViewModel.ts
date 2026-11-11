@@ -14,7 +14,7 @@ import {
 } from '../services/projectIO';
 import { desktopRequest, isDesktop } from '../services/desktopBridge';
 import { CardSaveCoordinator, type CardSaveStatus } from '../services/cardSaveCoordinator';
-import { cardFileName, createCardFile, createCardSaveCoordinator, defaultCardLibrary, lastCardLibrary, listCardDirectory, openCardFile, serializedCard } from '../services/cardFileIO';
+import { cardFileName, createCardFile, createCardSaveCoordinator, defaultCardLibrary, lastCardLibrary, listCardDirectory, openCardFile, saveArticlePair, serializedCard } from '../services/cardFileIO';
 
 type ParagraphCollection = 'content' | 'translation';
 const stringify = (project: Project) => JSON.stringify(projectDocument(project), null, 2);
@@ -79,6 +79,8 @@ export function useEditorViewModel() {
   const [activeCardPath, setActiveCardPath] = useState<string | null>(null);
   const [libraryRoot, setLibraryRoot] = useState('');
   const [libraryRevision, setLibraryRevision] = useState(0);
+  // A JSON autosave alone does not mean the matching ZIP is current.
+  const lastPairedSnapshot = useRef<string | null>(null);
   const libraryRootWasChanged = useRef(false);
   useEffect(() => {
     if (!desktop) return;
@@ -154,6 +156,12 @@ export function useEditorViewModel() {
   const settingsRevision = useRef(0);
   const ready = settingsReady && !opening && rendered?.project === previewProject;
   const hasFileChanges = cardSession.current ? cardSaveStatus !== 'clean' : lastFile !== stringify(project);
+  const emptyArticle = !project.title.trim() && !project.identityTag.trim()
+    && project.vocabulary.length === 0 && project.content.paragraphs.length === 0
+    && project.translation.paragraphs.length === 0;
+  const needsClearConfirmation = hasFileChanges || invalidCardSnapshot.current
+    || Object.keys(wordDrafts).length > 0
+    || (!emptyArticle && lastPairedSnapshot.current !== serializedCard(project));
 
   function update(next: Project | ((current: RenderProject) => Project)) {
     setProject(current => {
@@ -345,6 +353,7 @@ export function useEditorViewModel() {
       setLastFile(stringify(article));
       setVocabularySelection(null);
       setCardSaveStatus('clean');
+      lastPairedSnapshot.current = null;
       reportError('card-open', '');
       return true;
     } catch (reason) {
@@ -394,6 +403,95 @@ export function useEditorViewModel() {
       reportError('card-create', `新建卡片失败：${String(reason)}`);
       return false;
     } finally { setOpening(false); }
+  }
+
+  /** Wait for old writes before releasing a file-backed session. */
+  async function clearArticle(): Promise<boolean> {
+    if (!desktop || !settingsReady || preparingClose.current || exporting || opening) return false;
+    clearTimeout(cardTimer.current);
+    const session = cardSession.current;
+    if (session) await session.settle();
+    if (preparingClose.current || exporting || opening) return false;
+    const empty = createEmptyArticle();
+    cardSession.current = null;
+    invalidCardSnapshot.current = false;
+    lastPairedSnapshot.current = null;
+    setActiveCardPath(null);
+    setCardSaveStatus('clean');
+    wordDraftsRef.current = {};
+    setWordDrafts({});
+    update(empty);
+    setRendered(null);
+    setLastFile(stringify(empty));
+    setVocabularySelection(null);
+    reportError('card-open', '');
+    reportError('card-validation', '');
+    reportError('card-save', '');
+    reportError('pair-save', '');
+    return true;
+  }
+
+  /** A paired save is the only operation that establishes a current ZIP version. */
+  async function savePair(): Promise<boolean> {
+    if (!desktop || !settingsReady || opening || exporting || preparingClose.current) return false;
+    if (!ready || !rendered || rendered.project !== previewProject) {
+      showWarning('预览与编辑内容尚未同步，或分页尚未完成，请稍后保存。');
+      return false;
+    }
+    if (!project.title.trim()) {
+      showWarning('请先填写英文标题，再保存 JSON 与 ZIP。');
+      return false;
+    }
+    if (invalidCardSnapshot.current || Object.keys(wordDraftsRef.current).length > 0) {
+      showWarning('当前有未完成或无效的输入，请先完成词汇编辑。');
+      return false;
+    }
+    const snapshot = project;
+    const signature = rendered.layout.signature;
+    const pages = rendered.layout.pages.length;
+    if (pages < 1) { showWarning('请先完成文章分页后再保存。'); return false; }
+    // The editor must not change while a snapshot is exported to the native renderer.
+    flushSync(() => {
+      (document.activeElement as HTMLElement | null)?.blur();
+      setOpening(true);
+      setExporting(true);
+    });
+    try {
+      const existing = cardSession.current;
+      if (existing && !(await flushCardSave(existing))) {
+        showWarning('当前 JSON 自动保存尚未完成，请先处理保存错误。');
+        return false;
+      }
+      const result = await saveArticlePair(snapshot, signature, pages);
+      if (!result) return false; // Folder dialog or overwrite confirmation cancelled.
+      const saved = projectDocument(JSON.parse(result.text) as Project);
+      const session = createCardSaveCoordinator(result.path, saved);
+      clearTimeout(cardTimer.current);
+      cardSession.current = session;
+      invalidCardSnapshot.current = false;
+      wordDraftsRef.current = {};
+      setWordDrafts({});
+      update(saved);
+      setLastFile(stringify(saved));
+      setActiveCardPath(result.path);
+      setCardSaveStatus('clean');
+      lastPairedSnapshot.current = serializedCard(saved);
+      setVocabularySelection(null);
+      changeLibraryRoot(result.folder);
+      reportError('pair-save', '');
+      reportError('card-save', '');
+      reportError('card-open', '');
+      showWarning(result.folderPreferenceSaved
+        ? 'JSON 和 ZIP 均已保存，卡片馆已切换至保存目录。'
+        : 'JSON 和 ZIP 均已保存，但未能记住最近使用的文件夹。');
+      return true;
+    } catch (reason) {
+      reportError('pair-save', `联合保存失败：${String(reason)}`);
+      return false;
+    } finally {
+      setExporting(false);
+      setOpening(false);
+    }
   }
 
   async function retryCardSave(): Promise<boolean> {
@@ -667,6 +765,7 @@ export function useEditorViewModel() {
     project, warning, error, errors, settingsReady, ready, exporting, opening, desktop, closing,
     layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
     open, openCardPath, newCard, retryCardSave, cardSaveStatus, activeCardPath,
+    clearArticle, savePair, needsClearConfirmation, emptyArticle,
     libraryRoot, libraryRevision, changeLibraryRoot, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
     highlightRange, addVocabularyFromSelection, commitHead, setWordPreview, setEntryHighlights, setSenseField, setVocabularyMeaning,
     addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,

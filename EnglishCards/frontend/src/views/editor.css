@@ -213,3 +213,10 @@
 @media (prefers-reduced-motion:reduce){
   .phase-e-notice{animation:none}.phase-e-notice-ending{transition:none}
 }
+
+/* Clear with explicit Save / Discard / Cancel decisions. */
+.phase-e-clear-dialog{width:min(440px,calc(100vw - 48px));max-width:440px}
+.phase-e-clear-description{padding:4px 22px 8px;margin:0;color:#52645a;font-size:14px;line-height:1.6}
+.phase-e-clear-actions{display:flex;justify-content:flex-end;gap:10px;padding:12px 22px 22px}
+.phase-e-clear-actions button{min-width:76px}
+.phase-e-clear-actions button:first-child{background:#d3e5eb;border-color:#b9d4de;color:#27495b}

@@ -1,4 +1,4 @@
-import { parseProject, projectDocument, type Project } from '../models/project';
+import { parseProject, projectDocument, type Project, type RenderProject } from '../models/project';
 import { desktopRequest } from './desktopBridge';
 import { CardSaveCoordinator } from './cardSaveCoordinator';
 
@@ -80,5 +80,17 @@ export function serializedCard(article: Project): string {
 export function createCardSaveCoordinator(filePath: string, article: Project): CardSaveCoordinator {
   return new CardSaveCoordinator(filePath, serializedCard(article), async (path, snapshot) => {
     await desktopRequest<boolean>('saveCardFile', { path, text: snapshot });
+  });
+}
+
+/** Save a single validated Article v6 snapshot as a matching JSON + ZIP pair. */
+export function saveArticlePair(project: RenderProject, signature: string, pages: number):
+  Promise<{ path: string; text: string; folder: string; folderPreferenceSaved: boolean } | null> {
+  return desktopRequest('saveArticlePair', {
+    project,
+    document: projectDocument(project),
+    fileName: cardFileName(project.title),
+    signature,
+    pages,
   });
 }
