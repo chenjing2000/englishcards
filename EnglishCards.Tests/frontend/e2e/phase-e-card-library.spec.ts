@@ -37,6 +37,9 @@ test('Phase E rejects a card switch until A is saved and requires a second click
         const { id, command, payload } = request;
         let value: unknown = true;
         if (command === 'loadSettings') value = null;
+        if (command === 'defaultCardLibrary' || command === 'lastCardLibrary') value = 'C:/cards';
+        if (command === 'lastNewCardFolder') value = 'C:/cards';
+        if (command === 'saveLastCardLibrary') value = true;
         if (command === 'listCardDirectory') value = {
           path: payload, folders: [], files: [
             { path: 'C:/cards/A.json', name: 'A.json' },
