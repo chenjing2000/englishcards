@@ -1,62 +1,57 @@
-# Article v6 重构验收标准
+# Article v6 与桌面工作流验收标准
 
-> 本文是用户批准的目标验收标准。当前代码仍处于 v6 数据基础和目录迁移阶段；未接入的功能标记为待实现，不得用旧 v5 E2E 通过结果替代。
+Status: **Current acceptance reference.** Historical migration gates are superseded by the completed Article v6, Phase E and paired-save implementation. Recorded results are maintained in [RELEASE_ACCEPTANCE.md](../RELEASE_ACCEPTANCE.md).
 
-## A. Article v6 数据与导入
+## A. Article v6 data contract
 
-1. Article 根对象严格只接受 `schemaVersion`、`id`、`title`、`identityTag`、`content`、`vocabulary`、`translation`。
-2. `title`、`identityTag` 必须存在且允许空字符串；未知字段、缺失字段、错误类型均拒绝。
-3. 正文与译文各自独立从 `p001` 连续编号，分别最多 999 段；`p999` 接受，1000 段拒绝。
-4. Vocabulary 使用 `v001`–`v999`，最多 999 项；编号必须连续且与数组顺序一致。
-5. 删除段落或词汇条目后对应集合重新编号；正文与译文的 `p001` 不冲突，内部定位必须携带区域上下文。
-6. 不接受 v5 或更早格式；不转换 `source`、`personalizedHeader`、`expressions`、`mainIdea` 等旧字段。
-7. JSON 导入优先解析 Article v6；坏 JSON、旧版本、Schema 错误或明显 JSON 内容不得静默回退成 TXT。
-8. TXT 文件名去掉扩展名后作为默认标题；`identityTag` 为空；词汇与译文为空。
-9. TXT 中一个或多个空行创建新自然段；单个换行转换为空格；识别 UTF-8 BOM、CRLF、LF 和 CR。
-10. 空白 TXT、未知扩展名、超过 999 段或文本超长输入均整体拒绝，不得截断或改变当前文章。
-11. TXT 导出只输出完整英文正文，段落之间保留一个空行。
+1. The only accepted schema is Article `schemaVersion: 6`; reject v5 and earlier without migration or dual-write.
+2. The root object contains only `schemaVersion`, `id`, `title`, `identityTag`, `content`, `vocabulary`, and `translation`.
+3. `title` and `identityTag` are required strings and may be empty; reject unknown fields, missing fields and wrong types.
+4. Content and Translation each use sequential `p001`–`p999` IDs and allow at most 999 paragraphs independently.
+5. Vocabulary uses sequential `v001`–`v999` IDs and allows at most 999 entries.
+6. Vocabulary uses `word` for single words, phrases and idioms; do not introduce a separate expressions collection.
+7. Reject malformed JSON, unsupported schema versions, noncanonical IDs, duplicate IDs and capacity overflow. Never truncate content or silently reinterpret invalid JSON as plaintext.
 
-## B. 编辑器
+## B. Card Library and editor
 
-12. 右侧只保留一个编辑 TabPage，内容顺序为 Vocabulary → Content → Translation。
-13. 标题使用独立输入框，位于正文编辑区域上方，可独立修改。
-14. 正文和译文分别使用一个连续多段落编辑区域；向下滚动即可编辑全文，不为每个自然段创建独立输入框。
-15. 单个换行表示段内换行并在数据解析时转换为空格；一个或多个空行表示新自然段。
-16. 编辑过程中产生第 1000 个自然段时拒绝本次修改，原 Article 状态保持不变并给出明确提示。
-17. Vocabulary 统一管理单词、词组、习语；核心字段为 `word`，保留 `ipa`、`highlight`、`senses` 及现有义项编辑能力。
-18. 不再显示 Expressions 和 Main Idea 分区，也不再有右侧选区加入 Vocabulary 的交互。
+8. The Card Library browses a selected directory tree and opens independent JSON files.
+9. Directory children are loaded lazily; the filesystem is the source of card identity.
+10. The editor order is Vocabulary → Content → Translation. Content and Translation each use a continuous multi-paragraph editing surface.
+11. Preview selection-to-Vocabulary is limited to one card and one natural paragraph, contains at least one Latin letter and no Chinese character, and adds entries through the `word` field.
+12. There is no current user-facing JSON/TXT import button, New Card action, standalone JSON save action or legacy global-draft auto-recovery workflow.
+13. While a card is dirty or saving, a request to switch cards is rejected and discarded; no pending target is queued. A save error preserves in-memory edits and blocks switching.
 
-## C. 左侧选区加入 Vocabulary
+## C. Clear current article
 
-19. 仅在左侧卡片预览区选择文字时显示加号；加号是无 Tooltip 的圆角方形按钮，定位在选区右下角。
-20. 选区只能位于同一自然段、同一张卡片；跨自然段或跨卡片不显示加号。
-21. 选区必须至少包含一个英文字母，且不能包含中文字符；纯数字、纯空白和包含中文的混合选区不显示加号。
-22. 单词、多个单词、词组和习语均可加入，不做词性分类或表达类型判断。
-23. 点击加号前保存选区文本，避免按钮获得焦点后原生选区丢失。
-24. 去重采用 Unicode NFC、首尾空白去除、连续空白合并及英文大小写不敏感比较；重复项不覆盖已有释义。
-25. 新增条目写入 `vocabulary`，使用 `word` 字段和下一个连续 `vNNN` ID。
+14. With no unsaved edits and no save operation in progress, Clear resets the editor and preview and clears the active file/card selection.
+15. With unsaved edits, Clear offers Save / Discard / Cancel.
+16. Save completes the paired JSON + ZIP operation before clearing; a failed or cancelled save must not clear the article.
+17. Discard drops only the unsaved in-memory revision and does not delete committed files.
+18. Cancel preserves the current article, preview and navigation state.
+19. An in-flight save blocks Clear until it has completed; stale asynchronous work must not reactivate the previous article.
 
-## D. 保存、打开与导出
+## D. Paired JSON + ZIP save
 
-26. 自动草稿、项目 JSON、打开/保存和 ZIP 导出全部使用同一 Article v6 Schema，不保留 v5 生产读写路径，不双写。
-27. 自动草稿保存完整 Article JSON 根对象；保存失败不得清除脏状态或覆盖已提交的有效文件。
-28. 打开失败、取消、JSON 校验失败或保存失败时保留当前 Article 和已有文件。
-29. ZIP 根目录包含 `article.json`，并在 `images/` 下包含所有页面 PNG；JSON 是完整 Article v6，不含样式设置和运行时状态。
-30. 取消导出必须等待当前任务停止并清理任务临时 ZIP；已有目标 ZIP 字节不变。
+20. Save opens a native folder picker, initially at the most recently remembered successful Card Library path.
+21. Generate same-basename JSON and ZIP from one immutable, validated Article v6 snapshot and one pagination/render signature.
+22. If either destination exists, show one frontend overwrite confirmation using the shared Phase E modal styles; do not use native WPF MessageBox.
+23. Confirm commits the pair. Cancel, close and backdrop click cancel without changing existing files. ESC is not a cancellation gesture.
+24. Stage and validate both outputs, preserve backups of existing targets and perform best-effort rollback on failure. Do not claim cross-file filesystem atomicity.
+25. Only after both files commit successfully, remember the destination and switch/refresh the Card Library root there.
+26. Cancellation or failure must not change the remembered root, active article or selected library root.
 
-## E. 分页、预览与响应式行为
+## E. ZIP rendering and archive
 
-31. 保留当前分页引擎的字体测量和跨页连续性核心算法；预览和导出使用同一 Article 快照及渲染实现。
-32. 段落编号变化后，预览定位和高亮必须用 `content` / `translation` 区域上下文，不得仅依赖 `p001`。
-33. 卡片预览宽度限制、居中、Ctrl+滚轮缩放（20%–100%）和永久下调规则保持已确认行为；缩放不得改变分页或导出尺寸。
-34. 字体未就绪、分页或渲染校验失败时不得提交错误导出。
+27. ZIP contains root `article.json` and every page image under `images/page-NNN.png`.
+28. Article JSON is UTF-8 without BOM, two-space indented, Chinese-readable and ends with a newline. Runtime styles/settings are excluded.
+29. Preview and ZIP rendering use the same Article snapshot, pagination/render implementation and font fallback.
+30. Validate schema, render signature, page count/dimensions, archive entries, PNG signatures and IHDR dimensions before commit.
+31. Cancellation/failure removes only the current task's temporary files and preserves existing destination content.
 
-## F. 仓库与发布
+## F. Desktop runtime and release
 
-35. 生产代码位于 `EnglishCards/`；测试位于 `EnglishCards.Tests/`；文档、Skills、工具各自独立。
-36. Vite 资源输出至 `EnglishCards/.build/frontend-dist/`；测试报告和临时数据输出至根 `.build/`；不保留固定 `artifacts/` 目录。
-37. 唯一正式发布目录为 `dist/EnglishCards/`；发布升级不得删除其中的 EXE 同级 `userdata/`。
-38. Windows 上重新执行 Vitest、Playwright、.NET 测试、Vite 构建和 WPF 发布；新目录结构必须全部验证。
-39. 真实 Windows/WPF/WebView2 启动、用户数据、导出取消和 ZIP 内容检查不能由浏览器 E2E 替代。
-
-任何 v6 数据层、桌面桥接、编辑器或导出 P0 测试未通过，不得宣称 Article v6 重构完成。
+32. Target is Windows x64, WPF + .NET 10 + WebView2 + React/TypeScript.
+33. Publish is Framework-dependent, win-x64, single-file; target machine requires .NET 10 Desktop Runtime x64 and WebView2 Evergreen.
+34. User data lives in EXE-sibling `userdata/`; publishing must not delete it. Do not read or migrate old `%LOCALAPPDATA%\\EnglishCards` data.
+35. Browser tests do not replace real Windows/WPF/WebView2 startup and paired-save acceptance.
+36. External clean-machine runtime, portability, upgrade-preservation and sample-asset rights checks remain separate release gates; see [RELEASE_ACCEPTANCE.md](../RELEASE_ACCEPTANCE.md).

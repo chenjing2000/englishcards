@@ -2,19 +2,22 @@
 
 ## Authority and scope
 
-This document describes the approved WPF/WebView2 bridge contract. The current desktop implementation is still transitioning from schema v5 to Article v6; until integration is complete, existing v5 bridge behavior is an implementation detail, not the target data contract. `EnglishCards/desktop/Web/EditorBridge.cs` and `EnglishCards/frontend/src/services/desktopBridge.ts` are the implementation references.
+This document describes the WPF/WebView2 message boundary and the current Article v6 desktop workflow. The current implementation reference is `EnglishCards/desktop/Web/EditorBridge.cs`; the frontend request wrapper is `EnglishCards/frontend/src/services/desktopBridge.ts`.
+
+The bridge is an internal host boundary, not a declaration that every registered command is part of the current user-facing workflow. The Card Library and paired-save workflow in [PHASE_E_CARD_LIBRARY.md](PHASE_E_CARD_LIBRARY.md) and [COMBINED_ARTICLE_SAVE.md](COMBINED_ARTICLE_SAVE.md) define the current user behavior.
 
 ## Trust boundary
 
-- WPF owns filesystem access, native dialogs, user-data persistence, and ZIP export.
-- React requests only explicitly named host operations through WebView2 messages.
+- WPF owns filesystem access, native dialogs, user-data persistence and ZIP generation.
+- React requests only named host operations through WebView2 messages.
 - The host accepts messages only from the local editor origin `https://englishcards.invalid/`.
-- Do not expose arbitrary filesystem access, shell execution, generic method invocation, or unrestricted URL navigation.
+- Do not expose arbitrary filesystem access, shell execution, generic method invocation or unrestricted URL navigation.
 - Navigation and new-window requests remain restricted to local content.
+- Article content crossing the bridge must be validated as strict Article schemaVersion 6 at the host boundary.
 
 ## Request and response envelope
 
-Observed request:
+Example request:
 
 ```json
 {"id":1,"command":"loadSettings","payload":null}
@@ -23,23 +26,33 @@ Observed request:
 - `id`: positive integer used to correlate the response.
 - `command`: allow-listed command name.
 - `payload`: operation-specific JSON value, validated by the host.
-- Success response: `{ "id": 1, "ok": true, "value": ... }`.
-- Failure response: `{ "id": 1, "ok": false, "error": "..." }`.
+- Success: `{ "id": 1, "ok": true, "value": ... }`.
+- Failure: `{ "id": 1, "ok": false, "error": "..." }`.
 
-## Command allow-list
+## Current Card Library and paired-save commands
 
-| Command | Expected payload | Host responsibility |
+| Command | Payload | Host responsibility |
 |---|---|---|
-| `openProject` | `null` | Native open dialog; return selected file name and text |
-| `saveProject` | Article v6 JSON string | Strictly validate Article schemaVersion 6; native save dialog; atomic write |
+| `openCardFile` | absolute JSON path string | Read the selected file, parse JSON and validate Article v6; return path, text and content fingerprint |
+| `activateCardFile` | `{path, fingerprint}` | Re-read and fingerprint-check the file before recording active file identity |
+| `saveCardFile` | `{path, text}` | Verify active path and on-disk fingerprint, validate Article v6 and atomically save the file |
+| `listCardDirectory` | directory path string | List immediate child directories and JSON files |
+| `chooseCardLibrary` | `null` | Show native folder picker |
+| `defaultCardLibrary` | `null` | Return executable-adjacent default library root |
+| `lastCardLibrary` | `null` | Read last successfully remembered library folder |
+| `saveLastCardLibrary` | directory path string | Persist the successful library folder |
+| `chooseArticlePairTarget` | proposed JSON filename string | Show native folder picker and return target JSON path, folder and existing pair members |
+| `saveArticlePair` | `{fileName, document, path, overwriteApproved}` | Validate Article v6 and save matching JSON + ZIP pair through the export service |
 | `loadSettings` | `null` | Read settings from EXE-sibling `userdata/` |
-| `loadDraft` | `null` | Read and validate the complete Article v6 draft |
 | `saveSettings` | `{text, preserveOriginal}` | Validate and persist settings |
-| `saveDraft` | `{text, preserveOriginal}` | Validate and persist complete Article v6 JSON |
-| `saveRejectedDraft` | `null` | Explicitly save retained rejected draft elsewhere |
-| `exportAllZip` | immutable Article v6 snapshot plus render signature/page metadata | Validate snapshot and run full ZIP export |
 
-The v6 payloads above are the target contract. Do not enable v6 UI writes until the React state, draft persistence, native save/open, and export pipeline all validate and consume the same Article v6 snapshot.
+The paired-save command must receive one complete Article v6 document. The host must not trust a caller-supplied path without validating it, and overwrite must be explicitly approved by the frontend after the user confirms the shared overwrite dialog.
+
+## Legacy/internal commands present in the host
+
+The current host source also registers `openProject`, `saveProject`, `loadDraft`, `saveDraft`, `saveRejectedDraft`, and `exportAllZip`. Their presence in the host switch does not restore the former user-facing import, global-draft recovery, standalone JSON save or standalone ZIP export workflow.
+
+The current Card Library UI must use the file-specific and paired-save commands above. It must not route ordinary use through the old generic open/save/draft/export commands. These legacy/internal registrations are documented here for implementation transparency; their eventual removal is a separate source-code task and is outside a documentation-only change.
 
 ## Ordering and navigation
 
@@ -47,14 +60,15 @@ The v6 payloads above are the target contract. Do not enable v6 UI writes until 
 - The navigation generation is captured when a message arrives; stale-page responses must not be delivered to a later page.
 - Yield the dispatcher before showing native modal dialogs.
 - Do not post a response to a disposed or no-longer-current WebView.
+- The frontend must block card switching while its save coordinator reports dirty/saving/error. A blocked click is discarded, not queued.
 
 ## Required checks for bridge changes
 
-Test unknown commands, missing/wrong payload fields, malformed JSON, invalid IDs, wrong source origin, stale navigation, dialog cancellation, I/O failure, and WebView disposal. Event-boundary asynchronous handlers must observe and contain exceptions. Keep filesystem authority in WPF; do not accept arbitrary caller-selected paths unless a native user action authorizes them.
+Test unknown commands, missing/wrong payload fields, malformed JSON, invalid IDs, wrong source origin, stale navigation, dialog cancellation, I/O failure, external file modification, overwrite approval changes, paired-save rollback and WebView disposal. Event-boundary asynchronous handlers must observe and contain exceptions. Keep filesystem authority in WPF.
 
 ## WebView2 origin and navigation lifecycle
 
-- Local navigation and resource requests must use an absolute URI with HTTPS, host `englishcards.invalid`, port 443, and no user information.
+- Local navigation and resource requests must use an absolute URI with HTTPS, host `englishcards.invalid`, port 443 and no user information.
 - Prefix string comparisons are not the origin authority; use parsed URI components.
 - A `LoadAsync` call completes only for the `NavigationCompleted` event whose `NavigationId` matches the navigation it initiated and whose final source is the expected local page.
 - Cancellation of a `WaitAsync` wrapper does not cancel the underlying WebView2 initialization or DevTools operation. Callers must dispose/retire the associated WebView2 instance when abandoning work; do not assume the underlying operation was cancelled.
