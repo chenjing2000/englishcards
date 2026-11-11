@@ -59,7 +59,7 @@ test('unified vocabulary entries retain variants, paired senses and automatic hi
   const snapshot = await page.evaluate(() => window.editor);
   const { styles: _settings, ...document } = snapshot.project;
   expect(document).toEqual(saved);
-  const result = await request.post('/api/export', { data: snapshot });
+  const result = await request.post('/api/render-page', { data: { ...snapshot, page: 1 } });
   expect(result.ok(), result.ok() ? '' : await result.text()).toBe(true);
   const exported = JSON.parse(strFromU8(unzipSync(await result.body())['article.json']));
   expect(exported).toEqual(saved);
