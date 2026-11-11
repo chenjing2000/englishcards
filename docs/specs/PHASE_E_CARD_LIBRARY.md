@@ -1,7 +1,7 @@
 # Phase E — Card Library and File-backed Article Workflow
 
-Status: **Complete; Windows/WPF acceptance passed and merged into `main`.**  
-Phase E merge: PR [#2](https://github.com/chenjing2000/englishcards/pull/2), merge commit `8e47296dfa484f4f807550578ce9f3b147ad466e`.  
+Status: **Complete; Windows/WPF acceptance passed and merged into `main`.**
+Phase E merge: PR [#2](https://github.com/chenjing2000/englishcards/pull/2), merge commit `8e47296dfa484f4f807550578ce9f3b147ad466e`.
 The subsequent paired-save and clear workflow was completed in commit `822864ff99787395b21b040a0b0fccc0c62e2fc6`.
 
 ## Verification

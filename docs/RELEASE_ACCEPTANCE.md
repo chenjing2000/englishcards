@@ -1,7 +1,7 @@
 # EnglishCards — Windows x64 验收记录
 
-**产品基线：** Article v6 + Phase E Card Library + JSON/ZIP paired save  
-**最新源码基线：** `822864ff99787395b21b040a0b0fccc0c62e2fc6`  
+**产品基线：** Article v6 + Phase E Card Library + JSON/ZIP paired save
+**最新源码基线：** `822864ff99787395b21b040a0b0fccc0c62e2fc6`
 **状态：** 项目所有者已确认 Windows/WPF 本地验收通过；外部干净机器与公开发布前置检查仍需单独处理。
 
 ## A. 已完成的 Windows 验收
