@@ -22,9 +22,9 @@ beforeAll(async () => {
 
 function response() {
   return {
-    statusCode: 200, body: undefined as unknown,
+    statusCode: 200, body: undefined as unknown, contentType: '',
     status(code: number) { this.statusCode = code; return this; },
-    type() { return this; },
+    type(value: string) { this.contentType = value; return this; },
     send(body: unknown) { this.body = body; return this; },
   };
 }
@@ -70,6 +70,7 @@ it('does not send a successful PNG when browser cleanup fails', async () => {
   const next = response();
   await renderPage(request, next as unknown as Response);
   expect(next.statusCode).toBe(200);
+  expect(next.contentType).toBe('png');
   expect(next.body).toEqual(png);
 });
 
