@@ -166,6 +166,10 @@ test('Settings uses a two-column 560 DIP dialog and New Card uses the compact tw
   await expect(dialog.getByRole('button', { name: '取消' })).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: '创建' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: '关闭新建卡片' })).toBeVisible();
+  await folder.fill('E:/Uncommitted Folder');
+  await dialog.getByRole('button', { name: '关闭新建卡片' }).click();
+  await page.getByRole('button', { name: '新建卡片' }).click();
+  await expect(folder).toHaveValue('C:/EnglishCards/userdata');
   await dialog.getByRole('button', { name: '选择文件夹' }).click();
   await expect(folder).toHaveValue('D:/My Cards');
   await dialog.getByLabel('卡片名', { exact: true }).fill('Custom Card');
@@ -192,6 +196,7 @@ test('card library remembers a directory only after its listing succeeds', async
       postMessage({ id, command, payload }: NativeMessage) {
         requests.push({ id, command, payload });
         let value: unknown = true;
+        if (command === 'loadSettings') value = null;
         if (command === 'lastCardLibrary') value = localStorage.getItem('test.lastLibrary') ?? 'C:/cards';
         if (command === 'lastNewCardFolder') value = 'C:/cards';
         if (command === 'defaultCardLibrary') value = 'C:/cards';
