@@ -43,7 +43,7 @@ test('unified vocabulary senses preserve editing, deletion, canonical IDs and ex
   expect(snapshot.project.vocabulary[1].senses.map((sense: { meaning: string }) => sense.meaning)).toEqual(['记录']);
 
   snapshot = await page.evaluate(() => window.editor);
-  const exported = await request.post('/api/export', { data: { ...snapshot, page: 1 } });
+  const exported = await request.post('/api/render-page', { data: { ...snapshot, page: 1 } });
   expect(exported.ok(), exported.ok() ? '' : await exported.text()).toBe(true);
   const saved = await page.evaluate(() => window.editor.project);
   expect(saved.vocabulary.map((entry: { id: string }) => entry.id))
