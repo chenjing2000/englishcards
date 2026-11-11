@@ -57,7 +57,7 @@ test('left-preview selections add English words and phrases to Article v6 vocabu
   expect(saved.vocabulary[3]).toMatchObject({ id: 'v004', word: 'ran away', highlight: [] });
 
   const snapshot = await page.evaluate(() => window.editor);
-  const exported = await request.post('/api/export', { data: snapshot });
+  const exported = await request.post('/api/render-page', { data: { ...snapshot, page: 1 } });
   expect(exported.ok(), exported.ok() ? '' : await exported.text()).toBe(true);
   const files = unzipSync(new Uint8Array(await exported.body()));
   const exportedProject = JSON.parse(strFromU8(files['article.json']));
