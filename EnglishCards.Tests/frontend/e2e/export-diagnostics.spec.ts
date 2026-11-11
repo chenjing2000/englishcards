@@ -1,6 +1,6 @@
 import { test, expect, chromium } from './fixtures';
 
-test('export endpoint diagnoses project and line differences', async ({ page, request }) => {
+test('page-render endpoint diagnoses project and line differences', async ({ page, request }) => {
   await page.goto('/'); await expect(page.locator('[data-ready="true"]')).toBeVisible();
   const snapshot = await page.evaluate(() => window.editor);
   const changed = await request.post('/api/render-page', { data: { ...snapshot, project: { ...snapshot.project, title: 'Changed title' }, page: 1 } });
