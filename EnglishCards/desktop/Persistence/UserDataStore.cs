@@ -7,6 +7,7 @@ internal sealed class UserDataStore(string root)
 {
     private string SettingsPath => Path.Combine(root, "settings", "settings.json");
     private string DraftPath => Path.Combine(root, "drafts", "draft.json");
+    private string LastLibraryFolderPath => Path.Combine(root, "settings", "last-library-folder.txt");
     private string? rejectedSettings;
     private string? rejectedDraft;
     private bool rejectedDraftUnavailable;
@@ -56,6 +57,40 @@ internal sealed class UserDataStore(string root)
 
     internal Task<string?> LoadSettingsAsync() => ReadAsync(SettingsPath);
     internal Task<string?> LoadDraftAsync() => ReadAsync(DraftPath);
+
+    internal Task<string> LoadLastLibraryFolderAsync() => LoadDirectoryPreferenceAsync(LastLibraryFolderPath);
+
+    internal Task SaveLastLibraryFolderAsync(string path) =>
+        SaveDirectoryPreferenceAsync(LastLibraryFolderPath, path);
+
+    private async Task<string> LoadDirectoryPreferenceAsync(string path)
+    {
+        try
+        {
+            var saved = (await File.ReadAllTextAsync(path)).Trim();
+            if (!string.IsNullOrWhiteSpace(saved))
+            {
+                var fullPath = Path.GetFullPath(saved);
+                if (Directory.Exists(fullPath)) return fullPath;
+            }
+        }
+        catch (FileNotFoundException) { }
+        catch (DirectoryNotFoundException) { }
+        catch (ArgumentException) { }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+        catch (NotSupportedException) { }
+
+        return root;
+    }
+
+    private async Task SaveDirectoryPreferenceAsync(string path, string directory)
+    {
+        var fullPath = Path.GetFullPath(directory);
+        if (!Directory.Exists(fullPath))
+            throw new DirectoryNotFoundException($"目录不存在，无法记住该路径：{fullPath}");
+        await SaveAsync(path, fullPath);
+    }
 
     private static async Task<string?> ReadAsync(string path)
     {

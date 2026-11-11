@@ -80,16 +80,19 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
                 "activateCardFile" when payload.ValueKind == JsonValueKind.Object => await ActivateCardFileAsync(payload),
                 "saveCardFile" when payload.ValueKind == JsonValueKind.Object => await SaveCardFileAsync(payload),
                 "listCardDirectory" when payload.ValueKind == JsonValueKind.String => ListCardDirectory(payload.GetString()!),
-                "chooseCardLibrary" when payload.ValueKind == JsonValueKind.Null => ChooseCardLibrary(),
+                "chooseCardLibrary" when payload.ValueKind == JsonValueKind.Null => await ChooseCardLibraryAsync(),
                 "defaultCardLibrary" when payload.ValueKind == JsonValueKind.Null => data.LibraryRootPath,
-                "createCardFile" when payload.ValueKind == JsonValueKind.Object => await CreateCardFileAsync(payload),
+                "lastCardLibrary" when payload.ValueKind == JsonValueKind.Null => await data.LoadLastLibraryFolderAsync(),
+                "saveLastCardLibrary" when payload.ValueKind == JsonValueKind.String => await SaveLastCardLibraryAsync(payload.GetString()!),
+                "chooseArticlePairTarget" when payload.ValueKind == JsonValueKind.String => await ChooseArticlePairTargetAsync(payload.GetString()!),
+                "saveArticlePair" when payload.ValueKind == JsonValueKind.Object => await SaveArticlePairAsync(payload),
                 "saveProject" when payload.ValueKind == JsonValueKind.String => await SaveProjectAsync(payload.GetString()!),
                 "loadSettings" when payload.ValueKind == JsonValueKind.Null => await data.LoadSettingsAsync(),
                 "loadDraft" when payload.ValueKind == JsonValueKind.Null => await data.LoadDraftAsync(),
                 "saveSettings" => await SaveUserDataAsync(payload, data.SaveSettingsAsync),
                 "saveDraft" => await SaveUserDataAsync(payload, data.SaveDraftAsync),
                 "saveRejectedDraft" when payload.ValueKind == JsonValueKind.Null => await SaveRejectedDraftAsync(),
-                "exportAllZip" when payload.ValueKind == JsonValueKind.Object => await exporter.ExportAsync(payload),
+                "exportAllZip" when payload.ValueKind == JsonValueKind.Object => await exporter.ExportAsync(payload, activeCardPath ?? throw new InvalidOperationException("请先打开并保存一张 JSON 卡片。")),
                 _ => throw new InvalidDataException("不支持的桌面文件请求。")
             };
             response = new { id, ok = true, value };
@@ -186,65 +189,93 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         return true;
     }
 
-    private string? ChooseCardLibrary()
+    private async Task<string?> ChooseCardLibraryAsync()
     {
         var picker = new OpenFolderDialog
         {
             Title = "选择卡片馆目录",
-            InitialDirectory = data.LibraryRootPath,
+            InitialDirectory = await data.LoadLastLibraryFolderAsync(),
             Multiselect = false
         };
-        return picker.ShowDialog(owner) == true ? picker.FolderName : null;
+        return FolderDialogPositioning.ShowDialog(picker, owner) == true ? picker.FolderName : null;
     }
 
-    private async Task<object> CreateCardFileAsync(JsonElement payload)
+    private async Task<bool> SaveLastCardLibraryAsync(string directory)
     {
-        if (!payload.TryGetProperty("text", out var textValue) || textValue.ValueKind != JsonValueKind.String ||
-            !payload.TryGetProperty("directory", out var folderValue) || folderValue.ValueKind != JsonValueKind.String ||
-            !payload.TryGetProperty("fileName", out var fileValue) || fileValue.ValueKind != JsonValueKind.String)
-            throw new InvalidDataException("无效的新建卡片请求。");
-
-        var folder = Path.GetFullPath(folderValue.GetString()!);
-        if (!Directory.Exists(folder)) throw new DirectoryNotFoundException("卡片馆目录不存在。");
-        var text = textValue.GetString()!;
-        using (var parsed = JsonDocument.Parse(text))
-            ArticleContractValidator.Validate(parsed.RootElement);
-
-        var fileName = fileValue.GetString()!;
-        if (string.IsNullOrWhiteSpace(fileName) || fileName is "." or ".." ||
-            !string.Equals(Path.GetFileName(fileName), fileName, StringComparison.Ordinal) ||
-            !string.Equals(Path.GetExtension(fileName), ".json", StringComparison.OrdinalIgnoreCase) ||
-            fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
-            fileName.EndsWith(' ') || fileName.EndsWith('.'))
-            throw new InvalidDataException("文件名无效，必须为当前目录下的 JSON 文件。");
-
-        var destination = ValidateCardPath(Path.Combine(folder, fileName));
-        if (File.Exists(destination)) throw new IOException("同名卡片已存在，请更换标题或文件名。");
-        await WriteNewCardAsync(destination, text);
-        activeCardPath = destination;
-        activeFingerprint = Fingerprint(text);
-        return new { path = destination, text };
+        await data.SaveLastLibraryFolderAsync(directory);
+        return true;
     }
 
-    // Testable exclusive creation primitive shared by the new-card dialog.
-    internal static async Task WriteNewCardAsync(string destination, string text)
+    private static void ValidatePairFileName(string name)
     {
-        var staged = Path.Combine(Path.GetDirectoryName(destination)!,
-            $".englishcards-{Guid.NewGuid():N}.tmp");
-        try
+        if (string.IsNullOrWhiteSpace(name) || name is "." or ".." ||
+            !string.Equals(Path.GetFileName(name), name, StringComparison.Ordinal) ||
+            !string.Equals(Path.GetExtension(name), ".json", StringComparison.OrdinalIgnoreCase) ||
+            name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+            name.EndsWith(' ') || name.EndsWith('.'))
+            throw new InvalidDataException("保存文件名无效。");
+    }
+
+    private async Task<object?> ChooseArticlePairTargetAsync(string name)
+    {
+        if (exporter.IsRunning) throw new InvalidOperationException("请等待当前保存任务完成。");
+        ValidatePairFileName(name);
+        var picker = new OpenFolderDialog
         {
-            await using (var output = new FileStream(staged, FileMode.CreateNew, FileAccess.Write,
-                             FileShare.None, 4096, useAsync: true))
-            await using (var writer = new StreamWriter(output))
-                await writer.WriteAsync(text);
-            File.Move(staged, destination, overwrite: false);
-        }
-        finally
+            Title = "选择文章 JSON 和 ZIP 的保存文件夹",
+            InitialDirectory = await data.LoadLastLibraryFolderAsync(),
+            Multiselect = false
+        };
+        if (FolderDialogPositioning.ShowDialog(picker, owner) != true) return null;
+        var folder = Path.GetFullPath(picker.FolderName);
+        var path = ValidateCardPath(Path.Combine(folder, name));
+        var zip = Path.ChangeExtension(path, ".zip");
+        var existingFiles = new[] { path, zip }.Where(File.Exists).ToArray();
+        return new { path, folder, existingFiles };
+    }
+
+    private async Task<object?> SaveArticlePairAsync(JsonElement payload)
+    {
+        if (exporter.IsRunning) throw new InvalidOperationException("请等待当前保存任务完成。");
+        if (!payload.TryGetProperty("fileName", out var nameValue) ||
+            nameValue.ValueKind != JsonValueKind.String ||
+            !payload.TryGetProperty("document", out var document) ||
+            document.ValueKind != JsonValueKind.Object ||
+            !payload.TryGetProperty("path", out var pathValue) ||
+            pathValue.ValueKind != JsonValueKind.String ||
+            !payload.TryGetProperty("overwriteApproved", out var approvedValue) ||
+            approvedValue.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            throw new InvalidDataException("保存请求缺少文章、目标路径或覆盖确认状态。");
+        ArticleContractValidator.Validate(document);
+        var title = document.GetProperty("title").GetString();
+        if (string.IsNullOrWhiteSpace(title))
+            throw new InvalidDataException("请先填写英文标题，再保存 JSON 和 ZIP。");
+
+        var name = nameValue.GetString()!;
+        ValidatePairFileName(name);
+        var path = ValidateCardPath(pathValue.GetString()!);
+        if (!string.Equals(Path.GetFileName(path), name, StringComparison.Ordinal))
+            throw new InvalidDataException("保存目标文件名与文章标题不一致。");
+        var folder = Path.GetDirectoryName(path)!;
+        var zip = Path.ChangeExtension(path, ".zip");
+        var overwriting = File.Exists(path) || File.Exists(zip);
+        if (overwriting && !approvedValue.GetBoolean())
+            throw new IOException("目标文件已发生变化，请重新确认覆盖后再保存。");
+
+        var saved = await exporter.SavePairAsync(payload, path, approvedValue.GetBoolean());
+        if (saved != true) return null;
+
+        var jsonText = await File.ReadAllTextAsync(path);
+        activeCardPath = path;
+        activeFingerprint = Fingerprint(jsonText);
+        bool remembered = true;
+        try { await data.SaveLastLibraryFolderAsync(folder); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException)
         {
-            try { File.Delete(staged); }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
+            remembered = false;
+            Trace.TraceWarning("Article files saved, but the library path was not remembered: {0}", error);
         }
+        return new { path, text = jsonText, folder, folderPreferenceSaved = remembered };
     }
 
     private static object ListCardDirectory(string directory)

@@ -9,19 +9,21 @@ import {
 import { paginate, type Layout } from '../services/pagination';
 import {
   cacheDraft, download, loadDesktopData, loadSettings, saveSettings,
-  openProject, saveProject, requestExport, restoreDraft, sampleDraft,
+  openProject, saveProject, requestExport, restoreDraft,
   type DesktopPersistence, type DesktopSaveResult,
 } from '../services/projectIO';
 import { desktopRequest, isDesktop } from '../services/desktopBridge';
 import { CardSaveCoordinator, type CardSaveStatus } from '../services/cardSaveCoordinator';
-import { cardFileName, createCardFile, createCardSaveCoordinator, defaultCardLibrary, listCardDirectory, openCardFile, serializedCard } from '../services/cardFileIO';
+import { cardFileName, chooseArticlePairTarget, createCardSaveCoordinator, defaultCardLibrary, lastCardLibrary, listCardDirectory, openCardFile, saveArticlePair, serializedCard, type ArticlePairTarget } from '../services/cardFileIO';
 
 type ParagraphCollection = 'content' | 'translation';
 const stringify = (project: Project) => JSON.stringify(projectDocument(project), null, 2);
 
 export function useEditorViewModel() {
   const desktop = isDesktop();
-  const [boot, setBoot] = useState(desktop ? sampleDraft : restoreDraft);
+  const [boot, setBoot] = useState<ReturnType<typeof restoreDraft>>(desktop
+    ? () => ({ project: createEmptyArticle(), notice: '', cacheBlocked: false })
+    : restoreDraft);
   const [project, setProject] = useState<RenderProject>({ ...boot.project, styles: { ...defaults } });
   const [wordDrafts, setWordDrafts] = useState<Record<string, string>>({});
   const wordDraftsRef = useRef<Record<string, string>>({});
@@ -77,27 +79,27 @@ export function useEditorViewModel() {
   const cardTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [cardSaveStatus, setCardSaveStatus] = useState<CardSaveStatus>('clean');
   const [activeCardPath, setActiveCardPath] = useState<string | null>(null);
-  const [libraryRoot, setLibraryRoot] = useState(() =>
-    desktop ? localStorage.getItem('englishcards.library.root') ?? '' : '');
+  const [libraryRoot, setLibraryRoot] = useState('');
   const [libraryRevision, setLibraryRevision] = useState(0);
+  // A JSON autosave alone does not mean the matching ZIP is current.
+  const lastPairedSnapshot = useRef<string | null>(null);
   const libraryRootWasChanged = useRef(false);
   useEffect(() => {
     if (!desktop) return;
     let cancelled = false;
-    const initial = libraryRoot;
     void (async () => {
       try {
-        if (initial) {
-          await listCardDirectory(initial);
+        const remembered = await lastCardLibrary();
+        if (typeof remembered === 'string' && remembered) {
+          await listCardDirectory(remembered);
+          if (!cancelled && !libraryRootWasChanged.current) setLibraryRoot(remembered);
           return;
         }
-      } catch { /* Previous folder is unavailable: reset to userdata. */ }
+      } catch { /* The remembered library is unavailable: fall back to userdata. */ }
       try {
         const fallback = await defaultCardLibrary();
-        if (!cancelled && !libraryRootWasChanged.current && typeof fallback === 'string' && fallback) {
-          setLibraryRoot(current => current === initial ? fallback : current);
-          localStorage.setItem('englishcards.library.root', fallback);
-        }
+        if (!cancelled && !libraryRootWasChanged.current && typeof fallback === 'string' && fallback)
+          setLibraryRoot(fallback);
       } catch { /* No directory can be selected until the bridge becomes available. */ }
     })();
     return () => { cancelled = true; };
@@ -109,7 +111,6 @@ export function useEditorViewModel() {
     setLibraryRoot(path);
     // Re-selecting the same root refreshes its direct children without a Refresh button.
     setLibraryRevision(value => value + 1);
-    if (desktop) localStorage.setItem('englishcards.library.root', path);
   }
   const latest = useRef({ project, opening });
   useLayoutEffect(() => { latest.current = { project, opening }; }, [project, opening]);
@@ -157,6 +158,12 @@ export function useEditorViewModel() {
   const settingsRevision = useRef(0);
   const ready = settingsReady && !opening && rendered?.project === previewProject;
   const hasFileChanges = cardSession.current ? cardSaveStatus !== 'clean' : lastFile !== stringify(project);
+  const emptyArticle = !project.title.trim() && !project.identityTag.trim()
+    && project.vocabulary.length === 0 && project.content.paragraphs.length === 0
+    && project.translation.paragraphs.length === 0;
+  const needsClearConfirmation = hasFileChanges || invalidCardSnapshot.current
+    || Object.keys(wordDrafts).length > 0
+    || (!emptyArticle && lastPairedSnapshot.current !== serializedCard(project));
 
   function update(next: Project | ((current: RenderProject) => Project)) {
     setProject(current => {
@@ -348,6 +355,7 @@ export function useEditorViewModel() {
       setLastFile(stringify(article));
       setVocabularySelection(null);
       setCardSaveStatus('clean');
+      lastPairedSnapshot.current = null;
       reportError('card-open', '');
       return true;
     } catch (reason) {
@@ -356,45 +364,99 @@ export function useEditorViewModel() {
     } finally { setOpening(false); }
   }
 
-  async function newCard(directory: string, englishTitle: string): Promise<boolean> {
-    if (!desktop || !directory || opening || preparingClose.current) return false;
-    if (!settingsReady) { showWarning('正在初始化程序设置，请稍后重新新建卡片。'); return false; }
-    const current = cardSession.current;
-    if (invalidCardSnapshot.current || Object.keys(wordDraftsRef.current).length > 0 ||
-        (current && current.status !== 'clean') ||
-        (!current && hasFileChanges)) {
-      if (current?.status === 'dirty') void flushCardSave(current);
-      showWarning('当前卡片正在保存或存在未保存内容，请完成后重新点击新建卡片。');
+  /** Wait for old writes before releasing a file-backed session. */
+  async function clearArticle(): Promise<boolean> {
+    if (!desktop || !settingsReady || preparingClose.current || exporting || opening) return false;
+    clearTimeout(cardTimer.current);
+    const session = cardSession.current;
+    if (session) await session.settle();
+    if (preparingClose.current || exporting || opening) return false;
+    const empty = createEmptyArticle();
+    cardSession.current = null;
+    invalidCardSnapshot.current = false;
+    lastPairedSnapshot.current = null;
+    setActiveCardPath(null);
+    setCardSaveStatus('clean');
+    wordDraftsRef.current = {};
+    setWordDrafts({});
+    update(empty);
+    setRendered(null);
+    setLastFile(stringify(empty));
+    setVocabularySelection(null);
+    reportError('card-open', '');
+    reportError('card-validation', '');
+    reportError('card-save', '');
+    reportError('pair-save', '');
+    return true;
+  }
+
+  /** A paired save is the only operation that establishes a current ZIP version. */
+  async function savePair(confirmOverwrite: (target: ArticlePairTarget) => Promise<boolean>): Promise<boolean> {
+    if (!desktop || !settingsReady || opening || exporting || preparingClose.current) return false;
+    if (!ready || !rendered || rendered.project !== previewProject) {
+      showWarning('预览与编辑内容尚未同步，或分页尚未完成，请稍后保存。');
       return false;
     }
-    setOpening(true);
+    if (!project.title.trim()) {
+      showWarning('请先填写英文标题，再保存 JSON 与 ZIP。');
+      return false;
+    }
+    if (invalidCardSnapshot.current || Object.keys(wordDraftsRef.current).length > 0) {
+      showWarning('当前有未完成或无效的输入，请先完成词汇编辑。');
+      return false;
+    }
+    const snapshot = project;
+    const signature = rendered.layout.signature;
+    const pages = rendered.layout.pages.length;
+    if (pages < 1) { showWarning('请先完成文章分页后再保存。'); return false; }
+    // The editor must not change while a snapshot is exported to the native renderer.
+    flushSync(() => {
+      (document.activeElement as HTMLElement | null)?.blur();
+      setOpening(true);
+      setExporting(true);
+    });
     try {
-      const title = englishTitle.trim();
-      if (!title) { reportError('card-create', '请先填写英文标题。'); return false; }
-      const empty = createEmptyArticle(title);
-      const created = await createCardFile(directory, empty);
-      // File creation has completed. The bridge now owns the new file identity.
-      const next = projectDocument(JSON.parse(created.text) as Project);
-      const session = createCardSaveCoordinator(created.path, next);
+      const existing = cardSession.current;
+      if (existing && !(await flushCardSave(existing))) {
+        showWarning('当前 JSON 自动保存尚未完成，请先处理保存错误。');
+        return false;
+      }
+      const target = await chooseArticlePairTarget(cardFileName(snapshot.title));
+      if (!target) return false; // Folder selection cancelled.
+      const overwriteApproved = target.existingFiles.length > 0
+        ? await confirmOverwrite(target)
+        : false;
+      if (target.existingFiles.length > 0 && !overwriteApproved) return false;
+      const result = await saveArticlePair(snapshot, signature, pages, target, overwriteApproved);
+      if (!result) return false;
+      const saved = projectDocument(JSON.parse(result.text) as Project);
+      const session = createCardSaveCoordinator(result.path, saved);
       clearTimeout(cardTimer.current);
       cardSession.current = session;
       invalidCardSnapshot.current = false;
-      setActiveCardPath(created.path);
       wordDraftsRef.current = {};
       setWordDrafts({});
-      update(next);
-      setLastFile(stringify(next));
-      setVocabularySelection(null);
+      update(saved);
+      setLastFile(stringify(saved));
+      setActiveCardPath(result.path);
       setCardSaveStatus('clean');
-      setLibraryRevision(value => value + 1);
+      lastPairedSnapshot.current = serializedCard(saved);
+      setVocabularySelection(null);
+      changeLibraryRoot(result.folder);
+      reportError('pair-save', '');
+      reportError('card-save', '');
       reportError('card-open', '');
-      reportError('card-create', '');
-      showWarning(`已创建卡片：${cardFileName(title)}`);
+      showWarning(result.folderPreferenceSaved
+        ? 'JSON 和 ZIP 均已保存，卡片馆已切换至保存目录。'
+        : 'JSON 和 ZIP 均已保存，但未能记住最近使用的文件夹。');
       return true;
     } catch (reason) {
-      reportError('card-create', `新建卡片失败：${String(reason)}`);
+      reportError('pair-save', `联合保存失败：${String(reason)}`);
       return false;
-    } finally { setOpening(false); }
+    } finally {
+      setExporting(false);
+      setOpening(false);
+    }
   }
 
   async function retryCardSave(): Promise<boolean> {
@@ -667,7 +729,8 @@ export function useEditorViewModel() {
   return {
     project, warning, error, errors, settingsReady, ready, exporting, opening, desktop, closing,
     layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
-    open, openCardPath, newCard, retryCardSave, cardSaveStatus, activeCardPath,
+    open, openCardPath, retryCardSave, cardSaveStatus, activeCardPath,
+    clearArticle, savePair, needsClearConfirmation, emptyArticle,
     libraryRoot, libraryRevision, changeLibraryRoot, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
     highlightRange, addVocabularyFromSelection, commitHead, setWordPreview, setEntryHighlights, setSenseField, setVocabularyMeaning,
     addSense, removeSense, reorder, setEntryField, addEntry, removeEntry, setStyle, resetStyles,

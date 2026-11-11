@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import fixture from '@fixtures/projects/brainco/project.json';
-import { parseRenderProject } from '@frontend/models/project';
+import { createEmptyArticle, parseRenderProject } from '@frontend/models/project';
 import { loadDesktopData, requestExport, restoreDraft } from '@frontend/services/projectIO';
 import { defaults } from '@frontend/models/settings';
 
@@ -22,7 +22,7 @@ it('Phase E desktop bootstrap reads settings without restoring a legacy draft', 
   } } });
   try {
     const { settings, draft, persistence } = await loadDesktopData();
-    expect(draft.project.title).toBe(fixture.title);
+    expect(draft.project).toMatchObject({ ...createEmptyArticle(), id: expect.any(String) });
     expect(reads).toEqual(['loadSettings']);
     expect(draft.project.schemaVersion).toBe(6);
     await persistence.save({ ...draft.project, styles: settings });

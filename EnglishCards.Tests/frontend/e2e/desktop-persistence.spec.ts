@@ -24,9 +24,12 @@ async function start(page: import('@playwright/test').Page, initialSettings: str
       postMessage(request: Request) {
         host.phaseESettingsRequests.push(request);
         if (request.command === 'saveSettings' && host.phaseESettingsHold) return;
-        queueMicrotask(() => host.phaseESettingsReply(
-          request.id, request.command === 'loadSettings' ? settings : true,
-        ));
+        let value: unknown = request.command === 'loadSettings' ? settings : true;
+        if (request.command === 'lastCardLibrary' || request.command === 'lastNewCardFolder')
+          value = 'C:/EnglishCards/userdata';
+        if (request.command === 'listCardDirectory')
+          value = { path: request.payload, folders: [], files: [] };
+        queueMicrotask(() => host.phaseESettingsReply(request.id, value));
       },
       addEventListener: events.addEventListener.bind(events),
       removeEventListener: events.removeEventListener.bind(events),
@@ -43,14 +46,14 @@ const requests = (page: import('@playwright/test').Page, command: string) =>
 
 test('Phase E desktop boots without reading legacy article drafts', async ({ page }) => {
   await start(page, null);
-  await expect(page.getByRole('button', { name: '设计', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '设置', exact: true })).toBeVisible();
   await expect.poll(async () => (await requests(page, 'saveSettings')).length).toBe(1);
   // React StrictMode can replay mount effects in development; settings reads are idempotent.
   expect((await requests(page, 'loadSettings')).length).toBeGreaterThanOrEqual(1);
   expect(await requests(page, 'loadDraft')).toHaveLength(0);
   expect(await requests(page, 'saveDraft')).toHaveLength(0);
-  await page.getByRole('button', { name: '设计', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: '设计设置' })).toBeVisible();
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '设置' })).toBeVisible();
   await expect(page.getByRole('table', { name: '字号设置' })).toBeVisible();
   await expect(page.getByRole('button', { name: '默认配置' })).toBeVisible();
   await expect(page.getByRole('button', { name: '导入配置' })).toHaveCount(0);
@@ -58,7 +61,7 @@ test('Phase E desktop boots without reading legacy article drafts', async ({ pag
 
 test('Phase E persists settings separately even when no article file is open', async ({ page }) => {
   await start(page, JSON.stringify(defaults));
-  await page.getByRole('button', { name: '设计', exact: true }).click();
+  await page.getByRole('button', { name: '设置', exact: true }).click();
   await expect(page.getByLabel('英文正文字号', { exact: true })).toBeVisible();
   await page.getByLabel('英文正文字号', { exact: true }).fill('40');
   await expect.poll(async () => (await requests(page, 'saveSettings')).length).toBeGreaterThan(0);

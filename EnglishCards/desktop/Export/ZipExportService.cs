@@ -8,13 +8,12 @@ using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
-using Microsoft.Win32;
 
 namespace EnglishCards;
 
 // Captures a single immutable editor snapshot in a separate WebView2 renderer.
 // The ZIP is staged in the destination directory and is committed only after verification.
-internal sealed class ZipExportService(Window owner, LocalWebContent content, UserDataStore data)
+internal sealed class ZipExportService(Window owner, LocalWebContent content)
 {
     private CancellationTokenSource? cancellation;
     private ProgressDialog? activeProgress;
@@ -25,7 +24,7 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
         else cancellation?.Cancel();
     }
 
-    internal async Task<bool?> ExportAsync(JsonElement request)
+    internal async Task<bool?> ExportAsync(JsonElement request, string activeCardPath)
     {
         if (IsRunning) throw new InvalidOperationException("已有导出任务正在运行。");
         if (request.ValueKind != JsonValueKind.Object ||
@@ -45,16 +44,9 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
         if (width is < 400 or > 4000 || height is < 400 or > 4000)
             throw new InvalidDataException("页面尺寸超出允许范围。");
 
-        var name = document.TryGetProperty("title", out var title) ? title.GetString() ?? "EnglishCards" : "EnglishCards";
-        name = string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) || char.IsControl(c) ? '_' : c)).Trim().TrimEnd('.');
-        if (name.Length > 80) name = name[..80];
-        if (name.Length == 0) name = "EnglishCards";
-        var selected = new SaveFileDialog
-        {
-            Filter = "ZIP 压缩包 (*.zip)|*.zip", DefaultExt = ".zip", AddExtension = true,
-            FileName = name + ".zip", InitialDirectory = data.ExportsPath, OverwritePrompt = true
-        };
-        if (selected.ShowDialog(owner) != true) return null;
+        var destination = GetDestinationPath(activeCardPath);
+        if (!File.Exists(activeCardPath))
+            throw new FileNotFoundException("当前 JSON 卡片文件不存在，无法导出。", activeCardPath);
 
         using var cts = new CancellationTokenSource();
         cancellation = cts;
@@ -63,7 +55,7 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
         try
         {
             progressWindow.Show();
-            await GenerateAsync(selected.FileName, project.GetRawText(), document.GetRawText(), signature,
+            await GenerateAsync(destination, project.GetRawText(), document.GetRawText(), signature,
                 pages, width, height, progressWindow, cts.Token);
             return true;
         }
@@ -77,6 +69,91 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content, Us
             cancellation = null;
             progressWindow.CloseAfterOperation();
         }
+    }
+
+    /// <summary>
+    /// Render and commit a JSON + ZIP pair from the same validated Article v6
+    /// snapshot. This method does not choose the folder or confirm overwrites;
+    /// both decisions must happen before creating the progress window.
+    /// </summary>
+    internal async Task<bool?> SavePairAsync(JsonElement request, string targetJson, bool overwriteApproved)
+    {
+        if (IsRunning) throw new InvalidOperationException("已有保存任务正在运行。");
+        if (request.ValueKind != JsonValueKind.Object ||
+            !request.TryGetProperty("project", out var project) || project.ValueKind != JsonValueKind.Object ||
+            !request.TryGetProperty("document", out var document) || document.ValueKind != JsonValueKind.Object ||
+            !request.TryGetProperty("signature", out var signatureValue) || signatureValue.ValueKind != JsonValueKind.String ||
+            !request.TryGetProperty("pages", out var pagesValue) || !pagesValue.TryGetInt32(out var pages) || pages < 1)
+            throw new InvalidDataException("保存快照格式无效。");
+
+        ArticleContractValidator.Validate(document);
+        if (Encoding.UTF8.GetByteCount(project.GetRawText()) > 5 * 1024 * 1024)
+            throw new InvalidDataException("文章数据超过 5 MiB 的保存请求上限。");
+        string signature = signatureValue.GetString()!;
+        if (signature.Length is < 10 or > 512) throw new InvalidDataException("分页签名无效。");
+        var styles = project.GetProperty("styles");
+        int width = styles.GetProperty("pageWidth").GetInt32();
+        int height = styles.GetProperty("pageHeight").GetInt32();
+        if (width is < 400 or > 4000 || height is < 400 or > 4000)
+            throw new InvalidDataException("页面尺寸超出允许范围。");
+        var fullJson = Path.GetFullPath(targetJson);
+        if (!string.Equals(Path.GetExtension(fullJson), ".json", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("保存目标必须是 JSON 文件。");
+        var fullZip = Path.ChangeExtension(fullJson, ".zip");
+        var folder = Path.GetDirectoryName(fullJson)!;
+        if (!Directory.Exists(folder)) throw new DirectoryNotFoundException("保存目标文件夹不存在。");
+
+        var identifier = Guid.NewGuid().ToString("N");
+        var stagedJson = Path.Combine(folder, $".englishcards-{identifier}.json.tmp");
+        var stagedZip = Path.Combine(folder, $".englishcards-{identifier}.zip.tmp");
+        using var cts = new CancellationTokenSource();
+        cancellation = cts;
+        var dialog = new ProgressDialog(owner, "正在保存 JSON 与 ZIP", cts.Cancel);
+        activeProgress = dialog;
+        try
+        {
+            dialog.Show();
+            var formatted = ArticleJsonFormatter.FormatUtf8(document.GetRawText());
+            cts.Token.ThrowIfCancellationRequested();
+            dialog.SetIndeterminate("正在准备文章 JSON…", "正在生成与 ZIP 一致的 Article v6 数据。");
+            await using (var stream = new FileStream(stagedJson, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                             65536, FileOptions.Asynchronous))
+                await stream.WriteAsync(formatted, cts.Token);
+
+            await GenerateAsync(stagedZip, project.GetRawText(), document.GetRawText(), signature,
+                pages, width, height, dialog, cts.Token);
+            cts.Token.ThrowIfCancellationRequested();
+            dialog.SetIndeterminate("正在提交 JSON 和 ZIP…", "两个文件均已完成验证，正在保护并更新正式文件。");
+            await PairedFileCommit.CommitAsync(stagedJson, stagedZip, fullJson, fullZip,
+                overwriteApproved, cts.Token);
+            return true;
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            return false;
+        }
+        finally
+        {
+            activeProgress = null;
+            cancellation = null;
+            dialog.CloseAfterOperation();
+            try { File.Delete(stagedJson); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            { Trace.TraceWarning("JSON staging cleanup failed: {0}", error); }
+            try { File.Delete(stagedZip); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            { Trace.TraceWarning("ZIP staging cleanup failed: {0}", error); }
+        }
+    }
+
+    internal static string GetDestinationPath(string activeCardPath)
+    {
+        if (string.IsNullOrWhiteSpace(activeCardPath))
+            throw new InvalidDataException("当前卡片路径为空，无法确定 ZIP 保存位置。");
+        var fullPath = Path.GetFullPath(activeCardPath);
+        if (!string.Equals(Path.GetExtension(fullPath), ".json", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("当前卡片不是 JSON 文件，无法导出 ZIP。");
+        return Path.ChangeExtension(fullPath, ".zip");
     }
 
     private async Task GenerateAsync(string destination, string projectJson, string documentJson,

@@ -52,6 +52,11 @@ export class CardSaveCoordinator {
     return false;
   }
 
+  /** Await any in-flight write without starting another revision. */
+  async settle(): Promise<void> {
+    if (this.inFlight) await this.inFlight;
+  }
+
   /** Retry is an explicit action after a failed write. */
   retry(): Promise<boolean> {
     this.failure = null;

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import fixture from '@fixtures/projects/brainco/project.json';
-import { cardFileName, createCardFile, createCardSaveCoordinator, listCardDirectory, openCardFile, serializedCard } from '@frontend/services/cardFileIO';
-import { parseProject } from '@frontend/models/project';
+import { cardFileName, chooseArticlePairTarget, createCardSaveCoordinator, listCardDirectory, openCardFile, saveArticlePair, serializedCard } from '@frontend/services/cardFileIO';
+import { defaults, parseProject } from '@frontend/models/project';
 
 function fakeBridge(respond: (command: string, payload: unknown) => unknown) {
   const messages = new EventTarget();
@@ -51,18 +51,28 @@ describe('Phase E file-backed desktop bridge client', () => {
     });
   });
 
-  it('requests exclusive creation with a validated empty Article v6 document', async () => {
-    const requests = fakeBridge((_command, payload) => ({
-      path: 'C:/cards/new.json', text: (payload as { text: string }).text,
-    }));
+  it('requests a validated JSON and ZIP pair from a single snapshot', async () => {
+    const requests = fakeBridge((command, payload) => command === 'chooseArticlePairTarget'
+      ? { path: 'C:/cards/new.json', folder: 'C:/cards', existingFiles: [] }
+      : {
+        path: 'C:/cards/new.json', folder: 'C:/cards',
+        text: JSON.stringify((payload as { document: object }).document),
+        folderPreferenceSaved: true,
+      });
     const article = parseProject(fixture);
-    const created = await createCardFile('C:/cards', article);
-    expect(created?.path).toBe('C:/cards/new.json');
-    expect(requests[0].command).toBe('createCardFile');
-    const payload = requests[0].payload as { directory: string; fileName: string; text: string };
-    expect(payload.directory).toBe('C:/cards');
+    const target = await chooseArticlePairTarget('New Article.json');
+    expect(target?.existingFiles).toEqual([]);
+    const saved = await saveArticlePair({ ...article, styles: defaults }, 'page-signature-1', 2, target!, false);
+    expect(saved?.path).toBe('C:/cards/new.json');
+    expect(requests.at(-1)!.command).toBe('saveArticlePair');
+    const payload = requests.at(-1)!.payload as {
+      fileName: string; document: object; project: object; signature: string; pages: number;
+    };
     expect(payload.fileName).toBe(cardFileName(article.title));
-    expect(JSON.parse(payload.text)).toEqual(article);
+    expect(payload.document).toEqual(article);
+    expect(payload.signature).toBe('page-signature-1');
+    expect(payload.pages).toBe(2);
+    expect(payload.project).toMatchObject({ ...article, styles: defaults });
   });
 
   it('creates safe title-based filenames and handles invalid Windows path characters', () => {

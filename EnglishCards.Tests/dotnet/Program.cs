@@ -151,6 +151,52 @@ void Dispose(object store) => disposeStore.Invoke(store, null);
 Task SaveSettings(object store, string text) => (Task)saveSettings.Invoke(store, [text, true])!;
 Task SaveDraft(object store, string text) => (Task)saveDraft.Invoke(store, [text, true])!;
 
+var loadLibraryFolder = storeType.GetMethod("LoadLastLibraryFolderAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+var saveLibraryFolder = storeType.GetMethod("SaveLastLibraryFolderAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+Task<string> LoadPath(object store, System.Reflection.MethodInfo method) => (Task<string>)method.Invoke(store, null)!;
+Task SavePath(object store, System.Reflection.MethodInfo method, string path) => (Task)method.Invoke(store, [path])!;
+
+var preferenceRoot = Directory.CreateTempSubdirectory("EnglishCards-path-preferences-");
+var libraryFolder = Directory.CreateDirectory(Path.Combine(preferenceRoot.FullName, "library"));
+var preferenceStore = NewStore(preferenceRoot.FullName);
+try
+{
+    if (await LoadPath(preferenceStore, loadLibraryFolder) != preferenceRoot.FullName)
+        throw new Exception("The library preference must initially fall back to userdata.");
+    await SavePath(preferenceStore, saveLibraryFolder, libraryFolder.FullName);
+    Dispose(preferenceStore);
+    preferenceStore = NewStore(preferenceRoot.FullName);
+    if (await LoadPath(preferenceStore, loadLibraryFolder) != libraryFolder.FullName)
+        throw new Exception("Remembered library path must survive restart.");
+    Directory.Delete(libraryFolder.FullName);
+    if (await LoadPath(preferenceStore, loadLibraryFolder) != preferenceRoot.FullName)
+        throw new Exception("A missing library must fall back to userdata.");
+    Console.WriteLine("PASS recent card library folder survives restart and recovers from missing paths");
+}
+finally
+{
+    Dispose(preferenceStore);
+    preferenceRoot.Delete(recursive: true);
+}
+
+var positioningType = bridgeType.Assembly.GetType("EnglishCards.FolderDialogPositioning", throwOnError: true)!;
+var calculatePosition = positioningType.GetMethod("CalculatePosition", BindingFlags.Static | BindingFlags.NonPublic)!;
+var centered = (System.Windows.Point)calculatePosition.Invoke(null, [
+    new System.Windows.Rect(100, 100, 800, 600),
+    new System.Windows.Size(400, 300),
+    new System.Windows.Rect(0, 0, 1920, 1080)
+])!;
+if (centered != new System.Windows.Point(300, 250))
+    throw new Exception("The folder picker must be centered over its owner.");
+var clamped = (System.Windows.Point)calculatePosition.Invoke(null, [
+    new System.Windows.Rect(1600, 850, 300, 180),
+    new System.Windows.Size(500, 400),
+    new System.Windows.Rect(0, 0, 1920, 1080)
+])!;
+if (clamped != new System.Windows.Point(1420, 680))
+    throw new Exception("The centered folder picker must remain within the monitor work area.");
+Console.WriteLine("PASS native folder picker positioning centers over its owner and clamps to the monitor work area");
+
 var leaseDirectory = Directory.CreateTempSubdirectory("EnglishCards-lease-test-");
 var firstStore = NewStore(leaseDirectory.FullName);
 var secondStore = NewStore(leaseDirectory.FullName);
@@ -350,6 +396,24 @@ Console.WriteLine("PASS exported article JSON is pretty-printed UTF-8 without BO
 
 // Validate the staged ZIP before the final destination is replaced.
 var exportType = bridgeType.Assembly.GetType("EnglishCards.ZipExportService", throwOnError: true)!;
+var getExportDestination = exportType.GetMethod("GetDestinationPath", BindingFlags.Static | BindingFlags.NonPublic)
+    ?? throw new Exception("Card-relative ZIP destination resolution is missing.");
+var exportPathTestDirectory = Directory.CreateTempSubdirectory("EnglishCards-export-path-test-");
+try
+{
+    var sourceJson = Path.Combine(exportPathTestDirectory.FullName, "Nested", "My Article.json");
+    var expectedZip = Path.Combine(exportPathTestDirectory.FullName, "Nested", "My Article.zip");
+    var actualZip = (string)getExportDestination.Invoke(null, [sourceJson])!;
+    if (!string.Equals(actualZip, expectedZip, StringComparison.OrdinalIgnoreCase))
+        throw new Exception("ZIP export must use the active JSON directory and basename.");
+    bool invalidExtensionRejected = false;
+    try { getExportDestination.Invoke(null, [Path.Combine(exportPathTestDirectory.FullName, "article.txt")]); }
+    catch (TargetInvocationException error) when (error.InnerException is InvalidDataException) { invalidExtensionRejected = true; }
+    if (!invalidExtensionRejected) throw new Exception("Card-relative ZIP export must reject non-JSON paths.");
+    Console.WriteLine("PASS ZIP destination uses the active JSON directory and basename");
+}
+finally { exportPathTestDirectory.Delete(recursive: true); }
+
 var validateArchive = exportType.GetMethod("ValidateArchiveAsync", BindingFlags.Static | BindingFlags.NonPublic)!;
 Task ValidateArchive(string path, int pages, int width, int height) =>
     (Task)validateArchive.Invoke(null, [path, pages, width, height, CancellationToken.None])!;
@@ -494,27 +558,48 @@ try
 finally { cardDirectory.Delete(recursive: true); }
 
 
-// Phase E: new-card creation must never overwrite existing files, including races.
-var writeNewCard = bridgeType.GetMethod("WriteNewCardAsync", BindingFlags.Static | BindingFlags.NonPublic)
-    ?? throw new Exception("Phase E exclusive card creation primitive is missing.");
-Task CreateNewCard(string path, string json) =>
-    (Task)writeNewCard.Invoke(null, [path, json])!;
-var newCardDirectory = Directory.CreateTempSubdirectory("EnglishCards-new-card-test-");
+var pairCommitType = bridgeType.Assembly.GetType("EnglishCards.PairedFileCommit", throwOnError: true)!;
+var pairCommit = pairCommitType.GetMethod("CommitAsync", BindingFlags.Static | BindingFlags.NonPublic)!;
+Task CommitPair(string sourceJson, string sourceZip, string targetJson, string targetZip, bool approved) =>
+    (Task)pairCommit.Invoke(null, [sourceJson, sourceZip, targetJson, targetZip, approved, CancellationToken.None])!;
+var pairDir = Directory.CreateTempSubdirectory("EnglishCards-paired-save-");
 try
 {
-    var existing = Path.Combine(newCardDirectory.FullName, "Existing.json");
-    var created = Path.Combine(newCardDirectory.FullName, "New.json");
-    await File.WriteAllTextAsync(existing, "ORIGINAL");
-    await CreateNewCard(created, compactArticle);
-    if (await File.ReadAllTextAsync(created) != compactArticle)
-        throw new Exception("New-card creation must write the complete JSON snapshot.");
-    bool collisionRejected = false;
-    try { await CreateNewCard(existing, compactArticle); }
-    catch (IOException) { collisionRejected = true; }
-    if (!collisionRejected || await File.ReadAllTextAsync(existing) != "ORIGINAL")
-        throw new Exception("Existing JSON must remain byte-identical when creation conflicts.");
-    if (Directory.GetFiles(newCardDirectory.FullName, "*.tmp").Length != 0)
-        throw new Exception("New-card staging files must be removed after creation or failure.");
-    Console.WriteLine("PASS Phase E new-card creation is exclusive and cleans temporary files");
+    var json = Path.Combine(pairDir.FullName, "Article.json");
+    var zip = Path.Combine(pairDir.FullName, "Article.zip");
+    var stagedJson = Path.Combine(pairDir.FullName, ".article.json.tmp");
+    var stagedZip = Path.Combine(pairDir.FullName, ".article.zip.tmp");
+    await File.WriteAllTextAsync(json, "old JSON");
+    await File.WriteAllTextAsync(zip, "old ZIP");
+    await File.WriteAllTextAsync(stagedJson, "new JSON");
+    await File.WriteAllTextAsync(stagedZip, "new ZIP");
+    bool permissionRejected = false;
+    try { await CommitPair(stagedJson, stagedZip, json, zip, false); }
+    catch (IOException) { permissionRejected = true; }
+    if (!permissionRejected || File.ReadAllText(json) != "old JSON" || File.ReadAllText(zip) != "old ZIP")
+        throw new Exception("Paired save must not overwrite any file without approval.");
+
+    // The locked second target causes a failure after the first replacement;
+    // a rollback must restore the first target and preserve the old ZIP.
+    bool rolledBack = false;
+    using (var locked = File.Open(zip, FileMode.Open, FileAccess.Read, FileShare.Read))
+    {
+        try { await CommitPair(stagedJson, stagedZip, json, zip, true); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        { rolledBack = true; }
+    }
+    if (!rolledBack || File.ReadAllText(json) != "old JSON" || File.ReadAllText(zip) != "old ZIP")
+        throw new Exception("A failed ZIP commit must roll the earlier JSON replacement back.");
+    if (Directory.GetFiles(pairDir.FullName, "*.bak").Length != 0 ||
+        Directory.GetFiles(pairDir.FullName, "*.tmp").Length != 0)
+        throw new Exception("Paired save rollback left unnecessary temporary or backup files.");
+
+    await File.WriteAllTextAsync(stagedJson, "new JSON");
+    await File.WriteAllTextAsync(stagedZip, "new ZIP");
+    await CommitPair(stagedJson, stagedZip, json, zip, true);
+    if (File.ReadAllText(json) != "new JSON" || File.ReadAllText(zip) != "new ZIP" ||
+        Directory.GetFiles(pairDir.FullName).Length != 2)
+        throw new Exception("Paired save must commit both documents and remove staging files.");
+    Console.WriteLine("PASS paired save requires overwrite approval, rolls back a failed ZIP commit and cleans staging");
 }
-finally { newCardDirectory.Delete(recursive: true); }
+finally { pairDir.Delete(recursive: true); }
