@@ -81,7 +81,7 @@ public partial class MainWindow : Window
 
             var uiFolder = EmbeddedUiAssets.ExtractToCache(dataRoot);
             content = new LocalWebContent(environment, uiFolder);
-            exporter = new ZipExportService(this, content, userData);
+            exporter = new ZipExportService(this, content);
             try
             {
                 await content.LoadAsync(Editor, "index.html", ct, web =>

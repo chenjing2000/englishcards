@@ -13,7 +13,7 @@ namespace EnglishCards;
 
 // Captures a single immutable editor snapshot in a separate WebView2 renderer.
 // The ZIP is staged in the destination directory and is committed only after verification.
-internal sealed class ZipExportService(Window owner, LocalWebContent content, UserDataStore data)
+internal sealed class ZipExportService(Window owner, LocalWebContent content)
 {
     private CancellationTokenSource? cancellation;
     private ProgressDialog? activeProgress;
