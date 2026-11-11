@@ -1,85 +1,60 @@
 # Phase E — Card Library and File-backed Article Workflow
 
-Status: **Complete; Windows/WPF acceptance passed and merged into `main`**
-Merged by PR [#2](https://github.com/chenjing2000/englishcards/pull/2) on 2026-11-10.
-Merge commit: `8e47296dfa484f4f807550578ce9f3b147ad466e`
+Status: **Complete; Windows/WPF acceptance passed and merged into `main`.**  
+Phase E merge: PR [#2](https://github.com/chenjing2000/englishcards/pull/2), merge commit `8e47296dfa484f4f807550578ce9f3b147ad466e`.  
+The subsequent paired-save and clear workflow was completed in commit `822864ff99787395b21b040a0b0fccc0c62e2fc6`.
 
-This specification supersedes conflicting older import, draft, toolbar and workspace instructions in `README.md`, `docs/project-contract.md` and `docs/specs/PHASE2B_PRODUCT_ADDITIONS.md`. Existing Article v6 constraints and validated editor/preview behavior remain in force.
+## Verification
 
-Final verification: Vitest 64/64, Playwright 69/69, .NET desktop tests 19/19, TypeScript/Vite production build, Article v6 Skill validator, Windows x64 publish, Windows executable startup, owner-confirmed final UI acceptance, and GitHub Windows CI all passed. PR #2 was merged into `main` with a merge commit.
+Phase E baseline: Vitest 64/64, Playwright 69/69, .NET desktop tests 19/19, TypeScript/Vite production build, Article v6 Skill validation, Windows x64 publish, real WPF/WebView2 startup and key UI acceptance, and GitHub Windows CI passed.
 
-## 1. Product scope
+The later paired JSON + ZIP save and clear workflow was also accepted by the project owner on Windows. Do not attribute the Phase E baseline test counts to that later change as separate test counts.
 
-- Article remains strictly `schemaVersion: 6`. Each card is an independent JSON file.
-- Card Library browses a user-selected root directory as a directory tree. Load children lazily. Open JSON files directly from the tree.
-- File paths belong to the file system, not to a separate card database. No cross-directory coordination, indexing database or recursive background watcher.
-- Remove JSON/TXT import UI and manual standalone JSON save/export UI. Do not introduce automatic folder management or migration.
-- The sole official user export is complete ZIP with `article.json` and all page PNG images. Retain existing ZIP overwrite, cancellation, temporary-file cleanup and existing safety checks; add no expiry check or redundant post-export verification.
-- No migration, backward compatibility, or recovery framework for old global drafts. Do not automatically delete the user's existing draft files. Settings persistence remains independent.
-- Userdata remains adjacent to the executable, unchanged.
+## 1. Card Library
 
-## 2. Save and navigation contract
+- Article remains strictly `schemaVersion: 6`; each card is an independent JSON file.
+- The library browses a user-selected root directory as a directory tree and loads children lazily.
+- Clicking a JSON file opens that Article. Filesystem paths are the identity; there is no card database, cross-directory index or recursive background watcher.
+- The desktop UI has no legacy JSON/TXT import buttons and no standalone manual JSON save/export action.
+- Do not restore old global-draft auto-recovery or migration. Do not automatically delete old draft files.
+- User data remains adjacent to the executable in `userdata/`.
 
-- Debounce ordinary edits by about 300 ms and automatically save a validated Article v6 snapshot to the active card's JSON path.
-- Bind every write to the captured target path and immutable snapshot; serialize writes for the active card and track revisions. Only acknowledge the revision actually written.
-- `clean`: switching JSON cards is allowed immediately.
-- `dirty` (edit exists; debounce not elapsed): a click on another card **does not switch**; trigger saving the current card promptly and notify the user to click again once the save completes.
-- `saving`: a click on another card **does not switch**; notify the user to click again once the save completes.
-- `error`: do not switch or discard in-memory edits; show persistent error and allow retry.
-- **No pending switch queue, target-card memory, or automatic switching.** Every blocked click is discarded.
-- The same unsaved-write gate applies to creating a new card, export and application close. The latter two may wait for an in-flight write internally, but may not silently discard edits.
-- If the user edits again while an earlier revision is saving, save the newer revision before declaring clean.
-- Keep short-lived unfinished input buffers in memory; never weaken the persisted Article v6 schema just to save an incomplete edit.
-- New files must use non-overwriting creation. Only activate a new card after file creation succeeds.
+## 2. JSON autosave and card switching
+
+- Ordinary edits are debounced (approximately 300 ms) and saved as a validated Article v6 snapshot to the active card JSON path.
+- Bind each write to its captured target path and immutable snapshot; serialize writes and track revisions. Acknowledge only the revision actually written.
+- While an edit is dirty or a save is in progress, clicking another card does not switch. Trigger/continue the save as appropriate and notify the user to click again after completion.
+- Blocked clicks are discarded. There is no pending switch queue, remembered target card or automatic switching.
+- On save error, retain in-memory edits and error state; do not switch or discard edits.
+- If a new edit occurs while an earlier revision saves, save the newer revision before declaring the card clean.
+- Keep incomplete input buffers in memory; do not weaken persisted Article v6 validation to persist unfinished input.
 - Directory expansion, collapse and scrolling remain usable during saves.
 
-## 3. Workspace
+## 3. Clear and paired save
 
-- Three columns: library initially 310 DIP; remaining workspace preview/editor = 55:45; preserve splitter interaction, zoom and horizontal preview centering.
-- Enforce sensible minimum workspace width; do not let a narrow window make editors inaccessible.
-- Upper toolbar order: Settings, New Card, Export ZIP. Preserve approved 40 DIP round / 20 DIP SVG visual tokens where applicable.
-- Settings is an in-workspace modal surface; preserve existing valid settings fields and default reset, remove import-settings UI.
-- Notifications appear centered at the bottom of the preview pane: default 300 DIP, min 240, max 360; normal messages fade over 5 seconds; errors persist until dismissed; all messages have close buttons; multiple notices stack upwards and reflow down as earlier notices disappear.
+The final toolbar and file workflow are defined by [COMBINED_ARTICLE_SAVE.md](COMBINED_ARTICLE_SAVE.md).
 
-## Phase E final UI adjustments (2026-11-10)
+- Toolbar actions are Clear current article and Save JSON + ZIP (plus Settings); there is no New Card action or standalone Export ZIP action.
+- Clear with unsaved edits offers Save / Discard / Cancel. Save clears only after both JSON and ZIP commit; Discard does not delete committed files; Cancel leaves the session untouched.
+- An unfinished save operation blocks clearing until it completes.
+- Save creates same-basename JSON and ZIP from one validated snapshot. If either target exists, use the shared frontend overwrite modal.
+- On success, update the remembered Card Library path and switch the tree to the destination. On cancellation/failure, preserve current path and session.
 
-- Floating notices remain anchored to the preview pane's lower center but render in a body-level overlay above modal backdrops, so create-file errors are visible while the New Card dialog remains open.
-- Normal, warning, and error notices all have default width **360 DIP**, minimum **240 DIP**, and maximum **480 DIP**, further constrained by available preview width. Multiple notices continue to stack upwards. Normal notices expire after five seconds of active display, pause on hover, and are individually dismissible. Errors persist until dismissed or resolved.
-- Design Settings modal is centered with **320 DIP** default width, **280 DIP** minimum, and **360 DIP** maximum. Reduce its horizontal content padding and use a 60/40 two-column settings table to avoid unnecessary wrapping; internal scrolling remains available.
-- New Card modal does not show an inline duplicate-file or filesystem-error label. Business errors are reported once through the shared notice service. Card-library directory chooser and lazy-directory read failures also use this same floating notice service instead of inline error labels. Failed creation leaves the dialog open with the original title and does not overwrite a JSON file. A successful subsequent creation closes the dialog, clears the resolved create error, and emits a normal success notice.
-- Dismissing a save-error notice must **not** clear the underlying failed-save status or unlock a protected card switch.
+## 4. Workspace and notices
 
-## 4. Implementation sequence and gates
+- Three columns: Card Library initially 310 DIP; remaining preview/editor workspace defaults to 55:45. Preserve splitter interaction and minimum usable pane widths.
+- Settings is an in-workspace modal surface. Preserve valid settings fields and reset behavior.
+- Floating notices are centered at the bottom of the preview pane and stack upwards. Normal/warning/error notices use 360 DIP default width, 240 DIP minimum and 480 DIP maximum, constrained by available width. Normal notices expire after five seconds of active display, pause on hover and are individually dismissible; errors persist until dismissed or resolved.
+- Dismissing a save-error notice must not clear the underlying failed-save state or unlock protected card switching.
 
-0. Freeze requirements, inspect baseline and establish regression coverage.
-A1. Implement file identity, revision-aware save coordinator and navigation lock, with isolated unit tests.
-A2. Replace draft-primary persistence with file-backed JSON auto-save and WPF bridge, preserving atomic writes and strict validation.
-B. Add lazy directory tree, file opening, and non-overwriting New Card creation; remove old import/save UI.
-C1. Three-column layout and minimum-width/resize behavior.
-C2. Three-button SVG toolbar and in-workspace modal settings.
-C3. Stacked notifications and expiry/persistence rules.
-D. Integrate ZIP export and close flows, regression tests, owner Windows acceptance, and update current docs.
+## 5. Article v6 and editor
 
-Each phase must pass relevant unit/E2E/.NET tests and, where applicable, real Windows/WPF/WebView2 acceptance. Do not claim local Windows validation when unavailable.
+- Article v6 is the sole accepted schema. Each of Content and Translation permits at most 999 paragraphs; Vocabulary permits at most 999 entries.
+- Vocabulary unifies words, phrases and idioms under `word`.
+- The editor order is Vocabulary → Content → Translation. Content and Translation each use a continuous multi-paragraph editor.
+- Selection-to-Vocabulary is available from the left preview only. Selection must remain within one card and one natural paragraph, contain at least one Latin letter and no Chinese character; duplicates are not added or overwritten.
+- Preview and export use the same Article snapshot and shared pagination/rendering implementation.
 
-## Follow-up UI and export refinements (2026-11-10)
+## 6. Explicit non-goals
 
-- Design Settings modal width is 640 DIP, split into two equal columns with a vertical divider: font settings on the left and all remaining settings on the right. Preserve the existing setting fields, defaults and persistence behavior.
-- New Card modal has an editable absolute folder path defaulting to the executable-adjacent `userdata/` directory, plus a folder-picker button. The user may type any existing writable directory or choose one. The card name is a separate input; do not display filename-generation or save-directory hint text. The Create and Cancel actions are right-aligned.
-- The New Card folder picker and Card Library chooser are owned by the main window and use owner-relative placement. New-card creation remains exclusive and never overwrites an existing JSON file.
-- ZIP export uses the active card's JSON path. The destination is the same directory and basename with a `.zip` extension. Do not show a Save As dialog. Existing ZIP files are replaced only after the staged archive has been completely written and validated. Keep the existing progress/cancel lifecycle and ZIP contents.
-
-## 5. Explicit non-goals
-
-No database, autosync, automatic file renames/deletions, FileSystemWatcher, alternative document schema, undo/redo, complex compatibility logic, or new export format.
-
-
-## Final UI, path-memory and native-dialog refinements (2026-11-11)
-
-- Settings modal width is **560 DIP**. Keep the two settings tables side by side with a **20 DIP gap**, remove the vertical divider, and center each table heading over its own table.
-- New Card modal defaults to **560 DIP** width with a 400 DIP minimum and 600 DIP maximum. The modal is not user-resizable. It uses exactly two rows: Folder label + single-line folder path input + folder-picker icon; Card Name label + single-line name input + Create icon. Keep 20 DIP vertical spacing between rows. The title bar has a close icon; there are no footer Create/Cancel buttons.
-- Inputs use standard single-line text controls. They do not wrap and show no horizontal scrollbar. Long values may be clipped while unfocused; when focused, native HTML caret-following behavior remains available. Disable browser autofill and saved-entry suggestion UI in WebView2 and on the form inputs.
-- Remember the new-card destination only after a card has been successfully created. A typed or selected folder that is later cancelled or fails to create a card must not update the preference. On first use, fall back to the executable-adjacent userdata directory. Persist across application restarts.
-- Remember the Card Library root independently. Its preference is saved only after the selected directory has been successfully listed/opened. The next library picker starts at that last successful root. If the remembered directory is unavailable, fall back to userdata.
-- Both native folder pickers remain Windows shell dialogs, are owned by the WPF main window, and are explicitly centered over that owner. Positioning must clamp to the current monitor work area and use native HWND coordinates so mixed-DPI monitor layouts are handled without manually mixing DIP and pixel values.
-- ZIP export behavior is unchanged: export beside the active JSON using the same basename, replacing an existing ZIP only after the staged archive is validated.
+No database, autosync, automatic file renames/deletions, FileSystemWatcher, alternate document schema, undo/redo, global-draft recovery framework, or new export format.

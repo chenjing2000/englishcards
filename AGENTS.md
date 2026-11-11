@@ -2,39 +2,47 @@
 
 Before changing this repository:
 
-1. Read [`docs/project-contract.md`](docs/project-contract.md).
-2. Read the relevant specifications under [`docs/specs/`](docs/specs/).
-3. For Windows desktop review, follow [`docs/skills/windows-app-review/SKILL.md`](skills/windows-app-review/SKILL.md) and its adjacent reference documents.
-4. Inspect the current working tree and preserve user changes. A source ZIP without `.git` metadata cannot establish branch, commit, or remote state.
-5. Choose verification from the project contract. Distinguish automated tests, real Windows/WebView2 checks, and owner-reported historical acceptance.
+1. Read [the project contract](docs/project-contract.md).
+2. Read the relevant current specifications under [docs/specs](docs/specs/).
+3. For Windows desktop review, follow [the Windows App Review Skill](docs/skills/windows-app-review/SKILL.md) and its adjacent references.
+4. Inspect the current Git state and preserve user changes. A source ZIP without Git metadata cannot establish branch, commit, or remote state.
+5. Choose verification from the project contract. Distinguish automated tests, real Windows/WPF/WebView2 checks, and owner-reported acceptance.
 
-## Product boundaries
+## Current product contract
 
-- Product: Windows x64 desktop application using WPF + WebView2 + React/TypeScript. Keep this stack; do not migrate to Tauri, Electron, or pure WPF.
-- Keep the current lightweight separation. Do not add an MVVM framework, DI container, event bus, or abstraction without a demonstrated need.
-- The approved target data contract is **Article schemaVersion 6**. The v5 model remains only as a temporary implementation baseline during the coordinated migration; do not add new v5 features, dual-write schemas, or compatibility migrations. Remove the v5 runtime path when the v6 integration phase is complete.
-- Article v6 is deliberately incompatible with v5. Its fields and limits are specified in [`docs/architecture/ARTICLE_V6_PHASE1.md`](docs/architecture/ARTICLE_V6_PHASE1.md) and the Article v6 module under `EnglishCards/frontend/src/v6/`.
-- The only official user export remains a complete ZIP containing `article.json` and all page PNGs. Preserve the confirmed ZIP semantics while updating its JSON payload to Article v6 during integration.
-- Preserve the confirmed EXE-sibling `userdata/` contract. Do not migrate, read, or delete old `%LOCALAPPDATA%\EnglishCards` data unless the user explicitly changes this decision.
-- The target machine needs compatible .NET 10 Desktop Runtime x64 and WebView2 Evergreen. If .NET Desktop Runtime is missing, direct the user to Microsoft's official installer; do not add a native launcher or custom runtime downloader.
-- Node.js/npm, Express, Vite, TypeScript, Playwright and Chromium are development/build/test tools only, not end-user runtime dependencies.
+- Product: Windows x64 desktop application using WPF + .NET 10 + WebView2 + React/TypeScript. Do not migrate to Tauri, Electron, or pure WPF.
+- The only supported Article format is strict Article `schemaVersion: 6`. Reject v5 and earlier; do not silently migrate, dual-write, or retain a production v5 path.
+- Article fields are `schemaVersion`, `id`, `title`, `identityTag`, `content.paragraphs`, `vocabulary`, and `translation.paragraphs`. Paragraph groups each allow at most 999 entries; Vocabulary allows at most 999 entries. Vocabulary uses `word` for words, phrases, and idioms.
+- Card Library opens independent JSON files from a lazily browsed directory tree. There is no legacy global-draft auto-recovery and no desktop JSON/TXT import UI.
+- The toolbar offers Clear current article and Save JSON + ZIP (alongside Settings). Save produces same-basename JSON and ZIP from one validated Article v6 snapshot. See [combined save](docs/specs/COMBINED_ARTICLE_SAVE.md) and [Phase E](docs/specs/PHASE_E_CARD_LIBRARY.md).
+- Saving blocks card switching; blocked clicks are discarded, not queued.
+- User data lives in EXE-sibling `userdata/`. Do not migrate, read, or delete legacy `%LOCALAPPDATA%\\EnglishCards` data. Keep the Framework-dependent single-file publish model.
+- .NET 10 Desktop Runtime x64 and WebView2 Evergreen are end-user prerequisites. Node/npm, Vite, Playwright and Chromium are development tools only.
 
-## Repository structure
+## Documentation authority and reading order
 
-- `EnglishCards/`: all production functionality and runtime assets. WPF source is under `desktop/`; React/TypeScript source and frontend assets are under `frontend/`.
-- `EnglishCards.Tests/`: .NET tests under `dotnet/`; Vitest and Playwright tests under `frontend/`.
-- `docs/`: architecture, specifications, review records, plans, and reference material.
-- `docs/skills/`: project and development Skills, maintained alongside project documentation.
-- `tools/`: build, test, publish, comparison, demo, and development-only test-server tools.
-- `dist/EnglishCards/`: the single official publish output. Do not create parallel publish folders such as `dist/wpf`, `publish`, or `release`.
-- `EnglishCards/.build/` and root `.build/`: disposable generated build/test output. There is no permanent `artifacts/` directory.
+1. `docs/project-contract.md` is the single project-wide product and technical contract.
+2. Current focused specifications in `docs/specs/` define their respective technical details.
+3. `README.md` is the user/developer overview; `docs/implementation-status.md` and `docs/RELEASE_ACCEPTANCE.md` record current status and evidence.
+4. Skills under `docs/skills/` provide reusable workflows.
+
+Do not treat removed phase plans, old review reports, or historical notes as current instructions. Preserve the long-lived technical references and reference assets that remain in the repository.
+
+## Repository layout
+
+- `EnglishCards/`: production WPF and React/TypeScript application.
+- `EnglishCards.Tests/`: .NET, Vitest and Playwright tests.
+- `docs/specs/`: current contracts and technical specifications.
+- `docs/skills/`: Article generation, project code review and Windows app review Skills.
+- `docs/reference-assets/`: retained reference material.
+- `tools/`: build, test, publish and development-only utilities.
+- `dist/EnglishCards/`: sole publish output; generated and ignored.
 
 ## Change and delivery rules
 
-- The user's currently approved Article v6 and directory decisions override historical v5 documentation and plans.
-- Do not change confirmed user-data location, runtime deployment mode, primary UI behavior, or ZIP semantics without explicit approval.
-- Do not delete user data, sample projects, reference assets, tests, or historical records merely to reduce tree size.
-- Do not commit, push, tag, or modify remotes unless explicitly authorized.
-- Prefer targeted changes with regression tests. Report exact files, evidence, commands, and anything not verified.
-- Prefer direct `dotnet publish`; if a wrapper is useful, use `.bat`, not `.ps1`, as the publishing entry point.
-- Do not claim the v6 migration is complete until the WPF bridge, automatic draft, project open/save, editor, preview, and ZIP export all use the same validated Article v6 snapshot.
+- Do not change the approved schema, user-data location, deployment model, save workflow, or UI behavior without explicit approval.
+- Do not modify production source when the task is documentation-only.
+- Do not delete tests, reference assets, or retained Skills as part of documentation cleanup.
+- Do not commit, push, tag, or change remotes unless explicitly authorized.
+- Prefer targeted changes. Report exact files, verification evidence, commands, and anything not verified.
+- Use the Windows App Review Skill for desktop/runtime reviews and the Project Code Review Skill for code reviews.

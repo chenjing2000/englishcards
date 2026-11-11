@@ -1,26 +1,43 @@
-# Complete ZIP Export Contract
+# ZIP Rendering and Archive Contract
 
-## User-visible behavior
+## User workflow boundary
 
-- The only official export action is **Export all ZIP**.
-- The archive contains root-level `article.json` and every page image under `images/page-001.png`, `images/page-002.png`, etc.
-- There is no single-page PNG or PNG-only user workflow.
-- `article.json` is UTF-8 without BOM, two-space indented, keeps Chinese readable, contains the complete Article v6 object without runtime styles/settings, and ends with a newline.
+This document specifies ZIP generation, rendering, validation and safe file handling only. It does **not** define a standalone user-facing export action.
 
-## Snapshot
+The user-facing operation is **Save JSON + ZIP**, which creates a same-basename JSON/ZIP pair from one immutable Article v6 snapshot. See [COMBINED_ARTICLE_SAVE.md](COMBINED_ARTICLE_SAVE.md) for folder selection, overwrite confirmation, paired commit, clear behavior and Card Library path updates.
 
-The editor sends an immutable Article v6 export snapshot plus the render signature and page count. The service strictly validates schemaVersion 6, the signature, page count, and page dimensions before rendering. Rendering must use this request snapshot, not mutable live editor state. The running v5 export path is transitional and must not be mixed with v6 data.
+## Archive format
 
-## Rendering and archive lifecycle
+- Root-level `article.json` contains the complete Article v6 document.
+- Every rendered page is stored as `images/page-001.png`, `images/page-002.png`, etc.
+- No single-page PNG or PNG-only user workflow is provided.
+- `article.json` is UTF-8 without BOM, two-space indented, keeps Chinese readable and ends with a newline.
+- Runtime styles, settings, pagination metadata and transient UI state are not part of Article JSON.
+
+## Snapshot and validation
+
+- The renderer receives an immutable Article v6 snapshot, render signature and page count.
+- Validate `schemaVersion: 6`, the complete Article schema, signature, page count and page dimensions before rendering.
+- Rendering uses the request snapshot, never mutable live editor state.
+- Reject v5 and earlier schemas; no transitional v5 export path is supported.
+
+## Rendering
 
 - A dedicated WebView2 renderer loads the embedded local `render.html`.
-- Rendering uses the shared React pagination/render implementation. Nunito Sans Latin / Latin Extended (400/800) is bundled; Chinese glyphs use the target Windows system fallback stack: Microsoft YaHei UI, Microsoft YaHei, DengXian, then sans-serif. Preview and export run in the same WebView2 environment and use the same font stack.
-- Every page is captured at the configured page dimensions.
-- A task-specific temporary ZIP is staged in the destination directory.
-- Before commit, reopen and validate the archive, Article v6 schema, expected entry count, every page entry, each PNG signature and IHDR dimensions, and read each PNG entry fully to detect ZIP payload/decompression errors.
-- Commit only after validation. Failure/cancellation must clean only the current task's temporary archive and preserve an existing destination.
-- The reusable WPF `ProgressDialog` reports status and requests cancellation through the export cancellation token.
+- Rendering reuses the shared React pagination/render implementation.
+- Nunito Sans Latin / Latin Extended (400/800) is bundled. Chinese glyphs use Windows fallback: Microsoft YaHei UI, Microsoft YaHei, DengXian, then sans-serif.
+- Preview and archive rendering use the same font stack and rendering environment.
+- Capture every page at the configured page dimensions.
+- If a session-scoped companion image is part of the active Article rendering session, preview and ZIP rendering must consume the same already-loaded resource and crop; the export stage must not independently search for another image.
 
-## Required regression checks
+## Archive lifecycle and safety
 
-Cover invalid request envelopes, schema rejection (including v5), page count/dimension bounds, renderer/font failures, signature mismatch, cancellation during each cancellable stage, write/validation/commit failures, existing-target preservation, temporary-file cleanup, and successful semantic equivalence of the JSON plus all expected PNG entries. Real Windows/WebView2 checks are separate from unit tests.
+- Stage a task-specific temporary ZIP in the destination directory.
+- Before commit, reopen and validate the archive, Article v6 schema, expected entry count, every page entry, PNG signature and IHDR dimensions; read each PNG entry fully to detect decompression errors.
+- Commit only after validation. Failure or cancellation cleans only the current task's temporary archive and preserves an existing destination.
+- Paired JSON + ZIP saving stages and validates both outputs, backs up existing targets and commits the pair with best-effort rollback. Do not claim cross-file filesystem atomicity.
+- The reusable WPF progress dialog reports status and requests cancellation through the task cancellation token.
+
+## Regression checks
+
+Cover invalid request envelopes, schema rejection (including v5), page-count/dimension bounds, renderer/font failures, signature mismatch, cancellation at each cancellable stage, write/validation/commit failures, preservation of existing targets, temporary-file cleanup and semantic equivalence of the JSON plus all expected PNG entries. Real Windows/WebView2 checks remain separate from browser tests.

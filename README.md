@@ -1,98 +1,88 @@
 # EnglishCards
 
-**EnglishCards** 是面向 Windows x64 的本地英语精读卡片编辑器，采用 **WPF (.NET 10) + WebView2 + React/TypeScript**。
+**EnglishCards** 是面向 Windows x64 的本地英语精读卡片编辑器，采用 **WPF + .NET 10 + WebView2 + React/TypeScript**。当前正式数据格式为 Article v6，卡片馆与 JSON + ZIP 联合保存工作流已完成。
 
-**Phase E 已完成并合并到 `main`。** 功能包括三栏工作区、文件型 Article v6 自动保存、独立 JSON 新建、导出 ZIP、统一浮动通知和紧凑设置窗口。最终 Windows/WPF 实机验收及 GitHub Windows CI 均已通过。
+## 当前功能
 
-桌面端打开卡片馆里的 JSON 文件并直接保存到原文件。保存尚未完成时，切换卡片请求会被拒绝；保存完成后必须重新点击。旧全局草稿不会自动恢复或迁移，程序也不会自行删除既有草稿文件。
+- 三栏工作区：卡片馆目录树、文章预览、连续编辑器。
+- 卡片馆按目录浏览独立 JSON 文件；点击 JSON 打开文章。
+- 右侧编辑器按 Vocabulary → Content → Translation 排列；左侧预览用于阅读和选词。
+- Article v6 严格校验；v5 及更早格式拒绝，不做静默迁移或双写。
+- 工具栏提供清空当前文章，以及保存 JSON + ZIP。
+- 保存期间拒绝切换卡片；不会排队执行被阻止的切换请求。
+- 保存成功后同时生成同名 JSON 与 ZIP。ZIP 包含 `article.json` 和全部页面 PNG。
+- 统一前端覆盖确认窗口；取消、关闭或点击遮罩均不执行覆盖。ESC 不作为取消方式。
 
-最新规则以 [Phase E 卡片馆规格](docs/specs/PHASE_E_CARD_LIBRARY.md) 为准。Phase E 验证记录：Vitest 64/64、Playwright 69/69、.NET 桌面测试 19/19、TypeScript/Vite 生产构建、Article v6 Skill 校验、Windows x64 发布、真实 WPF/WebView2 启动与关键 UI 实机验收，以及 GitHub Windows CI 均已通过。
+## Article v6 数据规则
 
-## 已确认的目标产品规则
+- 唯一正式格式：`schemaVersion: 6`。
+- 顶层字段：`schemaVersion`、`id`、`title`、`identityTag`、`content`、`vocabulary`、`translation`。
+- 正文与译文各自最多 999 段，分别连续编号 `p001`–`p999`。
+- Vocabulary 最多 999 项，连续编号 `v001`–`v999`。
+- Vocabulary 统一使用 `word` 字段管理单词、词组和习语。
+- 不接受 v5 或更早格式，不做迁移、兼容双写或静默字段转换。
 
-- Article 使用 `schemaVersion: 6`，不兼容 v5，不提供旧格式迁移或双写。
-- Article 包含 `id`、`title`、`identityTag`、`content.paragraphs`、`vocabulary` 和 `translation.paragraphs`。
-- 正文和译文各自最多 999 个自然段，分别使用 `p001`–`p999`；Vocabulary 最多 999 项，使用 `v001`–`v999`。
-- Vocabulary 统一管理单词、词组和习语，核心字段为 `word`，保留音标、高亮规则及多义项。
-- 正式桌面端直接从卡片馆打开严格的 Article v6 JSON，并自动保存到原文件；TXT 可作为 Skill 的输入资料，不再通过桌面端导入按钮操作。
-- 右侧编辑器采用 Vocabulary → Content → Translation 顺序；正文和译文各使用连续多段落编辑区域。
-- 生词只从左侧卡片预览选择；加号位于选区右下角。只允许同一自然段、同一张卡片内的选择；选区必须含英文字母且不得包含中文字符。
-- 左侧预览用于阅读与提取：普通单击、双击不触发右侧编辑器导航；右侧编辑区独立工作，两侧通过 Article 数据模型同步。
-- 不提供 Undo/Redo；Ctrl+Z、Ctrl+Y、Ctrl+Shift+Z 不执行撤销/重做。鼠标右键在 React 页面与 WPF/WebView2 宿主中均无操作；Ctrl+C、Ctrl+V、Ctrl+A 等正常键盘编辑操作保留。
-- 唯一正式用户导出为完整 ZIP，包含 `article.json` 和全部页面 PNG。
-- 保留 WPF + WebView2 + React 技术栈及 EXE 同级 `userdata/` 用户数据契约。
+## 卡片馆、清空与联合保存
+
+- 左侧目录树浏览用户选择的目录，按需加载子目录；点击独立 JSON 文件打开卡片。
+- 保存期间拒绝切换卡片。用户需要在保存完成后重新点击目标卡片。
+- 工具栏不提供新建卡片、旧版 JSON/TXT 导入或旧全局草稿恢复。
+- 清空当前文章：无未保存修改时直接清空；有未保存修改时提供“保存”“放弃”“取消”。保存须在 JSON + ZIP 均成功后才清空；放弃不删除已保存文件；取消保持原状。已有保存任务未完成时先等待完成。
+- 保存 JSON + ZIP：选择目标文件夹，默认定位到最近一次成功保存的卡片馆路径；按文章标题生成同名 JSON 和 ZIP。
+- 只要 JSON 或 ZIP 任一目标已存在，就显示统一前端覆盖确认。确认后同时替换文件；取消、关闭弹窗或点击遮罩均不修改原文件。
+- 两个文件均提交成功后，更新最近路径并将卡片馆根目录切换到目标目录。跨两个文件不宣称具备文件系统级原子性；实现通过暂存、备份和失败回滚尽可能保护已有文件。
 
 ## 运行要求
 
 | 项目 | 要求 |
 |---|---|
 | 操作系统 | Windows x64 |
-| .NET | [Microsoft .NET 10 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/10.0) |
+| .NET | [.NET 10 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/10.0) |
 | 页面引擎 | [Microsoft Edge WebView2 Evergreen Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) |
-| 中文字体 | Microsoft YaHei UI、Microsoft YaHei、DengXian，最后回退 sans-serif |
-| Node.js | 最终用户不需要；仅开发、构建和测试使用 |
+| Node.js | 最终用户不需要；开发、构建和测试使用 |
 
-本程序采用 Framework-dependent 发布，不附带 .NET Runtime。目标电脑必须安装兼容的 .NET 10 Desktop Runtime x64。WebView2 使用 Evergreen Runtime。程序不需要独立安装 Chromium，也不需要启动 Express 服务。
+程序采用 Framework-dependent、win-x64、单文件发布，不附带 .NET Runtime。目标电脑须安装兼容的 .NET 10 Desktop Runtime x64 和 WebView2 Evergreen Runtime。缺少 .NET Runtime 时由 .NET Host 提示；WebView2 初始化失败时应用提供 Microsoft 官方安装/修复入口。
 
-## 开发环境与验证
+用户数据位于 EXE 同级 `userdata/`，用于设置、卡片馆路径、缓存、WebView2 Profile 和日志。发布/升级不得删除该目录。不会扫描、迁移或删除旧版 `%LOCALAPPDATA%\\EnglishCards` 数据。
 
-需要 Windows x64、.NET 10 SDK、Node.js 22.12 或更高版本和 npm。在仓库根目录执行：
+## 开发、测试与发布
+
+开发环境需要 Windows x64、.NET 10 SDK、Node.js 22.12+ 和 npm。在仓库根目录运行：
 
 ```bat
 npm.cmd ci
 npm.cmd test
 npm.cmd run build
 npm.cmd run test:e2e
-```
-
-.NET 桌面测试：
-
-```bat
 dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Release
 ```
 
-正式发布：
+发布：
 
 ```bat
 npm.cmd run build
 dotnet publish EnglishCards\desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\EnglishCards
 ```
 
-Playwright / Chromium 只用于开发测试，不属于最终用户运行依赖。自动化浏览器测试不能替代真实 Windows/WPF/WebView2 启动、用户数据和 ZIP 导出验收。
+Playwright/Chromium 只用于开发测试。自动化浏览器测试不能替代真实 Windows/WPF/WebView2 启动及联合保存验收。
 
-## 仓库目录
+## 仓库与文档
 
-```text
-EnglishCards/                    # 生产功能代码
-├── desktop/                     # WPF 主程序、WebView2、持久化和 ZIP 导出
-├── frontend/                    # React/TypeScript、前端入口和运行资源
-└── .build/                      # Vite 生成的嵌入资源（可删除重建）
+- `EnglishCards/`：生产代码（WPF、WebView2、React/TypeScript）。
+- `EnglishCards.Tests/`：.NET、Vitest 和 Playwright 测试。
+- `docs/specs/`：现行技术规格。
+- `docs/skills/`：项目 Skills。
+- `docs/reference-assets/`：保留的参考素材。
+- `tools/`：开发与发布工具。
+- `dist/EnglishCards/`：唯一发布输出目录。
 
-EnglishCards.Tests/              # 独立测试代码
-├── dotnet/                      # .NET 桌面测试
-└── frontend/
-    ├── unit/                    # Vitest
-    └── e2e/                     # Playwright
+文档阅读顺序：
 
-docs/                            # 项目契约、架构、规格、审查和历史记录
-docs/skills/                    # 项目专属 Skills
-tools/                           # 构建、测试、发布和开发辅助工具
-.build/                          # 临时测试结果、报告和测试运行数据
-dist/EnglishCards/               # 唯一正式发布目录
-```
+1. [项目总契约](docs/project-contract.md)
+2. [Phase E 卡片馆规格](docs/specs/PHASE_E_CARD_LIBRARY.md)
+3. [JSON + ZIP 联合保存规格](docs/specs/COMBINED_ARTICLE_SAVE.md)
+4. [ZIP 渲染与归档技术契约](docs/specs/EXPORT_CONTRACT.md)
+5. [WPF/WebView2 桌面宿主规格](docs/specs/DESKTOP_WEBVIEW2.md) 与 [编辑器桥接契约](docs/specs/EDITOR_BRIDGE_CONTRACT.md)
+6. [当前实施状态](docs/implementation-status.md) 与 [Windows 验收记录](docs/RELEASE_ACCEPTANCE.md)
 
-`package.json`、`package-lock.json`、`tsconfig.json`、`AGENTS.md` 和 `README.md` 保留在仓库根目录，作为仓库级构建与协作配置。`node_modules/`、`.build/`、`EnglishCards/.build/`、`bin/`、`obj/` 和 `dist/` 均不提交 Git。项目不再保留固定 `artifacts/` 目录。
-
-## 用户数据
-
-正式程序在 `EnglishCards.exe` 同级创建 `userdata/`，用于设置、卡片馆、导出、缓存、WebView2 Profile 和日志。旧版草稿内容不自动恢复，也不主动删除。发布/升级不得删除 `userdata/`。不要扫描、迁移或删除旧版 `%LOCALAPPDATA%\EnglishCards` 数据。用户数据不得放入源码包、Git 提交或发布构建清理流程。
-
-## 文档与开发代理
-
-- 项目契约：[`docs/project-contract.md`](docs/project-contract.md)
-- Article v6 阶段记录：[`docs/architecture/ARTICLE_V6_PHASE1.md`](docs/architecture/ARTICLE_V6_PHASE1.md)
-- Article v6 生成 Skill：[`docs/skills/article-to-englishcards/SKILL.md`](docs/skills/article-to-englishcards/SKILL.md)
-- Windows 桌面审查 Skill：[`docs/skills/windows-app-review/SKILL.md`](docs/skills/windows-app-review/SKILL.md)
-- 仓库代理规则：[`AGENTS.md`](AGENTS.md)
-
-当前 Phase E 的文件工作流以 `docs/specs/PHASE_E_CARD_LIBRARY.md` 为准。旧版阶段记录和审查报告仅用于追溯，不覆盖后续确认的 Phase E 规则。
+项目 Skills： [Article v6 生成](docs/skills/article-to-englishcards/SKILL.md)、[项目代码审查](docs/skills/project-code-review/SKILL.md)、[Windows 应用审查](docs/skills/windows-app-review/SKILL.md)。

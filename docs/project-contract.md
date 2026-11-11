@@ -1,204 +1,98 @@
-# EnglishCards 项目契约
+# EnglishCards 项目总契约
 
-> **Phase E 当前产品行为（2026-11-10）：** 独立 Article v6 JSON 直接通过卡片馆打开，自动保存到原文件，保存期间拒绝切换且不排队；新建卡片按标题生成 JSON；正式导出为 ZIP。右栏为独立连续编辑器，左侧为按需加载目录树。桌面端不再读取旧全局草稿，不再提供单独的 JSON/TXT 导入按钮和手动保存 JSON。详见 [Phase E 最终规格](specs/PHASE_E_CARD_LIBRARY.md)。本文件以下较早期的 JSON/TXT 导入、四按钮工具栏、全局草稿恢复等阶段描述仅为历史设计，不覆盖 Phase E。
+> 本文件是项目唯一的总契约。当前产品行为以本文和仍然有效的专项规格为准；阶段计划、历史审查报告及旧版本文档不构成现行要求。
 
+## 1. 产品与技术架构
 
-> **当前状态（2026-11-07）：** 已批准从 schemaVersion 5 破坏性升级至 Article v6。Article v6 已接入 React 生产数据模型、分页渲染、JSON/TXT 导入、项目保存、自动草稿和 WPF/ZIP schema 边界；前端/桌面端读写均以 Article v6 为准。右侧单页编辑器、左侧新式选区加号、配套图片加载、Settings 齿轮工具栏及 14/16 DIP 编辑器排版仍待后续阶段实施。不得把 v5 与 v6 混合写入同一项目，也不得宣称最终界面重构已完成。
+- 产品：Windows x64 本地英语精读卡片编辑器。
+- 技术栈：WPF + .NET 10 + WebView2 + React/TypeScript。
+- WPF 负责窗口、原生文件夹对话框、文件系统访问、用户数据持久化和 ZIP 渲染/归档宿主；React 负责编辑器、预览和交互。
+- 保持现有轻量架构；不迁移到 Tauri、Electron 或纯 WPF，不无必要引入重量级 MVVM、DI 容器或事件总线。
+- 最终用户不需要 Node.js、npm、Express、Vite、Playwright 或 Chromium。
+- 发布为 win-x64、Framework-dependent、PublishSingleFile。目标机器安装 .NET 10 Desktop Runtime x64 和 WebView2 Evergreen Runtime。
+- 唯一正式发布输出目录为 `dist/EnglishCards/`。
 
-## 1. 产品定位与技术边界
+## 2. 用户数据与兼容边界
 
-EnglishCards 是 Windows x64 本地英语精读卡片编辑器，正式产品采用 **WPF + WebView2 + React/TypeScript**。
+- 用户数据位于实际 `EnglishCards.exe` 同级的 `userdata/`，包含设置、卡片馆路径、缓存、WebView2 Profile 和日志。
+- 发布或升级不得删除 `userdata/`。
+- 不扫描、不读取、不迁移、不删除旧版 `%LOCALAPPDATA%\\EnglishCards` 数据；不恢复旧版全局草稿。
+- 不改变现有数据位置、部署方式或兼容策略，除非用户明确批准。
 
-- React 负责文章编辑状态、界面、样式设置、分页和卡片预览。
-- WPF 负责 Windows 窗口、原生文件对话框、用户数据持久化、WebView2 宿主及正式 ZIP 导出。
-- 不迁移到 Tauri、Electron 或纯 WPF；不增加 C++ Native Launcher。
-- 不引入重量级 MVVM、DI 或事件总线框架。
-- Node.js/npm、Express、Vite、TypeScript、Playwright/Chromium 仅用于开发、构建和测试，不属于最终用户运行依赖。
-- 不提供账号、云同步或在线文章处理。
+## 3. Article v6 数据契约
 
-## 2. Article v6 正式数据契约
+### 3.1 唯一正式格式
 
-### 2.1 顶层结构
+- 唯一正式格式为数字 `schemaVersion: 6`。v5 及更早格式拒绝；不静默迁移、不双写、不保留生产兼容路径。
+- 顶层只允许：`schemaVersion`、`id`、`title`、`identityTag`、`content`、`vocabulary`、`translation`。
+- `id` 为非空字符串；`title` 与 `identityTag` 必须存在且允许空字符串。
+- `content` 和 `translation` 均包含 `paragraphs` 数组；每个段落仅包含 `id`、`text`。
+- 正文、译文分别最多 999 段，各自从 `p001` 连续编号至 `p999`。两组可同时出现相同 ID，定位时必须带区域上下文。
+- Vocabulary 最多 999 项，按数组顺序从 `v001` 连续编号至 `v999`。
+- Vocabulary 统一使用 `word` 字段管理单词、词组和习语；保留 `ipa`、`highlight`、`senses` 等 schema 字段，不设置独立 expressions 集合。
+- 拒绝未知字段、缺失字段、错误类型、超限内容及非连续/重复 ID。不得静默丢弃字段或截断内容。
 
-Article v6 是唯一目标数据格式，`schemaVersion` 必须为数字 `6`。v5 及更早版本不兼容，不提供自动迁移、双写或静默兼容。
+### 3.2 生成质量约定
 
-```typescript
-interface Article {
-  schemaVersion: 6;
-  id: string;
-  title: string;
-  identityTag: string;
-  content: { paragraphs: Paragraph[] };
-  vocabulary: VocabularyItem[];
-  translation: { paragraphs: Paragraph[] };
-}
+- Article Skill 生成的正文和译文段落不得为空。
+- 单词词条（按空白分隔恰好一个 token）应提供英式音标、词性、含义、英文例句及中文例句翻译；不同词性分别列为 sense。
+- 多词词条不设置词性和音标，但须提供含义、英文例句及中文例句翻译。
+- 上述词汇质量要求约束 Skill 输出，不额外扩大为应用导入拒绝条件。
 
-interface Paragraph {
-  id: string; // p001–p999
-  text: string;
-}
+## 4. 卡片馆与编辑行为
 
-interface VocabularyItem {
-  id: string; // v001–v999
-  word: string;
-  ipa?: string;
-  highlight: string[];
-  senses: Sense[];
-}
+- 左侧卡片馆以用户选择的目录为根，按需加载子目录；每个 Article 是独立 JSON 文件，点击 JSON 文件打开。
+- 不引入卡片数据库、跨目录索引、递归后台监视或自动文件重命名/删除。
+- 不提供桌面 JSON/TXT 导入按钮，不提供旧版全局草稿自动恢复。
+- 编辑器顺序为 Vocabulary → Content → Translation；正文和译文分别采用连续多段落编辑区域。
+- 左侧预览用于阅读和选择词汇；右侧独立编辑，通过 Article 数据模型同步。
+- 预览选区加入 Vocabulary 的约束：同一文章、同一自然段；至少包含英文字母且不包含中文字符；新增词条使用 `word`，按规范化规则去重。
+- 现行分页、预览、字体、布局和桥接细节见相关专项规格及生产实现；不得从历史阶段文档恢复旧 UI 约定。
 
-interface Sense {
-  pos: string;
-  meaning: string;
-  example: string;
-  exampleTranslation: string;
-}
-```
+## 5. 保存、切换与清空
 
-### 2.2 字段与容量
+- 卡片 JSON 自动保存到当前打开的原文件。保存绑定目标路径和不可变 Article v6 快照，并按修订版本串行写入。
+- 保存期间拒绝切换卡片；被阻止的点击直接丢弃，不排队、不记忆目标卡片。保存完成后用户重新点击。
+- 保存错误时保留内存修改和错误状态，不允许切换丢弃修改。
+- 工具栏提供“清空当前文章”和“保存 JSON + ZIP”，不再提供“新建卡片”。
+- 清空时：无未保存修改则直接清空；有未保存修改则提供“保存”“放弃”“取消”。保存必须等 JSON + ZIP 均提交成功后再清空；放弃只丢弃当前未保存修改，不删除已保存文件；取消不改变状态。
+- 有未完成的保存任务时不得清空；先等待任务完成或提示用户完成保存。异步旧会话写入不得重新激活已清空文章。
 
-- `title` 必须存在，允许空字符串。
-- `identityTag` 替代旧 `personalizedHeader`，必须存在，允许空字符串，并继续承担卡片页眉显示功能。
-- `content.paragraphs` 和 `translation.paragraphs` 分别最多 999 段，各自从 `p001` 连续编号至 `p999`。
-- `vocabulary` 最多 999 项，按当前顺序从 `v001` 连续编号至 `v999`。
-- 段落和词汇 ID 在各自集合内连续编号；正文与译文可以同时存在 `p001`，二者定位时必须带集合/区域上下文。
-- 删除段落或 Vocabulary 项后，相关集合按当前顺序重新编号。ID 表示集合中的顺序位置，不是永久身份。
-- Vocabulary 统一管理单词、词组、习语及用户选择的英文内容，核心字段保持 `word`。保留 `ipa`、`highlight`、`senses` 等已有辅助能力；不再使用独立 `expressions` 集合。
-- Skill 生成规则：`word` 按空白分隔后只有一个单词时，必须提供词性、英式音标、含义、英文例句和例句翻译；同一单词的不同词性分别建立 sense。`word` 有两个或以上单词时，不配置词性和音标，但必须提供含义、例句和例句翻译。连字符和撇号不拆分单词，例如 `well-known`、`don't` 均按单词处理。此规则约束 Skill 生成质量，不作为强制拒绝用户手动导入的应用级校验。
-- 删除 `expressions`、`mainIdea`、`source`、`personalizedHeader`、`readingLevel`、`theme` 和 Article 顶层 `warnings`。运行时警告属于 UI 状态，不属于文章数据。
-- Skill 生成的正文和译文段落不得为空；应用编辑器允许保留空段落作为编辑状态，TXT 导入不会生成空段落。字段和数组严格校验，未知字段拒绝，不静默丢弃。
+## 6. JSON + ZIP 联合保存
 
-### 2.3 TXT 与 JSON 导入
+- 用户选择目标文件夹；默认目录为最近一次成功记录的卡片馆路径。
+- 按文章标题生成同名 `.json` 和 `.zip`，两者来自同一个不可变、已验证的 Article v6 快照及同一分页/渲染签名。
+- ZIP 内含根目录 `article.json` 和所有页面 PNG（`images/page-001.png` 等）。
+- 如果 JSON 或 ZIP 任一目标已存在，弹出统一前端覆盖确认窗口。使用现有 `phase-e-modal` 与 `phase-e-modal-heading` 样式；不使用原生 WPF MessageBox。
+- 点击取消、关闭弹窗或点击遮罩均取消保存且不修改原文件；ESC 不作为取消方式（此行为已由用户接受）。
+- 确认后同时替换 JSON 与 ZIP。两个文件系统提交不具备真正的跨文件原子性；实现必须使用同目录暂存、校验、备份、提交和尽可能的回滚，失败时保留/恢复原目标。
+- 仅当两个文件均成功提交后，更新最近成功路径并将卡片馆根目录切换到目标目录。若偏好设置写入失败，应单独报告，不将已成功提交的文件对误报为失败。
+- 取消或失败不得改变最近路径、活动文章或卡片馆根目录。
 
-- 提供独立 `ArticleJsonImporter` 和 `PlainTextImporter`，由统一导入协调器负责调用。
-- 先尝试 Article v6 JSON 解析；只有可以确定为普通文本的输入才允许回退 TXT。
-- JSON 文件语法错误、schemaVersion 不是 6、缺字段、多余字段、ID 不连续或超出容量时，必须拒绝导入，不得把 JSON 内容静默当作正文。
-- TXT 文件名（去掉扩展名）作为默认 `title`；`identityTag` 默认为空，`vocabulary` 和 `translation.paragraphs` 默认为空。
-- TXT 采用 UTF-8；识别 BOM、CRLF、LF 和 CR。一个或多个空行分隔自然段，单个换行转换为空格。
-- 正文或译文超过 999 段、Vocabulary 超过 999 项时拒绝本次操作，保留当前 Article，不截断、不部分导入。
+## 7. ZIP 技术契约
 
-## 3. 编辑器与选区目标行为
+- ZIP 渲染与归档细节由 [EXPORT_CONTRACT.md](specs/EXPORT_CONTRACT.md) 定义；用户操作流程由 [COMBINED_ARTICLE_SAVE.md](specs/COMBINED_ARTICLE_SAVE.md) 定义。
+- 预览和导出共享分页/渲染实现、字体回退顺序和同一快照。
+- ZIP 必须在提交前验证 Article schema、归档条目、每张 PNG 的签名与尺寸，并完整读取 PNG 数据。
+- 临时文件按任务隔离；取消/失败仅清理本任务暂存文件，不破坏已有目标。
 
-### 3.1 右侧编辑器
+## 8. 分页、图片与视觉一致性
 
-- 所有编辑内容放在同一个 TabPage。
-- 顺序为 **Vocabulary → Content → Translation**。
-- Vocabulary 位于第一个编辑区，正文第二，译文第三。
-- 正文和译文各使用一个连续的多段落编辑区域，不为每个自然段落创建独立输入框；向下滚动编辑完整文章。
-- 标题使用独立输入框，位于正文上方；标题可独立修改。
-- 右侧只负责编辑，不提供选词加入 Vocabulary 的交互。
+- 分页逻辑以完整自然段为数据单元；视觉分页可拆分段落片段，但不得丢失、重复或重排字符。分页片段展平后必须与原文一致。
+- 使用实际浏览器字体测量和同一渲染入口；首行缩进只作用于逻辑段落起点，续页不得重复缩进。
+- 预览与 ZIP 渲染必须使用相同 Article 快照、分页签名、字体与会话资源。
+- Article v6 不保存配套图片路径或 Base64。若当前生产流程加载会话级配套图片，预览和导出必须共用同一资源，不得在导出阶段重新搜索或泄露预览中已裁掉的区域。
+- 当前布局与字体的具体常量以生产样式和有效专项规格为准，不从已删除的阶段计划推断。
 
-### 3.2 左侧预览与 Vocabulary 选择
+## 9. 当前专项规格与 Skills
 
-- 左侧显示完整文章并自动分页；段落是数据结构和分页单元，不再按段落分段导入或分段编辑。
-- 鼠标选中文字后，在选区右下角显示圆角方形加号；无 Tooltip。
-- 选区必须在同一张卡片、同一个自然段内，不允许跨卡片或跨自然段。
-- 选区必须至少包含一个英文字母（A–Z/a–z），且不得包含中文字符；纯数字、纯空白和含中文的混合选区不显示加号。
-- 可以选择单词、多个单词、词组或习语；不做词性、词组或习语分类。
-- 点击加号时必须在焦点变化前保存选区文本；执行空白规范化和大小写不敏感去重。重复项不新增、不覆盖现有释义。
-- 新增条目写入 `vocabulary`，使用 `word` 字段，并保留现有义项编辑能力。
+- [Phase E 卡片馆](specs/PHASE_E_CARD_LIBRARY.md)
+- [JSON + ZIP 联合保存](specs/COMBINED_ARTICLE_SAVE.md)
+- [ZIP 渲染与归档技术契约](specs/EXPORT_CONTRACT.md)
+- [WPF/WebView2 宿主](specs/DESKTOP_WEBVIEW2.md)
+- [编辑器桥接接口](specs/EDITOR_BRIDGE_CONTRACT.md)
+- [Article v6 生成 Skill](skills/article-to-englishcards/SKILL.md)
+- [项目代码审查 Skill](skills/project-code-review/SKILL.md)
+- [Windows 应用审查 Skill](skills/windows-app-review/SKILL.md)
 
-### 3.3 Vocabulary 列表与编辑排版
-
-- Vocabulary 列表采用单栏纵向布局，每个条目占据编辑区域完整可用宽度；不再将词条拆成左右两列。
-- 右侧所有 TabPage/编辑内容区域统一采用 14 DIP 正文字号；目录级、分区级标题采用 16 DIP 且加粗。图标和工具栏不受正文排版字号约束。
-
-## 4. 分页、预览与渲染
-
-- 保留当前分页引擎的字体测量、逐行布局、分页连续性校验等成熟算法；先改数据输入和段落映射，不无故重写测量算法。
-- `EnglishCards/frontend/src/services/pagination.ts` 是当前分页实现入口；修改前检查调用方以及预览/导出共用关系。
-- 预览和导出必须基于同一 Article 快照、字体回退顺序、分页规则和渲染入口。
-- 段落 ID 重新编号后，分页和高亮定位必须使用区域上下文，不能仅凭 `p001` 在正文和译文之间定位。
-- 英文内置 Nunito Sans，仅包含 Latin / Latin Extended 的 400 与 800 字重。
-- 中文使用 Windows 系统字体回退：Microsoft YaHei UI、Microsoft YaHei、DengXian、sans-serif。
-- 默认画布 1200×1600；实际输出尺寸遵循样式设置。
-- 左右栏首次打开默认宽度比例为预览 55% / 编辑 45%；保留用户拖动调整，左右栏最小宽度仍为 280 DIP。当前分隔条比例仅保存在组件运行状态中，应用重启后回到默认 55:45；本阶段不新增跨重启布局持久化。打开文章不得重置当前会话内用户手动调整的比例。
-- JSON 导入时，在 JSON 文件所在目录的顶层（不递归）搜索 `.png` 和 `.jpg` 图片，扩展名大小写不敏感；按文件名不区分大小写排序，取第一张。无匹配图片时正常导入且不显示图片占位区域。
-- 配套图片不是 Article 字段，不在 JSON 中保存图片文件名、路径或 Base64。每次显式导入 JSON 时重新搜索；搜索结果只作为当前导入会话的临时资源，当前会话内预览与导出使用同一份已加载图像，不在导出时再次搜索。关闭/重新导入后重新搜索。自动草稿不持久化图片元数据；单独恢复草稿时若没有当前 JSON 导入会话的图片资源，则不显示插图。
-- 配套图片显示在正文上方，宽度适配预览内容区域并保持原始宽高比；超出可用显示高度时顶部对齐、裁剪下方超出部分，不修改原始图片。PNG/ZIP 页面渲染必须复用本次会话同一图片及相同裁剪边界，不显示预览中已裁掉的部分。
-- 字体未就绪或分页/渲染校验失败时，不得提交错误导出。
-
-### 4.1 工具栏与设置入口
-
-- 原【样式】TabPage 改为独立【设置】入口，使用齿轮图标按钮，不再作为右侧普通 TabPage。
-- 工作区右上角横向排列四个圆形操作按钮，顺序为：设置、打开 JSON、保存 JSON、导出 ZIP。后三项沿用原有三个项目文件操作的实际功能，不改变其行为。
-- 按钮视觉规格：40×40 DIP 圆形按钮、20×20 DIP 图标、背景 `#D3E5EB`、图标 `#27495B`、无边框；Hover 仅做轻微背景加深。Tooltip 使用简短功能名称。
-- 四个 SVG 资源位于 `EnglishCards/frontend/src/assets/icons/toolbar/`：`settings.svg`、`open-json.svg`、`save-json.svg`、`export-zip.svg`。图标文件只定义线条，不把按钮背景烘焙进 SVG。
-
-## 5. 正式 ZIP 导出
-
-- 唯一用户导出入口为**导出全部 ZIP**，不提供单页 PNG 或 PNG-only 导出。
-- ZIP 包含根目录 `article.json` 和 `images/page-001.png` 等全部页面图片。
-- `article.json` 使用 UTF-8 无 BOM、2 空格缩进、中文不转义、末尾换行；完成 v6 集成后必须保存完整 Article v6，不含样式配置或运行时字段。
-- 保留现有 Win11 风格 WPF 导出进度对话框、取消流程、任务临时文件清理及原 ZIP 保护行为。
-- 取消时必须等待渲染/写入停止并清理当前任务临时 ZIP，不得损坏已有 ZIP。
-
-## 6. 运行环境与发布
-
-| 项目 | 要求 |
-|---|---|
-| 操作系统/架构 | Windows x64 |
-| 桌面框架 | .NET 10 WPF |
-| 发布模式 | Framework-dependent、单文件、win-x64 |
-| .NET 运行依赖 | 兼容的 .NET 10 Desktop Runtime x64 |
-| WebView2 | Microsoft Edge WebView2 Evergreen Runtime |
-| Node.js | 最终用户不需要 |
-| Express/Playwright/Chromium | 最终用户不需要 |
-
-目标机缺少兼容的 .NET 10 Desktop Runtime x64 时，用户需通过 Microsoft 官方入口安装后重新启动。保持 Framework-dependent，不实现自定义 Runtime 下载器，不增加 Native Launcher。
-
-WebView2 使用 Evergreen Runtime；缺失或初始化失败时提供可理解的错误及 Microsoft 官方安装/修复入口。
-
-## 7. 用户数据与文件保护
-
-- 数据根目录为真实 EXE 所在目录同级 `userdata/`，不是当前工作目录、快捷方式目录或 LocalAppData。
-- 首次启动自动创建；目录不可写或创建失败时明确报错，不静默回退到其他位置。
-- 不读取、不迁移、不合并、不提示迁移旧版 `%LOCALAPPDATA%\EnglishCards\` 数据；新版也不主动删除旧目录。
-- 发布/更新不得清理 `userdata/`；发布脚本只处理应用产物。
-- 用户数据不纳入源码包、Git 提交或 GitHub Release。
-
-## 8. 仓库目录和构建约定
-
-```text
-EnglishCards/
-├── desktop/                 # WPF 主程序、WebView2、持久化和 ZIP 导出
-├── frontend/                # React/TypeScript、前端入口及运行资源
-└── .build/                  # Vite 嵌入资源，自动生成、可删除重建
-
-EnglishCards.Tests/
-├── dotnet/                  # .NET 桌面测试
-└── frontend/
-    ├── unit/                # Vitest
-    └── e2e/                  # Playwright
-
-docs/                        # 项目文档、规格、审查记录和历史材料
-docs/skills/                 # 项目专属 Skills
-tools/                       # 构建、测试、发布及开发期测试服务
-.build/                      # 测试结果、报告和临时运行数据
-dist/EnglishCards/           # 唯一正式发布目录
-```
-
-- `package.json`、`package-lock.json`、`tsconfig.json`、`AGENTS.md`、`README.md` 为仓库级配置，保留在根目录。
-- 不保留固定 `artifacts/` 目录。前端构建输出位于 `EnglishCards/.build/frontend-dist/`；测试输出位于根 `.build/`。
-- `node_modules/`、`.build/`、`EnglishCards/.build/`、`bin/`、`obj/` 和 `dist/` 不提交 Git。
-- 正式发布仅输出到 `dist/EnglishCards/`，不同时维护 `dist/wpf`、`publish`、`release` 等重复发布目录。
-
-## 9. 构建与测试命令
-
-在仓库根目录执行：
-
-```bat
-npm.cmd ci
-npm.cmd test
-npm.cmd run build
-npm.cmd run test:e2e
-dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Release
-dotnet publish EnglishCards\desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\EnglishCards
-```
-
-单元测试、浏览器 E2E、.NET 桌面测试和真实 Windows/WebView2 实机验收是不同层级，报告必须区分通过、失败、跳过和未验证。
-
-## 10. 当前迁移状态
-
-- 已完成：Article v6 独立数据模型、严格校验、JSON/TXT 导入基础、v6 单元测试；目录迁移至 `EnglishCards/`、`EnglishCards.Tests/`、`docs/skills/`、`tools/`；构建输出目标改为 `.build`。
-- 尚未完成：将 WPF 桥接、自动草稿、项目打开/保存、React 编辑器、预览、高亮和 ZIP 导出全部迁移到 Article v6；删除 v5 生产模型及旧分区 UI；在迁移后的目录结构上完成 Windows .NET 测试与正式发布。
-- 用户最近报告的验证结果：Vitest 46/46、Vite 构建成功、Playwright 61/61、.NET Release 发布成功。该日志对应目录迁移前的测试修复包；目录重组后的新路径尚未在 Windows 上验证。
+`docs/reference-assets/` 中的历史样本和截图是参考素材，不是现行 schema 或 UI 契约。历史报告和阶段计划不再作为常规项目文档维护。

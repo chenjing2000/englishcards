@@ -1,45 +1,47 @@
-# EnglishCards — Final Windows Release Acceptance
+# EnglishCards — Windows x64 验收记录
 
-Status: **Historical v5 release candidate; Article v6 migration is in progress**  
-Historical evidence baseline: Windows PowerShell logs supplied by the project owner on 2026-11-06, after the system-font optimization. These results validate the prior v5 source, not the current v6 migration tree.  
-Product contract: [`project-contract.md`](project-contract.md).
+**产品基线：** Article v6 + Phase E Card Library + JSON/ZIP paired save  
+**最新源码基线：** `822864ff99787395b21b040a0b0fccc0c62e2fc6`  
+**状态：** 项目所有者已确认 Windows/WPF 本地验收通过；外部干净机器与公开发布前置检查仍需单独处理。
 
-## A. Verified on the owner's Windows development machine
+## A. 已完成的 Windows 验收
 
-| Verification | Outcome | Evidence |
-|---|---|---|
-| `npm.cmd ci` | PASS | 184 packages installed (esbuild `allow-scripts` notice was nonfatal) |
-| `npm.cmd test` | PASS — 35/35 | 9 Vitest test files |
-| `npm.cmd run build` | PASS | TypeScript and Vite completed; third-party Zod/Rollup comments were nonfatal warnings |
-| `npm.cmd run test:e2e` | PASS — 59/59 | Playwright, one worker |
-| `dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Release` | PASS — 16/16 | Includes resource embedding, WebView2 origin/startup guidance, persistence, ZIP validation |
-| `dotnet publish EnglishCards\desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\EnglishCards` | PASS | Windows win-x64 framework-dependent publish succeeded |
-| EXE size | Owner-reported ~1.9 MB | Previous ~14.9 MB, ~87.2% smaller after removing bundled Noto Sans SC |
-| Preview/PNG CJK visual comparison | Owner-reported acceptable | No obvious differences on the owner's Windows installation |
+### Phase E 基线
 
-**Boundary:** The browser test suite includes historical development-only HTTP test-service scenarios. These results do not substitute for manual checks of the published WPF executable.
+项目所有者提供并确认的验收结果：
 
-## B. External Windows acceptance — NOT YET VERIFIED
+| 检查 | 结果 |
+|---|---|
+| Vitest | PASS — 64/64 |
+| Playwright | PASS — 69/69 |
+| .NET 桌面测试 | PASS — 19/19 |
+| TypeScript / Vite 生产构建 | PASS |
+| Article v6 Skill 校验 | PASS |
+| Windows x64 Framework-dependent 发布 | PASS |
+| WPF / WebView2 启动与关键 UI 实机验收 | PASS |
+| GitHub Windows CI | PASS |
 
-Use a disposable Windows x64 VM snapshot or another isolated Windows installation. Do not remove required runtimes from the primary development PC just to simulate missing prerequisites.
+以上计数属于 Phase E 基线。后续联合保存与清空工作流已另行完成；项目所有者确认了 Windows 本地验收，但本记录不把上述数字表述为后续改动的独立测试计数。
 
-- [ ] On a clean Windows x64 machine without Node.js, npm, Visual Studio or the .NET SDK, copy the **entire** publish folder (not only the EXE); install the .NET **10 Desktop Runtime x64** and WebView2 **Evergreen Runtime**. Verify normal startup.
-- [ ] On an isolated VM without .NET 10 Desktop Runtime, verify the standard .NET host reports the missing runtime and the README's official link is sufficient. The application cannot display a custom WPF dialog before the runtime loads.
-- [ ] On an isolated VM without WebView2 Evergreen, verify the app offers understandable Chinese instructions and the official Microsoft installation/repair page.
-- [ ] Create/open/edit/save an Article v6 JSON, close the EXE and reopen; confirm the saved content and settings persist.
-- [ ] Preview multiple pages with Chinese punctuation, English accents and mixed text. Verify page breaks, visible glyphs and no clipping on the target Windows installation.
-- [ ] Export a complete ZIP; verify root `article.json`, `images/page-001.png` and all expected pages, and compare PNGs with preview.
-- [ ] Cancel an in-progress ZIP export; verify task-local staging is cleaned, any existing destination ZIP is unchanged, and the app remains responsive.
-- [ ] Test closing during export, following the current cancellation/close behavior, and confirm no orphaned renderer remains.
-- [ ] Confirm first-run `userdata/` creation under the EXE's directory in a writable portable folder; moving the portable folder should preserve access to its data.
-- [ ] **Prove upgrade preservation safely:** create a disposable copy of `dist\EnglishCards`, place marker files inside its `userdata/`, publish again to that *disposable destination*, and compare marker SHA-256 values. Never delete a live `userdata/` to test publishing.
-- [ ] Confirm a failed or interrupted publish does not remove the existing `userdata/`; avoid interpreting an in-place publish as an atomic software upgrade.
-- [ ] Review `EnglishCards/frontend/assets/` sample articles/images for permission to redistribute before publicly posting a source ZIP or repository.
-- [ ] Confirm the intended public version label; `package.json` currently declares `1.0.0`, whereas earlier plans mentioned `v0.1.0`.
+### JSON + ZIP 联合保存与清空
 
-## C. Recommended repeatable build (Windows PowerShell)
+- 保存从单独 ZIP 导出操作调整为同名 JSON + ZIP 联合保存。
+- JSON 与 ZIP 使用同一 Article v6 快照；覆盖任一目标时先显示统一前端确认。
+- 清空流程包含保存、放弃、取消；保存任务未完成时不允许清空。
+- 覆盖弹窗复用 `phase-e-modal` 与 `phase-e-modal-heading`，不使用原生 WPF MessageBox。
+- 用户实机确认：取消按钮和点击遮罩均可取消覆盖；ESC 不支持取消，该行为按用户决定保留。
+- 后续提交 `822864ff99787395b21b040a0b0fccc0c62e2fc6` 完成联合保存与清空工作流。
 
-Run from the root of this final source checkout:
+## B. 发布环境要求
+
+- Windows x64。
+- Microsoft .NET 10 Desktop Runtime x64。
+- Microsoft Edge WebView2 Evergreen Runtime。
+- 最终用户不需要 Node.js、npm、Visual Studio、.NET SDK、Vite、Playwright 或 Chromium。
+- 发布模式为 Framework-dependent、win-x64、PublishSingleFile；保留发布输出目录中的所有必要文件，不只复制 EXE。
+- 用户数据在 EXE 同级 `userdata/`；升级不得删除该目录。不扫描或迁移旧版 `%LOCALAPPDATA%\\EnglishCards`。
+
+## C. 可复现构建与测试
 
 ```powershell
 npm.cmd ci
@@ -50,31 +52,20 @@ dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Rele
 dotnet publish EnglishCards\desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\EnglishCards
 ```
 
-The executable will be at `dist\EnglishCards\EnglishCards.exe`. Keep any other files generated by publish beside the EXE. The host machine requires .NET 10 Desktop Runtime x64 and WebView2 Evergreen; it does **not** require npm, Node.js, Chromium, Vite, or Playwright.
-
-For an optional post-publish archive created **on Windows after testing**, compress the actual publish folder. Do not package `userdata/` containing private projects, settings, caches or logs:
+Article v6 Skill 验证：
 
 ```powershell
-$publish = (Resolve-Path 'dist\EnglishCards').Path
-$stage = Join-Path $env:TEMP 'EnglishCards-release-stage'
-if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
-New-Item -ItemType Directory -Path $stage | Out-Null
-Get-ChildItem $publish -Force | Where-Object { $_.Name -ne 'userdata' } | Copy-Item -Destination $stage -Recurse -Force
-Compress-Archive -Path (Join-Path $stage '*') -DestinationPath 'EnglishCards-win-x64.zip' -Force
-Remove-Item $stage -Recurse -Force
+npx.cmd tsx docs/skills/article-to-englishcards/scripts/validate-project.ts
 ```
 
-Do not publish a release archive from this Linux environment: it cannot produce or execute a Windows WPF single-file build.
+## D. 外部发布前仍需独立核实
 
-## D. Publish decision
+以下事项不因本地开发机验收通过而自动视为完成：
 
-- **Automated quality gate:** PASS on the owner's Windows development machine.
-- **Local visual comparison after font optimization:** PASS (owner-reported).
-- **Clean-machine prerequisite, portability and update safety gate:** PENDING.
-- **Public redistribution of sample assets:** PENDING rights review.
-- **Release tag/push/GitHub Release:** NOT DONE; requires explicit authorization and final acceptance.
+- [ ] 在隔离的干净 Windows x64 环境验证 .NET 10 Desktop Runtime 与 WebView2 Evergreen 前置条件及启动提示。
+- [ ] 在便携目录验证首次创建 `userdata/`、移动目录后的数据可用性。
+- [ ] 在一次性副本上验证发布/升级不会破坏 `userdata/`；不要在含真实数据的目录中做破坏性测试。
+- [ ] 核实仓库内样例文章、图片等公开分发素材的授权。
+- [ ] 明确正式版本号、发布标签和 GitHub Release；本记录不表示已创建 Release 或发布标签。
 
-
-## Article v6 migration gate (2026-11-07)
-
-The owner supplied a later Windows log for the Article v6 phase-1.1 source: Vitest 46/46, Vite build PASS, Playwright 61/61, and .NET win-x64 framework-dependent publish PASS. Those tests still exercised the old v5 running UI; the independent Article v6 model tests were included in Vitest, but full WPF v6 integration was not yet implemented. The subsequent repository directory migration has not yet been re-run on Windows. Do not use the historical v5 acceptance table as evidence that v6 is ready to release.
+浏览器 E2E 不替代真实 WPF/WebView2 验收。发布决策应依据目标机器实测，不将未执行项目标为通过。
