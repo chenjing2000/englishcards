@@ -596,3 +596,49 @@ try
     Console.WriteLine("PASS Phase E new-card creation is exclusive and cleans temporary files");
 }
 finally { newCardDirectory.Delete(recursive: true); }
+
+var pairCommitType = bridgeType.Assembly.GetType("EnglishCards.PairedFileCommit", throwOnError: true)!;
+var pairCommit = pairCommitType.GetMethod("CommitAsync", BindingFlags.Static | BindingFlags.NonPublic)!;
+Task CommitPair(string sourceJson, string sourceZip, string targetJson, string targetZip, bool approved) =>
+    (Task)pairCommit.Invoke(null, [sourceJson, sourceZip, targetJson, targetZip, approved, CancellationToken.None])!;
+var pairDir = Directory.CreateTempSubdirectory("EnglishCards-paired-save-");
+try
+{
+    var json = Path.Combine(pairDir.FullName, "Article.json");
+    var zip = Path.Combine(pairDir.FullName, "Article.zip");
+    var stagedJson = Path.Combine(pairDir.FullName, ".article.json.tmp");
+    var stagedZip = Path.Combine(pairDir.FullName, ".article.zip.tmp");
+    await File.WriteAllTextAsync(json, "old JSON");
+    await File.WriteAllTextAsync(zip, "old ZIP");
+    await File.WriteAllTextAsync(stagedJson, "new JSON");
+    await File.WriteAllTextAsync(stagedZip, "new ZIP");
+    bool permissionRejected = false;
+    try { await CommitPair(stagedJson, stagedZip, json, zip, false); }
+    catch (TargetInvocationException error) when (error.InnerException is IOException) { permissionRejected = true; }
+    if (!permissionRejected || File.ReadAllText(json) != "old JSON" || File.ReadAllText(zip) != "old ZIP")
+        throw new Exception("Paired save must not overwrite any file without approval.");
+
+    // The locked second target causes a failure after the first replacement;
+    // a rollback must restore the first target and preserve the old ZIP.
+    bool rolledBack = false;
+    using (var locked = File.Open(zip, FileMode.Open, FileAccess.Read, FileShare.Read))
+    {
+        try { await CommitPair(stagedJson, stagedZip, json, zip, true); }
+        catch (TargetInvocationException error) when (error.InnerException is IOException or UnauthorizedAccessException)
+        { rolledBack = true; }
+    }
+    if (!rolledBack || File.ReadAllText(json) != "old JSON" || File.ReadAllText(zip) != "old ZIP")
+        throw new Exception("A failed ZIP commit must roll the earlier JSON replacement back.");
+    if (Directory.GetFiles(pairDir.FullName, "*.bak").Length != 0 ||
+        Directory.GetFiles(pairDir.FullName, "*.tmp").Length != 0)
+        throw new Exception("Paired save rollback left unnecessary temporary or backup files.");
+
+    await File.WriteAllTextAsync(stagedJson, "new JSON");
+    await File.WriteAllTextAsync(stagedZip, "new ZIP");
+    await CommitPair(stagedJson, stagedZip, json, zip, true);
+    if (File.ReadAllText(json) != "new JSON" || File.ReadAllText(zip) != "new ZIP" ||
+        Directory.GetFiles(pairDir.FullName).Length != 2)
+        throw new Exception("Paired save must commit both documents and remove staging files.");
+    Console.WriteLine("PASS paired save requires overwrite approval, rolls back a failed ZIP commit and cleans staging");
+}
+finally { pairDir.Delete(recursive: true); }
