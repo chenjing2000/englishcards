@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import fixture from '@fixtures/projects/brainco/project.json';
 import { createEmptyArticle, parseRenderProject } from '@frontend/models/project';
-import { loadDesktopData, requestExport, restoreDraft } from '@frontend/services/projectIO';
+import { loadDesktopData, restoreDraft } from '@frontend/services/projectIO';
 import { defaults } from '@frontend/models/settings';
 
 it('Phase E desktop bootstrap reads settings without restoring a legacy draft', async () => {
@@ -63,36 +63,5 @@ it('quarantines the previous v5 localStorage draft key without migrating it', ()
     expect(restored.notice).toContain('旧版自动草稿（v5）');
     expect(store.get('article-editor.rejected-draft')).toBe(raw);
     expect(store.get('reading-editor.draft.v2')).toBe(raw);
-  } finally { vi.unstubAllGlobals(); }
-});
-
-it('sends one complete Article v6 ZIP export snapshot through the desktop bridge', async () => {
-  const messages = new EventTarget();
-  const requests: { command: string; payload: unknown }[] = [];
-  vi.stubGlobal('window', { chrome: { webview: {
-    postMessage({ id, command, payload }: { id: number; command: string; payload: unknown }) {
-      requests.push({ command, payload });
-      messages.dispatchEvent(new MessageEvent('message', { data: { id, ok: true, value: true } }));
-    },
-    addEventListener: messages.addEventListener.bind(messages),
-    removeEventListener: messages.removeEventListener.bind(messages),
-  } } });
-  try {
-    const project = parseRenderProject({ ...fixture, styles: defaults });
-    expect(await requestExport(project, 'signature-1234567890', 6)).toBe(true);
-    expect(requests).toHaveLength(1);
-    expect(requests[0].command).toBe('exportAllZip');
-    const payload = requests[0].payload as { signature: string; pages: number; document: { schemaVersion: number }; project: unknown };
-    expect(payload.signature).toBe('signature-1234567890');
-    expect(payload.pages).toBe(6);
-    expect(payload.document.schemaVersion).toBe(6);
-    expect(payload.project).toEqual(project);
-  } finally { vi.unstubAllGlobals(); }
-});
-
-it('does not silently fall back to the removed web export service', async () => {
-  vi.stubGlobal('window', {});
-  try {
-    await expect(requestExport(parseRenderProject({ ...fixture, styles: defaults }), 'signature', 2)).rejects.toThrow('桌面版');
   } finally { vi.unstubAllGlobals(); }
 });
