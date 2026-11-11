@@ -65,14 +65,19 @@ export function createCardSaveCoordinator(filePath: string, article: Project): C
   });
 }
 
-/** Save a single validated Article v6 snapshot as a matching JSON + ZIP pair. */
-export function saveArticlePair(project: RenderProject, signature: string, pages: number):
+export type ArticlePairTarget = { path: string; folder: string; existingFiles: string[] };
+
+/** Choose a destination folder and report only the matching files that already exist. */
+export function chooseArticlePairTarget(fileName: string): Promise<ArticlePairTarget | null> {
+  return desktopRequest('chooseArticlePairTarget', fileName);
+}
+
+/** Commit one immutable Article v6 snapshot to the previously selected target. */
+export function saveArticlePair(project: RenderProject, signature: string, pages: number,
+  target: ArticlePairTarget, overwriteApproved: boolean):
   Promise<{ path: string; text: string; folder: string; folderPreferenceSaved: boolean } | null> {
   return desktopRequest('saveArticlePair', {
-    project,
-    document: projectDocument(project),
-    fileName: cardFileName(project.title),
-    signature,
-    pages,
+    project, document: projectDocument(project), fileName: cardFileName(project.title),
+    signature, pages, path: target.path, overwriteApproved,
   });
 }

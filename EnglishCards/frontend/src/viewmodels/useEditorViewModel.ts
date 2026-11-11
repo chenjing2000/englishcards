@@ -14,7 +14,7 @@ import {
 } from '../services/projectIO';
 import { desktopRequest, isDesktop } from '../services/desktopBridge';
 import { CardSaveCoordinator, type CardSaveStatus } from '../services/cardSaveCoordinator';
-import { createCardSaveCoordinator, defaultCardLibrary, lastCardLibrary, listCardDirectory, openCardFile, saveArticlePair, serializedCard } from '../services/cardFileIO';
+import { cardFileName, chooseArticlePairTarget, createCardSaveCoordinator, defaultCardLibrary, lastCardLibrary, listCardDirectory, openCardFile, saveArticlePair, serializedCard, type ArticlePairTarget } from '../services/cardFileIO';
 
 type ParagraphCollection = 'content' | 'translation';
 const stringify = (project: Project) => JSON.stringify(projectDocument(project), null, 2);
@@ -391,7 +391,7 @@ export function useEditorViewModel() {
   }
 
   /** A paired save is the only operation that establishes a current ZIP version. */
-  async function savePair(): Promise<boolean> {
+  async function savePair(confirmOverwrite: (target: ArticlePairTarget) => Promise<boolean>): Promise<boolean> {
     if (!desktop || !settingsReady || opening || exporting || preparingClose.current) return false;
     if (!ready || !rendered || rendered.project !== previewProject) {
       showWarning('预览与编辑内容尚未同步，或分页尚未完成，请稍后保存。');
@@ -421,8 +421,14 @@ export function useEditorViewModel() {
         showWarning('当前 JSON 自动保存尚未完成，请先处理保存错误。');
         return false;
       }
-      const result = await saveArticlePair(snapshot, signature, pages);
-      if (!result) return false; // Folder dialog or overwrite confirmation cancelled.
+      const target = await chooseArticlePairTarget(cardFileName(snapshot.title));
+      if (!target) return false; // Folder selection cancelled.
+      const overwriteApproved = target.existingFiles.length > 0
+        ? await confirmOverwrite(target)
+        : false;
+      if (target.existingFiles.length > 0 && !overwriteApproved) return false;
+      const result = await saveArticlePair(snapshot, signature, pages, target, overwriteApproved);
+      if (!result) return false;
       const saved = projectDocument(JSON.parse(result.text) as Project);
       const session = createCardSaveCoordinator(result.path, saved);
       clearTimeout(cardTimer.current);

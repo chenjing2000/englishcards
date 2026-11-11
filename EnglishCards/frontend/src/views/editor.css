@@ -191,3 +191,12 @@
 .phase-e-clear-actions{display:flex;justify-content:flex-end;gap:10px;padding:12px 22px 22px}
 .phase-e-clear-actions button{min-width:76px}
 .phase-e-clear-actions button:first-child{background:#d3e5eb;border-color:#b9d4de;color:#27495b}
+
+
+/* Overwrite confirmation reuses the clear-dialog dimensions and shared modal chrome. */
+.phase-e-overwrite-dialog{width:min(440px,calc(100vw - 48px));max-width:440px}
+.phase-e-overwrite-content{padding:4px 22px 8px;color:#354747;font-size:14px;line-height:1.55;overflow-wrap:anywhere}
+.phase-e-overwrite-content p{margin:10px 0}
+.phase-e-overwrite-content ul{margin:8px 0;padding:10px 12px 10px 30px;border-radius:8px;background:#f1f4f5;max-height:180px;overflow:auto}
+.phase-e-overwrite-content li{margin:3px 0}
+.phase-e-overwrite-actions button:last-child{background:#d3e5eb;border-color:#b9d4de;color:#27495b}

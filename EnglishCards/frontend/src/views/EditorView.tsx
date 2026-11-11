@@ -11,6 +11,7 @@ import SplitPane from './SplitPane';
 import AutoSizeTextarea from './AutoSizeTextarea';
 import ContinuousParagraphEditor from './ContinuousParagraphEditor';
 import SettingInput from './SettingInput';
+import type { ArticlePairTarget } from '../services/cardFileIO';
 
 /**
  * Match Transcript Studio's native React toolbar drawing:
@@ -33,6 +34,18 @@ export default function EditorView() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const [clearBusy, setClearBusy] = useState(false);
+  const [overwriteTarget, setOverwriteTarget] = useState<ArticlePairTarget | null>(null);
+  const overwriteResolver = useRef<((approved: boolean) => void) | null>(null);
+  function confirmOverwrite(target: ArticlePairTarget): Promise<boolean> {
+    setOverwriteTarget(target);
+    return new Promise(resolve => { overwriteResolver.current = resolve; });
+  }
+  function resolveOverwrite(approved: boolean) {
+    setOverwriteTarget(null);
+    const resolve = overwriteResolver.current;
+    overwriteResolver.current = null;
+    resolve?.(approved);
+  }
 
   const inputs = useRef(new Map<string, HTMLInputElement | HTMLTextAreaElement>());
   function registerInput(id: string, input: HTMLInputElement | HTMLTextAreaElement | null) {
@@ -89,7 +102,7 @@ export default function EditorView() {
       }}><ToolbarIcon name="clear" /></button>
     <button type="button" aria-label="保存" title="保存 JSON 与 ZIP"
       disabled={!ready || exporting || vm.opening || clearBusy}
-      onClick={() => { void vm.savePair(); }}><ToolbarIcon name="save" /></button>
+      onClick={() => { void vm.savePair(confirmOverwrite); }}><ToolbarIcon name="save" /></button>
   </div>;
 
   return <div className="app-shell" inert={vm.desktop && (!settingsReady || vm.closing)}>
@@ -151,7 +164,7 @@ export default function EditorView() {
         <div className="phase-e-clear-actions">
           <button type="button" disabled={clearBusy} onClick={() => {
             setClearBusy(true);
-            void vm.savePair().then(async saved => {
+            void vm.savePair(confirmOverwrite).then(async saved => {
               if (saved && await vm.clearArticle()) setClearOpen(false);
             }).finally(() => setClearBusy(false));
           }}>保存</button>
@@ -162,6 +175,22 @@ export default function EditorView() {
             }).finally(() => setClearBusy(false));
           }}>放弃</button>
           <button type="button" disabled={clearBusy} onClick={() => setClearOpen(false)}>取消</button>
+        </div>
+      </section>
+    </div>}
+    {vm.desktop && overwriteTarget && <div className="phase-e-modal-backdrop" role="presentation"
+      onMouseDown={event => { if (event.target === event.currentTarget) resolveOverwrite(false); }}>
+      <section role="dialog" aria-modal="true" aria-label="确认覆盖" className="phase-e-modal phase-e-overwrite-dialog">
+        <div className="phase-e-modal-heading"><h2>确认覆盖</h2>
+          <button type="button" aria-label="关闭确认覆盖" onClick={() => resolveOverwrite(false)}>×</button></div>
+        <div className="phase-e-overwrite-content">
+          <p>以下位置已存在同名文件：</p>
+          <ul>{overwriteTarget.existingFiles.map(file => <li key={file}>{file}</li>)}</ul>
+          <p>是否覆盖这一组文件？</p>
+        </div>
+        <div className="phase-e-clear-actions phase-e-overwrite-actions">
+          <button type="button" onClick={() => resolveOverwrite(false)}>取消</button>
+          <button type="button" onClick={() => resolveOverwrite(true)}>覆盖</button>
         </div>
       </section>
     </div>}

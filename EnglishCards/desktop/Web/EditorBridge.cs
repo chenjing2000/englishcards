@@ -84,6 +84,7 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
                 "defaultCardLibrary" when payload.ValueKind == JsonValueKind.Null => data.LibraryRootPath,
                 "lastCardLibrary" when payload.ValueKind == JsonValueKind.Null => await data.LoadLastLibraryFolderAsync(),
                 "saveLastCardLibrary" when payload.ValueKind == JsonValueKind.String => await SaveLastCardLibraryAsync(payload.GetString()!),
+                "chooseArticlePairTarget" when payload.ValueKind == JsonValueKind.String => await ChooseArticlePairTargetAsync(payload.GetString()!),
                 "saveArticlePair" when payload.ValueKind == JsonValueKind.Object => await SaveArticlePairAsync(payload),
                 "saveProject" when payload.ValueKind == JsonValueKind.String => await SaveProjectAsync(payload.GetString()!),
                 "loadSettings" when payload.ValueKind == JsonValueKind.Null => await data.LoadSettingsAsync(),
@@ -205,27 +206,20 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         return true;
     }
 
-    private async Task<object?> SaveArticlePairAsync(JsonElement payload)
+    private static void ValidatePairFileName(string name)
     {
-        if (exporter.IsRunning) throw new InvalidOperationException("请等待当前保存任务完成。");
-        if (!payload.TryGetProperty("fileName", out var nameValue) ||
-            nameValue.ValueKind != JsonValueKind.String ||
-            !payload.TryGetProperty("document", out var document) ||
-            document.ValueKind != JsonValueKind.Object)
-            throw new InvalidDataException("保存请求缺少文章或文件名。");
-        ArticleContractValidator.Validate(document);
-        var title = document.GetProperty("title").GetString();
-        if (string.IsNullOrWhiteSpace(title))
-            throw new InvalidDataException("请先填写英文标题，再保存 JSON 和 ZIP。");
-
-        var name = nameValue.GetString()!;
         if (string.IsNullOrWhiteSpace(name) || name is "." or ".." ||
             !string.Equals(Path.GetFileName(name), name, StringComparison.Ordinal) ||
             !string.Equals(Path.GetExtension(name), ".json", StringComparison.OrdinalIgnoreCase) ||
             name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
             name.EndsWith(' ') || name.EndsWith('.'))
             throw new InvalidDataException("保存文件名无效。");
+    }
 
+    private async Task<object?> ChooseArticlePairTargetAsync(string name)
+    {
+        if (exporter.IsRunning) throw new InvalidOperationException("请等待当前保存任务完成。");
+        ValidatePairFileName(name);
         var picker = new OpenFolderDialog
         {
             Title = "选择文章 JSON 和 ZIP 的保存文件夹",
@@ -233,19 +227,42 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
             Multiselect = false
         };
         if (FolderDialogPositioning.ShowDialog(picker, owner) != true) return null;
-
         var folder = Path.GetFullPath(picker.FolderName);
         var path = ValidateCardPath(Path.Combine(folder, name));
         var zip = Path.ChangeExtension(path, ".zip");
-        bool overwriting = File.Exists(path) || File.Exists(zip);
-        if (overwriting &&
-            MessageBox.Show(owner,
-                $"以下位置已有同名 JSON 或 ZIP 文件：\\n{folder}\\n\\n是否覆盖这一组文件？",
-                "确认覆盖", MessageBoxButton.YesNo, MessageBoxImage.Warning,
-                MessageBoxResult.No) != MessageBoxResult.Yes)
-            return null;
+        var existingFiles = new[] { path, zip }.Where(File.Exists).ToArray();
+        return new { path, folder, existingFiles };
+    }
 
-        var saved = await exporter.SavePairAsync(payload, path, overwriting);
+    private async Task<object?> SaveArticlePairAsync(JsonElement payload)
+    {
+        if (exporter.IsRunning) throw new InvalidOperationException("请等待当前保存任务完成。");
+        if (!payload.TryGetProperty("fileName", out var nameValue) ||
+            nameValue.ValueKind != JsonValueKind.String ||
+            !payload.TryGetProperty("document", out var document) ||
+            document.ValueKind != JsonValueKind.Object ||
+            !payload.TryGetProperty("path", out var pathValue) ||
+            pathValue.ValueKind != JsonValueKind.String ||
+            !payload.TryGetProperty("overwriteApproved", out var approvedValue) ||
+            approvedValue.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            throw new InvalidDataException("保存请求缺少文章、目标路径或覆盖确认状态。");
+        ArticleContractValidator.Validate(document);
+        var title = document.GetProperty("title").GetString();
+        if (string.IsNullOrWhiteSpace(title))
+            throw new InvalidDataException("请先填写英文标题，再保存 JSON 和 ZIP。");
+
+        var name = nameValue.GetString()!;
+        ValidatePairFileName(name);
+        var path = ValidateCardPath(pathValue.GetString()!);
+        if (!string.Equals(Path.GetFileName(path), name, StringComparison.Ordinal))
+            throw new InvalidDataException("保存目标文件名与文章标题不一致。");
+        var folder = Path.GetDirectoryName(path)!;
+        var zip = Path.ChangeExtension(path, ".zip");
+        var overwriting = File.Exists(path) || File.Exists(zip);
+        if (overwriting && !approvedValue.GetBoolean())
+            throw new IOException("目标文件已发生变化，请重新确认覆盖后再保存。");
+
+        var saved = await exporter.SavePairAsync(payload, path, approvedValue.GetBoolean());
         if (saved != true) return null;
 
         var jsonText = await File.ReadAllTextAsync(path);

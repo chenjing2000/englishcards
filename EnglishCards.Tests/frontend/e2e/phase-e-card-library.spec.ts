@@ -117,6 +117,10 @@ test('Settings keep 560 DIP layout and Clear / Save replace new-card creation', 
           path: payload, folders: [], files: payload === 'D:/Saved Cards'
             ? [{ path: 'D:/Saved Cards/New Article.json', name: 'New Article.json' }] : [],
         };
+        if (command === 'chooseArticlePairTarget') value = {
+          path: 'D:/Saved Cards/New Article.json', folder: 'D:/Saved Cards',
+          existingFiles: ['D:/Saved Cards/New Article.json'],
+        };
         if (command === 'saveArticlePair') value = {
           path: 'D:/Saved Cards/New Article.json',
           folder: 'D:/Saved Cards',
@@ -162,6 +166,11 @@ test('Settings keep 560 DIP layout and Clear / Save replace new-card creation', 
   await title.fill('New Article');
   await expect(page.getByRole('button', { name: '保存' })).toBeEnabled();
   await page.getByRole('button', { name: '保存' }).click();
+  const overwrite = page.getByRole('dialog', { name: '确认覆盖' });
+  await expect(overwrite).toBeVisible();
+  await expect(overwrite.getByText('D:/Saved Cards/New Article.json')).toBeVisible();
+  await expect(overwrite.getByText('D:/Saved Cards/New Article.zip')).toHaveCount(0);
+  await overwrite.getByRole('button', { name: '覆盖' }).click();
   await expect.poll(() => page.evaluate(() => (window as any).phaseEWorkflowRequests.some(
     (item: NativeMessage) => item.command === 'saveArticlePair'))).toBe(true);
   await expect(page.getByRole('button', { name: 'New Article.json' })).toBeVisible();

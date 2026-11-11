@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import fixture from '@fixtures/projects/brainco/project.json';
-import { cardFileName, createCardSaveCoordinator, listCardDirectory, openCardFile, saveArticlePair, serializedCard } from '@frontend/services/cardFileIO';
+import { cardFileName, chooseArticlePairTarget, createCardSaveCoordinator, listCardDirectory, openCardFile, saveArticlePair, serializedCard } from '@frontend/services/cardFileIO';
 import { defaults, parseProject } from '@frontend/models/project';
 
 function fakeBridge(respond: (command: string, payload: unknown) => unknown) {
@@ -59,10 +59,12 @@ describe('Phase E file-backed desktop bridge client', () => {
       folderPreferenceSaved: true,
     }));
     const article = parseProject(fixture);
-    const saved = await saveArticlePair({ ...article, styles: defaults }, 'page-signature-1', 2);
+    const target = await chooseArticlePairTarget('New Article.json');
+    expect(target?.existingFiles).toEqual([]);
+    const saved = await saveArticlePair({ ...article, styles: defaults }, 'page-signature-1', 2, target!, false);
     expect(saved?.path).toBe('C:/cards/new.json');
-    expect(requests[0].command).toBe('saveArticlePair');
-    const payload = requests[0].payload as {
+    expect(requests.at(-1)!.command).toBe('saveArticlePair');
+    const payload = requests.at(-1)!.payload as {
       fileName: string; document: object; project: object; signature: string; pages: number;
     };
     expect(payload.fileName).toBe(cardFileName(article.title));
