@@ -141,7 +141,7 @@ test('long content and translation paginate without gaps; vocabulary is a single
   const vocabLines = page.locator('.vocab[data-source="v001"]');
   expect(await vocabLines.count()).toBeGreaterThan(1);
   const exportSnapshot = await page.evaluate(() => window.editor);
-  const response = await page.request.post('/api/export', { data: exportSnapshot });
+  const response = await page.request.post('/api/render-page', { data: { ...exportSnapshot, page: 1 });
   expect(response.ok(), response.ok() ? '' : await response.text()).toBe(true);
   const files = unzipSync(new Uint8Array(await response.body()));
   expect(files['article.json']).toBeTruthy();
