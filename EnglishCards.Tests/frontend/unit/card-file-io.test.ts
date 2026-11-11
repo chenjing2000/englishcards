@@ -52,12 +52,13 @@ describe('Phase E file-backed desktop bridge client', () => {
   });
 
   it('requests a validated JSON and ZIP pair from a single snapshot', async () => {
-    const requests = fakeBridge((_command, payload) => ({
-      path: 'C:/cards/new.json',
-      folder: 'C:/cards',
-      text: JSON.stringify((payload as { document: object }).document),
-      folderPreferenceSaved: true,
-    }));
+    const requests = fakeBridge((command, payload) => command === 'chooseArticlePairTarget'
+      ? { path: 'C:/cards/new.json', folder: 'C:/cards', existingFiles: [] }
+      : {
+        path: 'C:/cards/new.json', folder: 'C:/cards',
+        text: JSON.stringify((payload as { document: object }).document),
+        folderPreferenceSaved: true,
+      });
     const article = parseProject(fixture);
     const target = await chooseArticlePairTarget('New Article.json');
     expect(target?.existingFiles).toEqual([]);
