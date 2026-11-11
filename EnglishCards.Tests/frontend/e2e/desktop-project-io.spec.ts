@@ -9,6 +9,7 @@ declare global {
       failNextSave: boolean;
       corruptNextOpen: boolean;
       failDirectoryRead: boolean;
+      failNextPair: boolean;
     };
   }
 }
@@ -19,7 +20,7 @@ test.beforeEach(async ({ page }) => {
     const cards: Record<string, unknown> = {
       'C:/cards/A.json': { ...initial, title: 'Card A' },
     };
-    window.phaseEIO = { requests: [], failNextSave: false, corruptNextOpen: false, failDirectoryRead: false };
+    window.phaseEIO = { requests: [], failNextSave: false, corruptNextOpen: false, failDirectoryRead: false, failNextPair: false };
     const respond = (id: number, value: unknown, error?: string) =>
       events.dispatchEvent(new MessageEvent('message', {
         data: error ? { id, ok: false, error } : { id, ok: true, value },
@@ -37,8 +38,8 @@ test.beforeEach(async ({ page }) => {
         if (command === 'listCardDirectory') value = {
           path: payload,
           folders: payload === 'C:/cards' ? [{ path: 'C:/cards/Subfolder', name: 'Subfolder' }] : [],
-          files: payload === 'C:/cards'
-            ? Object.keys(cards).map(path => ({ path, name: path.split('/').at(-1)! })) : [],
+          files: Object.keys(cards).filter(path => path.startsWith(String(payload) + '/'))
+            .map(path => ({ path, name: path.split('/').at(-1)! })),
         };
         if (command === 'listCardDirectory' && window.phaseEIO.failDirectoryRead && payload === 'C:/cards/Subfolder') {
           error = 'Access denied';
@@ -58,13 +59,18 @@ test.beforeEach(async ({ page }) => {
             cards[snapshot.path] = JSON.parse(snapshot.text);
           }
         }
-        if (command === 'createCardFile') {
-          const contents = (payload as { text: string }).text;
-          const path = (payload as { directory: string }).directory + '/' + (payload as { fileName: string }).fileName;
-          if (Object.hasOwn(cards, path)) error = '同名卡片已存在，请更换标题或文件名。';
-          else {
-            cards[path] = JSON.parse(contents);
-            value = { path, text: contents };
+        if (command === 'saveArticlePair') {
+          if (window.phaseEIO.failNextPair) {
+            window.phaseEIO.failNextPair = false;
+            error = 'Pair save failed';
+          } else {
+            const request = payload as { fileName: string; document: object };
+            const path = 'D:/Saved Cards/' + request.fileName;
+            cards[path] = request.document;
+            value = {
+              path, folder: 'D:/Saved Cards',
+              text: JSON.stringify(request.document), folderPreferenceSaved: true,
+            };
           }
         }
         queueMicrotask(() => respond(id, value, error));
@@ -111,8 +117,8 @@ test('right editor title and Transcript Studio-style circular icons share one ro
   await expect(title).toBeVisible();
   await expect(buttons).toHaveCount(3);
   await expect(buttons.nth(0)).toHaveAttribute('aria-label', '设置');
-  await expect(buttons.nth(1)).toHaveAttribute('aria-label', '新建卡片');
-  await expect(buttons.nth(2)).toHaveAttribute('aria-label', '导出 ZIP');
+  await expect(buttons.nth(1)).toHaveAttribute('aria-label', '清空');
+  await expect(buttons.nth(2)).toHaveAttribute('aria-label', '保存');
   await expect(buttons.nth(0)).toHaveCSS('border-radius', '50%');
   await expect(buttons.nth(0)).toHaveCSS('background-color', 'rgb(162, 210, 226)');
   for (const button of await buttons.all()) {
@@ -167,62 +173,42 @@ test('independent desktop errors stack upwards and each close clears only its so
   await expect(page.getByRole('button', { name: '重试保存当前卡片' })).toBeVisible();
 });
 
-test('Phase E new card creates JSON before activating the editor', async ({ page }) => {
-  await page.getByRole('button', { name: '新建卡片' }).click();
-  await expect(page.getByRole('dialog', { name: '新建卡片' })).toBeVisible();
-  await page.getByLabel('卡片名', { exact: true }).fill('My New Card');
-  await expect(page.getByLabel('文件夹', { exact: true })).toHaveValue('C:/cards');
-  await expect(page.getByText('默认文件名：My New Card.json')).toHaveCount(0);
-  await page.getByRole('button', { name: '创建', exact: true }).click();
-  await expect(page.getByLabel('英文标题', { exact: true })).toHaveValue('My New Card');
-  const requests = await page.evaluate(() => window.phaseEIO.requests);
-  const create = requests.find(item => item.command === 'createCardFile');
-  expect(create).toBeDefined();
-  const payload = create!.payload as { directory: string; text: string };
-  expect(payload.directory).toBe('C:/cards');
-  const document = JSON.parse(payload.text);
-  expect(document.schemaVersion).toBe(6);
-  expect(document.title).toBe('My New Card');
-  expect(payload).toHaveProperty('fileName', 'My New Card.json');
-  await expect(page.getByRole('button', { name: 'My New Card.json' })).toBeVisible();
+test('Clear offers Save, Discard, Cancel without deleting the source card', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  const title = page.getByLabel('英文标题', { exact: true });
+  await expect(title).toHaveValue('Card A');
+  await title.fill('Unsaved revision');
+  await page.getByRole('button', { name: '清空' }).click();
+  const dialog = page.getByRole('dialog', { name: '清空当前文章' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: '取消' }).click();
+  await expect(title).toHaveValue('Unsaved revision');
+  await page.getByRole('button', { name: '清空' }).click();
+  await dialog.getByRole('button', { name: '放弃' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(title).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'A.json' })).not.toHaveAttribute('aria-current', 'page');
+  const pairWrites = await page.evaluate(() => window.phaseEIO.requests.filter(item => item.command === 'saveArticlePair'));
+  expect(pairWrites).toHaveLength(0);
 });
 
-test('new-card duplicate errors use one visible preview toast while modal keeps its title', async ({ page }) => {
-  const notices = page.locator('.phase-e-notices');
-  await page.getByRole('button', { name: '新建卡片' }).click();
-  const dialog = page.getByRole('dialog', { name: '新建卡片' });
-  await expect(dialog).toBeVisible();
-  await page.getByLabel('卡片名', { exact: true }).fill('A');
-  await page.getByRole('button', { name: '创建', exact: true }).click();
+test('Paired save failure retains the article and successful retry switches the card library', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  const title = page.getByLabel('英文标题', { exact: true });
+  await expect(title).toHaveValue('Card A');
+  await page.evaluate(() => { window.phaseEIO.failNextPair = true; });
+  await expect(page.getByRole('button', { name: '保存' })).toBeEnabled();
+  await page.getByRole('button', { name: '保存' }).click();
+  await expect(page.locator('.phase-e-notices .phase-e-notice-error')).toContainText('Pair save failed');
+  await expect(title).toHaveValue('Card A');
+  await expect(page.getByRole('button', { name: 'A.json' })).toHaveAttribute('aria-current', 'page');
 
-  const duplicate = notices.locator('.phase-e-notice-error');
-  await expect(notices).toHaveCSS('width', '360px');
-  await expect(notices).toHaveCSS('min-width', '240px');
-  await expect(duplicate).toHaveCount(1);
-  await expect(duplicate).toContainText('同名卡片已存在');
-  await expect(dialog.getByText('同名卡片已存在')).toHaveCount(0);
-  await expect(dialog).toBeVisible();
-  await expect(page.getByLabel('卡片名', { exact: true })).toHaveValue('A');
-
-  // The toast must be above the modal backdrop and remain in the preview pane.
-  const toast = await duplicate.boundingBox();
-  const preview = await page.locator('#preview-panel').boundingBox();
-  expect(toast && preview).toBeTruthy();
-  expect(Math.abs((toast!.x + toast!.width / 2) - (preview!.x + preview!.width / 2))).toBeLessThan(3);
-  expect(await duplicate.evaluate(node => {
-    const bounds = node.getBoundingClientRect();
-    const hit = document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
-    return hit === node || node.contains(hit);
-  })).toBe(true);
-
-  // Repeating the same failure should not multiply the persistent error.
-  await page.getByRole('button', { name: '创建', exact: true }).click();
-  await expect(duplicate).toHaveCount(1);
-  await page.getByLabel('卡片名', { exact: true }).fill('Another Card');
-  await page.getByRole('button', { name: '创建', exact: true }).click();
-  await expect(dialog).toHaveCount(0);
-  await expect(duplicate).toHaveCount(0);
-  await expect(notices.locator('.phase-e-notice-normal')).toContainText('已创建卡片');
+  await expect(page.getByRole('button', { name: '保存' })).toBeEnabled();
+  await page.getByRole('button', { name: '保存' }).click();
+  await expect(page.getByRole('button', { name: 'Card A.json' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Card A.json' })).toHaveAttribute('aria-current', 'page');
+  const request = await page.evaluate(() => window.phaseEIO.requests.find(item => item.command === 'saveArticlePair'));
+  expect((request!.payload as { fileName: string }).fileName).toBe('Card A.json');
 });
 
 test('settings modal has 560 DIP two-column layout without a divider', async ({ page }) => {

@@ -7,7 +7,6 @@ internal sealed class UserDataStore(string root)
 {
     private string SettingsPath => Path.Combine(root, "settings", "settings.json");
     private string DraftPath => Path.Combine(root, "drafts", "draft.json");
-    private string LastNewCardFolderPath => Path.Combine(root, "settings", "last-new-card-folder.txt");
     private string LastLibraryFolderPath => Path.Combine(root, "settings", "last-library-folder.txt");
     private string? rejectedSettings;
     private string? rejectedDraft;
@@ -59,11 +58,7 @@ internal sealed class UserDataStore(string root)
     internal Task<string?> LoadSettingsAsync() => ReadAsync(SettingsPath);
     internal Task<string?> LoadDraftAsync() => ReadAsync(DraftPath);
 
-    internal Task<string> LoadLastNewCardFolderAsync() => LoadDirectoryPreferenceAsync(LastNewCardFolderPath);
     internal Task<string> LoadLastLibraryFolderAsync() => LoadDirectoryPreferenceAsync(LastLibraryFolderPath);
-
-    internal Task SaveLastSuccessfulNewCardFolderAsync(string path) =>
-        SaveDirectoryPreferenceAsync(LastNewCardFolderPath, path);
 
     internal Task SaveLastLibraryFolderAsync(string path) =>
         SaveDirectoryPreferenceAsync(LastLibraryFolderPath, path);

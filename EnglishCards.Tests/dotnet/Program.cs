@@ -151,41 +151,27 @@ void Dispose(object store) => disposeStore.Invoke(store, null);
 Task SaveSettings(object store, string text) => (Task)saveSettings.Invoke(store, [text, true])!;
 Task SaveDraft(object store, string text) => (Task)saveDraft.Invoke(store, [text, true])!;
 
-var loadNewCardFolder = storeType.GetMethod("LoadLastNewCardFolderAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
 var loadLibraryFolder = storeType.GetMethod("LoadLastLibraryFolderAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
-var saveNewCardFolder = storeType.GetMethod("SaveLastSuccessfulNewCardFolderAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
 var saveLibraryFolder = storeType.GetMethod("SaveLastLibraryFolderAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
 Task<string> LoadPath(object store, System.Reflection.MethodInfo method) => (Task<string>)method.Invoke(store, null)!;
 Task SavePath(object store, System.Reflection.MethodInfo method, string path) => (Task)method.Invoke(store, [path])!;
 
 var preferenceRoot = Directory.CreateTempSubdirectory("EnglishCards-path-preferences-");
-var newCardFolderOne = Directory.CreateDirectory(Path.Combine(preferenceRoot.FullName, "cards-one"));
-var newCardFolderTwo = Directory.CreateDirectory(Path.Combine(preferenceRoot.FullName, "cards-two"));
 var libraryFolder = Directory.CreateDirectory(Path.Combine(preferenceRoot.FullName, "library"));
 var preferenceStore = NewStore(preferenceRoot.FullName);
 try
 {
-    if (await LoadPath(preferenceStore, loadNewCardFolder) != preferenceRoot.FullName ||
-        await LoadPath(preferenceStore, loadLibraryFolder) != preferenceRoot.FullName)
-        throw new Exception("Both remembered folder preferences must initially fall back to userdata.");
-
-    await SavePath(preferenceStore, saveNewCardFolder, newCardFolderOne.FullName);
+    if (await LoadPath(preferenceStore, loadLibraryFolder) != preferenceRoot.FullName)
+        throw new Exception("The library preference must initially fall back to userdata.");
     await SavePath(preferenceStore, saveLibraryFolder, libraryFolder.FullName);
-    if (await LoadPath(preferenceStore, loadNewCardFolder) != newCardFolderOne.FullName ||
-        await LoadPath(preferenceStore, loadLibraryFolder) != libraryFolder.FullName)
-        throw new Exception("New-card and library folders must be persisted independently.");
-
     Dispose(preferenceStore);
     preferenceStore = NewStore(preferenceRoot.FullName);
-    if (await LoadPath(preferenceStore, loadNewCardFolder) != newCardFolderOne.FullName ||
-        await LoadPath(preferenceStore, loadLibraryFolder) != libraryFolder.FullName)
-        throw new Exception("Remembered folder preferences must survive a new store instance.");
-
-    await SavePath(preferenceStore, saveNewCardFolder, newCardFolderTwo.FullName);
-    Directory.Delete(newCardFolderTwo.FullName);
-    if (await LoadPath(preferenceStore, loadNewCardFolder) != preferenceRoot.FullName)
-        throw new Exception("A missing remembered destination must fall back to userdata.");
-    Console.WriteLine("PASS last successful new-card folder and last library folder persist independently and recover from missing paths");
+    if (await LoadPath(preferenceStore, loadLibraryFolder) != libraryFolder.FullName)
+        throw new Exception("Remembered library path must survive restart.");
+    Directory.Delete(libraryFolder.FullName);
+    if (await LoadPath(preferenceStore, loadLibraryFolder) != preferenceRoot.FullName)
+        throw new Exception("A missing library must fall back to userdata.");
+    Console.WriteLine("PASS recent card library folder survives restart and recovers from missing paths");
 }
 finally
 {
@@ -571,31 +557,6 @@ try
 }
 finally { cardDirectory.Delete(recursive: true); }
 
-
-// Phase E: new-card creation must never overwrite existing files, including races.
-var writeNewCard = bridgeType.GetMethod("WriteNewCardAsync", BindingFlags.Static | BindingFlags.NonPublic)
-    ?? throw new Exception("Phase E exclusive card creation primitive is missing.");
-Task CreateNewCard(string path, string json) =>
-    (Task)writeNewCard.Invoke(null, [path, json])!;
-var newCardDirectory = Directory.CreateTempSubdirectory("EnglishCards-new-card-test-");
-try
-{
-    var existing = Path.Combine(newCardDirectory.FullName, "Existing.json");
-    var created = Path.Combine(newCardDirectory.FullName, "New.json");
-    await File.WriteAllTextAsync(existing, "ORIGINAL");
-    await CreateNewCard(created, compactArticle);
-    if (await File.ReadAllTextAsync(created) != compactArticle)
-        throw new Exception("New-card creation must write the complete JSON snapshot.");
-    bool collisionRejected = false;
-    try { await CreateNewCard(existing, compactArticle); }
-    catch (IOException) { collisionRejected = true; }
-    if (!collisionRejected || await File.ReadAllTextAsync(existing) != "ORIGINAL")
-        throw new Exception("Existing JSON must remain byte-identical when creation conflicts.");
-    if (Directory.GetFiles(newCardDirectory.FullName, "*.tmp").Length != 0)
-        throw new Exception("New-card staging files must be removed after creation or failure.");
-    Console.WriteLine("PASS Phase E new-card creation is exclusive and cleans temporary files");
-}
-finally { newCardDirectory.Delete(recursive: true); }
 
 var pairCommitType = bridgeType.Assembly.GetType("EnglishCards.PairedFileCommit", throwOnError: true)!;
 var pairCommit = pairCommitType.GetMethod("CommitAsync", BindingFlags.Static | BindingFlags.NonPublic)!;

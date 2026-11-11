@@ -14,11 +14,6 @@ export function defaultCardLibrary(): Promise<string> {
   return desktopRequest<string>('defaultCardLibrary');
 }
 
-/** Last successfully created card destination; falls back to userdata on first use. */
-export function lastNewCardFolder(): Promise<string> {
-  return desktopRequest<string>('lastNewCardFolder');
-}
-
 /** Last card-library directory successfully selected and loaded. */
 export function lastCardLibrary(): Promise<string> {
   return desktopRequest<string>('lastCardLibrary');
@@ -34,12 +29,7 @@ export function chooseCardLibrary(): Promise<string | null> {
   return desktopRequest<string | null>('chooseCardLibrary');
 }
 
-/** Ask the Windows host to choose the destination folder for a new card. */
-export function chooseCardFolder(initialDirectory: string): Promise<string | null> {
-  return desktopRequest<string | null>('chooseCardFolder', initialDirectory);
-}
-
-/** Create an independent new Article v6 file, never overwriting an existing path. */
+/** Produce a safe filename from the English title for a JSON/ZIP pair. */
 export function cardFileName(title: string): string {
   const name = Array.from(title.normalize('NFC'), char =>
     char.charCodeAt(0) < 32 || char.charCodeAt(0) === 92 || '<>:"/|?*'.includes(char) ? '-' : char,
@@ -47,14 +37,6 @@ export function cardFileName(title: string): string {
     .replace(/\s+/gu, ' ').replace(/[. ]+$/gu, '').trim().slice(0, 100);
   const safe = name || 'Untitled';
   return (/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/iu.test(safe) ? '_' : '') + safe + '.json';
-}
-
-export function createCardFile(directory: string, article: Project): Promise<{ path: string; text: string; folderPreferenceSaved?: boolean }> {
-  return desktopRequest<{ path: string; text: string }>('createCardFile', {
-    directory,
-    fileName: cardFileName(article.title),
-    text: serializedCard(article),
-  });
 }
 
 /** Load only one directory level; folder expansion initiates the next request. */

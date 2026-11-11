@@ -14,7 +14,7 @@ import {
 } from '../services/projectIO';
 import { desktopRequest, isDesktop } from '../services/desktopBridge';
 import { CardSaveCoordinator, type CardSaveStatus } from '../services/cardSaveCoordinator';
-import { cardFileName, createCardFile, createCardSaveCoordinator, defaultCardLibrary, lastCardLibrary, listCardDirectory, openCardFile, saveArticlePair, serializedCard } from '../services/cardFileIO';
+import { createCardSaveCoordinator, defaultCardLibrary, lastCardLibrary, listCardDirectory, openCardFile, saveArticlePair, serializedCard } from '../services/cardFileIO';
 
 type ParagraphCollection = 'content' | 'translation';
 const stringify = (project: Project) => JSON.stringify(projectDocument(project), null, 2);
@@ -358,49 +358,6 @@ export function useEditorViewModel() {
       return true;
     } catch (reason) {
       reportError('card-open', `卡片打开失败：${String(reason)}`);
-      return false;
-    } finally { setOpening(false); }
-  }
-
-  async function newCard(directory: string, englishTitle: string): Promise<boolean> {
-    if (!desktop || !directory || opening || preparingClose.current) return false;
-    if (!settingsReady) { showWarning('正在初始化程序设置，请稍后重新新建卡片。'); return false; }
-    const current = cardSession.current;
-    if (invalidCardSnapshot.current || Object.keys(wordDraftsRef.current).length > 0 ||
-        (current && current.status !== 'clean') ||
-        (!current && hasFileChanges)) {
-      if (current?.status === 'dirty') void flushCardSave(current);
-      showWarning('当前卡片正在保存或存在未保存内容，请完成后重新点击新建卡片。');
-      return false;
-    }
-    setOpening(true);
-    try {
-      const title = englishTitle.trim();
-      if (!title) { reportError('card-create', '请先填写英文标题。'); return false; }
-      const empty = createEmptyArticle(title);
-      const created = await createCardFile(directory, empty);
-      // File creation has completed. The bridge now owns the new file identity.
-      const next = projectDocument(JSON.parse(created.text) as Project);
-      const session = createCardSaveCoordinator(created.path, next);
-      clearTimeout(cardTimer.current);
-      cardSession.current = session;
-      invalidCardSnapshot.current = false;
-      setActiveCardPath(created.path);
-      wordDraftsRef.current = {};
-      setWordDrafts({});
-      update(next);
-      setLastFile(stringify(next));
-      setVocabularySelection(null);
-      setCardSaveStatus('clean');
-      setLibraryRevision(value => value + 1);
-      reportError('card-open', '');
-      reportError('card-create', '');
-      showWarning(created.folderPreferenceSaved === false
-        ? `已创建卡片：${cardFileName(title)}，但无法保存最近使用的文件夹。`
-        : `已创建卡片：${cardFileName(title)}`);
-      return true;
-    } catch (reason) {
-      reportError('card-create', `新建卡片失败：${String(reason)}`);
       return false;
     } finally { setOpening(false); }
   }
@@ -764,7 +721,7 @@ export function useEditorViewModel() {
   return {
     project, warning, error, errors, settingsReady, ready, exporting, opening, desktop, closing,
     layout: rendered?.layout, rejectedDraft: boot.desktopRejected || boot.rejected,
-    open, openCardPath, newCard, retryCardSave, cardSaveStatus, activeCardPath,
+    open, openCardPath, retryCardSave, cardSaveStatus, activeCardPath,
     clearArticle, savePair, needsClearConfirmation, emptyArticle,
     libraryRoot, libraryRevision, changeLibraryRoot, save, exportImages, setProjectText, setParagraphText, setContinuousParagraphText, addParagraph,
     highlightRange, addVocabularyFromSelection, commitHead, setWordPreview, setEntryHighlights, setSenseField, setVocabularyMeaning,

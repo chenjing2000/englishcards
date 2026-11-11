@@ -90,7 +90,7 @@ test('Phase E rejects a card switch until A is saved and requires a second click
   await expect(warningNotice).toHaveCount(0, { timeout: 6500 });
 
   await page.evaluate(() => window.phaseETest.releaseSave());
-  await expect(page.getByRole('button', { name: '导出 ZIP' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '保存' })).toBeEnabled();
   expect(await page.evaluate(() => window.phaseETest.requests.filter(item =>
     item.command === 'activateCardFile').length)).toBe(1);
   await page.getByRole('button', { name: 'B.json' }).click();
@@ -100,11 +100,10 @@ test('Phase E rejects a card switch until A is saved and requires a second click
 });
 
 
-test('Settings uses a two-column 560 DIP dialog and New Card uses the compact two-row layout', async ({ page }) => {
+test('Settings keep 560 DIP layout and Clear / Save replace new-card creation', async ({ page }) => {
   await page.addInitScript(initial => {
     const messages = new EventTarget();
     const requests: NativeMessage[] = [];
-    let rememberedNewCardFolder = 'C:/EnglishCards/userdata';
     const respond = (reply: NativeReply) => messages.dispatchEvent(new MessageEvent('message', { data: reply }));
     const chrome = Reflect.get(window, 'chrome') ?? {};
     Object.assign(chrome, { webview: {
@@ -113,79 +112,59 @@ test('Settings uses a two-column 560 DIP dialog and New Card uses the compact tw
         const { id, command, payload } = request;
         let value: unknown = true;
         if (command === 'loadSettings') value = null;
-        if (command === 'defaultCardLibrary' || command === 'lastCardLibrary')
-          value = 'C:/EnglishCards/userdata';
-        if (command === 'lastNewCardFolder') value = rememberedNewCardFolder;
-        if (command === 'saveLastCardLibrary') value = true;
-        if (command === 'listCardDirectory') value = { path: payload, folders: [], files: [] };
-        if (command === 'chooseCardFolder') value = 'D:/My Cards';
-        if (command === 'createCardFile') {
-          rememberedNewCardFolder = (payload as { directory: string }).directory;
-          value = {
-            path: 'D:/My Cards/Custom Card.json',
-            text: JSON.stringify({ ...initial, title: 'Custom Card' }),
-            folderPreferenceSaved: true,
-          };
-        }
+        if (command === 'defaultCardLibrary' || command === 'lastCardLibrary') value = 'C:/cards';
+        if (command === 'listCardDirectory') value = {
+          path: payload, folders: [], files: payload === 'D:/Saved Cards'
+            ? [{ path: 'D:/Saved Cards/New Article.json', name: 'New Article.json' }] : [],
+        };
+        if (command === 'saveArticlePair') value = {
+          path: 'D:/Saved Cards/New Article.json',
+          folder: 'D:/Saved Cards',
+          text: JSON.stringify((payload as { document: object }).document),
+          folderPreferenceSaved: true,
+        };
         queueMicrotask(() => respond({ id, ok: true, value }));
       },
       addEventListener: messages.addEventListener.bind(messages),
       removeEventListener: messages.removeEventListener.bind(messages),
     } });
     Reflect.set(window, 'chrome', chrome);
-    Object.defineProperty(window, 'phaseENewCardRequests', { value: requests });
+    Object.defineProperty(window, 'phaseEWorkflowRequests', { value: requests });
   }, fixture);
 
   await page.goto('/');
-  const newCardButton = page.getByRole('button', { name: '新建卡片' });
-  await expect(newCardButton).toBeEnabled();
+  await expect(page.getByRole('button', { name: '新建卡片' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '清空' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '保存' })).toBeVisible();
   await page.getByRole('button', { name: '设置' }).click();
   const settings = page.getByRole('dialog', { name: '设置' });
-  await expect(settings).toBeVisible();
-  await expect.poll(() => settings.evaluate(element => Math.round(element.getBoundingClientRect().width))).toBe(560);
-  await expect(settings.locator('.settings-columns')).toHaveCSS('grid-template-columns', /\d+px \d+px/);
+  await expect(settings).toHaveCSS('width', '560px');
   await expect(settings.locator('.settings-columns')).toHaveCSS('column-gap', '20px');
   await expect(settings.locator('.settings-column').nth(1)).toHaveCSS('border-left-style', 'none');
-  await expect(settings.getByRole('heading', { name: '字号设置' })).toHaveCSS('text-align', 'center');
-  await expect(settings.getByRole('heading', { name: '其余设置' })).toHaveCSS('text-align', 'center');
   await settings.getByRole('button', { name: '关闭设置' }).click();
 
-  await page.getByRole('button', { name: '新建卡片' }).click();
-  const dialog = page.getByRole('dialog', { name: '新建卡片' });
-  await expect(dialog).toHaveCSS('width', '560px');
-  await expect(dialog).toHaveCSS('min-width', '400px');
-  await expect(dialog).toHaveCSS('max-width', '600px');
-  await expect(dialog).toHaveCSS('resize', 'none');
-  const rows = dialog.locator('.phase-e-create-row');
-  await expect(rows).toHaveCount(2);
-  await expect(dialog.locator('.phase-e-create-form')).toHaveCSS('row-gap', '20px');
-  const folder = dialog.getByLabel('文件夹', { exact: true });
-  await expect(folder).toHaveValue('C:/EnglishCards/userdata');
-  await expect(folder).toHaveAttribute('type', 'text');
-  await expect(folder).toHaveAttribute('autocomplete', 'off');
-  await expect(dialog.getByLabel('卡片名', { exact: true })).toHaveAttribute('type', 'text');
-  await expect(dialog.getByLabel('卡片名', { exact: true })).toHaveAttribute('autocomplete', 'off');
-  await expect(dialog.locator('textarea')).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: '取消' })).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: '创建' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '关闭新建卡片' })).toBeVisible();
-  await folder.fill('E:/Uncommitted Folder');
-  await dialog.getByRole('button', { name: '关闭新建卡片' }).click();
-  await page.getByRole('button', { name: '新建卡片' }).click();
-  await expect(folder).toHaveValue('C:/EnglishCards/userdata');
-  await dialog.getByRole('button', { name: '选择文件夹' }).click();
-  await expect(folder).toHaveValue('D:/My Cards');
-  await dialog.getByLabel('卡片名', { exact: true }).fill('Custom Card');
-  await dialog.getByRole('button', { name: '创建', exact: true }).click();
+  await page.getByRole('button', { name: '清空' }).click();
+  const dialog = page.getByRole('dialog', { name: '清空当前文章' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: '取消' }).click();
+  await expect(page.getByLabel('英文标题', { exact: true })).not.toHaveValue('');
+  await page.getByRole('button', { name: '清空' }).click();
+  await dialog.getByRole('button', { name: '放弃' }).click();
   await expect(dialog).toHaveCount(0);
-  const createRequest = await page.evaluate(() => (window as any).phaseENewCardRequests.find((item: NativeMessage) => item.command === 'createCardFile'));
-  expect(createRequest.payload).toMatchObject({ directory: 'D:/My Cards', fileName: 'Custom Card.json' });
+  const title = page.getByLabel('英文标题', { exact: true });
+  await expect(title).toHaveValue('');
+  await expect(page.locator('.preview .card')).toHaveCount(0);
 
-  await page.getByRole('button', { name: '新建卡片' }).click();
-  const reopened = page.getByRole('dialog', { name: '新建卡片' });
-  await expect(reopened.getByLabel('文件夹', { exact: true })).toHaveValue('D:/My Cards');
-  await reopened.getByRole('button', { name: '关闭新建卡片' }).click();
-  await expect(reopened).toHaveCount(0);
+  await title.fill('New Article');
+  await expect(page.getByRole('button', { name: '保存' })).toBeEnabled();
+  await page.getByRole('button', { name: '保存' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).phaseEWorkflowRequests.some(
+    (item: NativeMessage) => item.command === 'saveArticlePair'))).toBe(true);
+  await expect(page.getByRole('button', { name: 'New Article.json' })).toBeVisible();
+  const saved = await page.evaluate(() => (window as any).phaseEWorkflowRequests.find(
+    (item: NativeMessage) => item.command === 'saveArticlePair'));
+  expect(saved.payload.fileName).toBe('New Article.json');
+  expect(saved.payload.document.title).toBe('New Article');
 });
 
 test('card library remembers a directory only after its listing succeeds', async ({ page }) => {

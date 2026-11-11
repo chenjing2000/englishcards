@@ -81,13 +81,10 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
                 "saveCardFile" when payload.ValueKind == JsonValueKind.Object => await SaveCardFileAsync(payload),
                 "listCardDirectory" when payload.ValueKind == JsonValueKind.String => ListCardDirectory(payload.GetString()!),
                 "chooseCardLibrary" when payload.ValueKind == JsonValueKind.Null => await ChooseCardLibraryAsync(),
-                "chooseCardFolder" when payload.ValueKind == JsonValueKind.String => await ChooseCardFolderAsync(payload.GetString()!),
                 "defaultCardLibrary" when payload.ValueKind == JsonValueKind.Null => data.LibraryRootPath,
-                "lastNewCardFolder" when payload.ValueKind == JsonValueKind.Null => await data.LoadLastNewCardFolderAsync(),
                 "lastCardLibrary" when payload.ValueKind == JsonValueKind.Null => await data.LoadLastLibraryFolderAsync(),
                 "saveLastCardLibrary" when payload.ValueKind == JsonValueKind.String => await SaveLastCardLibraryAsync(payload.GetString()!),
                 "saveArticlePair" when payload.ValueKind == JsonValueKind.Object => await SaveArticlePairAsync(payload),
-                "createCardFile" when payload.ValueKind == JsonValueKind.Object => await CreateCardFileAsync(payload),
                 "saveProject" when payload.ValueKind == JsonValueKind.String => await SaveProjectAsync(payload.GetString()!),
                 "loadSettings" when payload.ValueKind == JsonValueKind.Null => await data.LoadSettingsAsync(),
                 "loadDraft" when payload.ValueKind == JsonValueKind.Null => await data.LoadDraftAsync(),
@@ -202,30 +199,6 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         return FolderDialogPositioning.ShowDialog(picker, owner) == true ? picker.FolderName : null;
     }
 
-    private async Task<string?> ChooseCardFolderAsync(string requestedInitialDirectory)
-    {
-        string initialDirectory = await data.LoadLastNewCardFolderAsync();
-        if (!string.IsNullOrWhiteSpace(requestedInitialDirectory))
-        {
-            try
-            {
-                var candidate = Path.GetFullPath(requestedInitialDirectory);
-                if (Directory.Exists(candidate)) initialDirectory = candidate;
-            }
-            catch (Exception error) when (error is ArgumentException or IOException or NotSupportedException)
-            {
-                // Keep the last successfully used destination, or userdata on first use.
-            }
-        }
-        var picker = new OpenFolderDialog
-        {
-            Title = "选择新卡片保存文件夹",
-            InitialDirectory = initialDirectory,
-            Multiselect = false
-        };
-        return FolderDialogPositioning.ShowDialog(picker, owner) == true ? picker.FolderName : null;
-    }
-
     private async Task<bool> SaveLastCardLibraryAsync(string directory)
     {
         await data.SaveLastLibraryFolderAsync(directory);
@@ -286,67 +259,6 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
             Trace.TraceWarning("Article files saved, but the library path was not remembered: {0}", error);
         }
         return new { path, text = jsonText, folder, folderPreferenceSaved = remembered };
-    }
-
-    private async Task<object> CreateCardFileAsync(JsonElement payload)
-    {
-        if (!payload.TryGetProperty("text", out var textValue) || textValue.ValueKind != JsonValueKind.String ||
-            !payload.TryGetProperty("directory", out var folderValue) || folderValue.ValueKind != JsonValueKind.String ||
-            !payload.TryGetProperty("fileName", out var fileValue) || fileValue.ValueKind != JsonValueKind.String)
-            throw new InvalidDataException("无效的新建卡片请求。");
-
-        var folder = Path.GetFullPath(folderValue.GetString()!);
-        if (!Directory.Exists(folder)) throw new DirectoryNotFoundException("卡片馆目录不存在。");
-        var text = textValue.GetString()!;
-        using (var parsed = JsonDocument.Parse(text))
-            ArticleContractValidator.Validate(parsed.RootElement);
-
-        var fileName = fileValue.GetString()!;
-        if (string.IsNullOrWhiteSpace(fileName) || fileName is "." or ".." ||
-            !string.Equals(Path.GetFileName(fileName), fileName, StringComparison.Ordinal) ||
-            !string.Equals(Path.GetExtension(fileName), ".json", StringComparison.OrdinalIgnoreCase) ||
-            fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
-            fileName.EndsWith(' ') || fileName.EndsWith('.'))
-            throw new InvalidDataException("文件名无效，必须为当前目录下的 JSON 文件。");
-
-        var destination = ValidateCardPath(Path.Combine(folder, fileName));
-        if (File.Exists(destination)) throw new IOException("同名卡片已存在，请更换标题或文件名。");
-        await WriteNewCardAsync(destination, text);
-        bool folderPreferenceSaved = true;
-        try
-        {
-            // Only a successfully created card may update the remembered destination.
-            await data.SaveLastSuccessfulNewCardFolderAsync(folder);
-        }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-        {
-            folderPreferenceSaved = false;
-            Trace.TraceWarning("EnglishCards could not remember the last successful new-card folder: {0}", error);
-        }
-        activeCardPath = destination;
-        activeFingerprint = Fingerprint(text);
-        return new { path = destination, text, folderPreferenceSaved };
-    }
-
-    // Testable exclusive creation primitive shared by the new-card dialog.
-    internal static async Task WriteNewCardAsync(string destination, string text)
-    {
-        var staged = Path.Combine(Path.GetDirectoryName(destination)!,
-            $".englishcards-{Guid.NewGuid():N}.tmp");
-        try
-        {
-            await using (var output = new FileStream(staged, FileMode.CreateNew, FileAccess.Write,
-                             FileShare.None, 4096, useAsync: true))
-            await using (var writer = new StreamWriter(output))
-                await writer.WriteAsync(text);
-            File.Move(staged, destination, overwrite: false);
-        }
-        finally
-        {
-            try { File.Delete(staged); }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
-        }
     }
 
     private static object ListCardDirectory(string directory)
