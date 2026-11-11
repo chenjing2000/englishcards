@@ -143,11 +143,15 @@ test('Settings keep 560 DIP layout and Clear / Save replace new-card creation', 
   await expect(settings.locator('.settings-column').nth(1)).toHaveCSS('border-left-style', 'none');
   await settings.getByRole('button', { name: '关闭设置' }).click();
 
+  // An untouched new editor clears directly; an edited article requires a decision.
   await page.getByRole('button', { name: '清空' }).click();
   const dialog = page.getByRole('dialog', { name: '清空当前文章' });
+  await expect(dialog).toHaveCount(0);
+  await page.getByLabel('英文标题', { exact: true }).fill('Unsaved Draft');
+  await page.getByRole('button', { name: '清空' }).click();
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: '取消' }).click();
-  await expect(page.getByLabel('英文标题', { exact: true })).not.toHaveValue('');
+  await expect(page.getByLabel('英文标题', { exact: true })).toHaveValue('Unsaved Draft');
   await page.getByRole('button', { name: '清空' }).click();
   await dialog.getByRole('button', { name: '放弃' }).click();
   await expect(dialog).toHaveCount(0);

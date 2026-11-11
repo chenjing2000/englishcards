@@ -9,7 +9,7 @@ import {
 import { paginate, type Layout } from '../services/pagination';
 import {
   cacheDraft, download, loadDesktopData, loadSettings, saveSettings,
-  openProject, saveProject, requestExport, restoreDraft, sampleDraft,
+  openProject, saveProject, requestExport, restoreDraft,
   type DesktopPersistence, type DesktopSaveResult,
 } from '../services/projectIO';
 import { desktopRequest, isDesktop } from '../services/desktopBridge';
@@ -21,7 +21,9 @@ const stringify = (project: Project) => JSON.stringify(projectDocument(project),
 
 export function useEditorViewModel() {
   const desktop = isDesktop();
-  const [boot, setBoot] = useState(desktop ? sampleDraft : restoreDraft);
+  const [boot, setBoot] = useState(desktop
+    ? () => ({ project: createEmptyArticle(), notice: '', cacheBlocked: false })
+    : restoreDraft);
   const [project, setProject] = useState<RenderProject>({ ...boot.project, styles: { ...defaults } });
   const [wordDrafts, setWordDrafts] = useState<Record<string, string>>({});
   const wordDraftsRef = useRef<Record<string, string>>({});

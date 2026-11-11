@@ -1,6 +1,6 @@
 import fixture from '../../assets/projects/brainco/project.json';
 import {
-  parseProject, projectDocument, type Project, type RenderProject,
+  createEmptyArticle, parseProject, projectDocument, type Project, type RenderProject,
 } from '../models/project';
 import { settingsSchema, defaults, type Styles } from '../models/settings';
 import { ArticleImportCoordinator, type ImportResult } from '../v6/importers';
@@ -147,7 +147,8 @@ export class DesktopPersistence {
 export async function loadDesktopData() {
   // Phase E: the desktop no longer reads or restores a global article draft.
   // File-backed articles are opened explicitly through the Card Library.
-  const sample = sampleDraft();
+  // Desktop starts with an empty unsaved editor, not the sample article fixture.
+  const sample: RestoredDraft = { project: createEmptyArticle(), notice: '', cacheBlocked: false };
   const settings = await loadDesktopFile(
     'loadSettings', text => settingsSchema.parse(JSON.parse(text)), defaults,
   );
