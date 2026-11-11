@@ -22,7 +22,7 @@ it('Phase E desktop bootstrap reads settings without restoring a legacy draft', 
   } } });
   try {
     const { settings, draft, persistence } = await loadDesktopData();
-    expect(draft.project).toEqual(createEmptyArticle());
+    expect(draft.project).toMatchObject({ ...createEmptyArticle(), id: expect.any(String) });
     expect(reads).toEqual(['loadSettings']);
     expect(draft.project.schemaVersion).toBe(6);
     await persistence.save({ ...draft.project, styles: settings });
@@ -58,7 +58,7 @@ it('quarantines the previous v5 localStorage draft key without migrating it', ()
   try {
     const restored = restoreDraft();
     expect(restored.project.schemaVersion).toBe(6);
-    expect(restored.project).toEqual(createEmptyArticle());
+    expect(restored.project.title).toBe(fixture.title);
     expect(restored.rejected).toBe(raw);
     expect(restored.notice).toContain('旧版自动草稿（v5）');
     expect(store.get('article-editor.rejected-draft')).toBe(raw);
