@@ -17,7 +17,7 @@ export default function VocabularyTable({ viewModel: vm, registerInput }: Props)
       return <EntryHeadInput
         label={`${label} ${index + 1}`}
         value={entry.word}
-        commit={value => vm.commitHead('vocabulary', entry.id, value)}
+        commit={value => vm.commitHead(entry.id, value)}
         onDraftChange={value => vm.setWordPreview(entry.id, value)}
         inputRef={input => registerInput(`vocabulary:${entry.id}:word`, input)}
       />;
@@ -27,7 +27,7 @@ export default function VocabularyTable({ viewModel: vm, registerInput }: Props)
       aria-label={`${label} ${index + 1}`}
       value={entry[property] ?? ''}
       ref={input => registerInput(`vocabulary:${entry.id}:${property}`, input)}
-      onChange={event => vm.setEntryField('vocabulary', entry.id, property, event.target.value)}
+      onChange={event => vm.setEntryField(entry.id, property, event.target.value)}
     />;
   }
 
@@ -48,7 +48,7 @@ export default function VocabularyTable({ viewModel: vm, registerInput }: Props)
                 <div className="entry-input">{editor(entry, index, 'word', '词头')}</div>
                 <button className="sense-button" title="添加义项" aria-label={`为词汇 ${index + 1} 添加义项`}
                   disabled={entry.senses.length >= 2000}
-                  onClick={() => vm.addSense('vocabulary', entry.id)}>+</button>
+                  onClick={() => vm.addSense(entry.id)}>+</button>
               </div>
             </td>
           </tr>
@@ -90,7 +90,7 @@ export default function VocabularyTable({ viewModel: vm, registerInput }: Props)
                   <button className="sense-button" title="删除义项"
                     aria-label={`删除词汇 ${index + 1} 义项 ${senseIndex + 1}`}
                     disabled={entry.senses.length <= 1}
-                    onClick={() => vm.removeSense('vocabulary', entry.id, senseIndex)}>−</button>
+                    onClick={() => vm.removeSense(entry.id, senseIndex)}>−</button>
                 </div>
               </td>
             </tr>
@@ -101,7 +101,7 @@ export default function VocabularyTable({ viewModel: vm, registerInput }: Props)
                   label={`词汇${property === 'example' ? '例句' : '翻译'} ${index + 1} 义项 ${senseIndex + 1}`}
                   value={sense[property]}
                   inputRef={input => registerInput(`vocabulary:${senseSourceId(entry.id, senseIndex, property)}`, input)}
-                  onChange={value => vm.setSenseField('vocabulary', entry.id, senseIndex, property, value)}
+                  onChange={value => vm.setSenseField(entry.id, senseIndex, property, value)}
                 />
               </td>
             </tr>)}
