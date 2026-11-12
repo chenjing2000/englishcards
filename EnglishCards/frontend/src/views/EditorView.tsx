@@ -103,7 +103,8 @@ export default function EditorView() {
     <button type="button" aria-label="保存"
       title={vm.hasUnpairedChanges ? '保存 JSON 与 ZIP（有未联合保存的修改）' : '保存 JSON 与 ZIP'}
       data-unpaired={vm.hasUnpairedChanges}
-      disabled={!settingsReady || vm.previewCleared || exporting || vm.opening || clearBusy}
+      data-has-content={!vm.emptyArticle}
+      disabled={!ready || exporting || vm.opening || clearBusy}
       onClick={() => { void vm.savePair(confirmOverwrite); }}>
       <ToolbarIcon name="save" />
       {vm.hasUnpairedChanges && <span className="save-unpaired-star" aria-hidden="true">*</span>}
