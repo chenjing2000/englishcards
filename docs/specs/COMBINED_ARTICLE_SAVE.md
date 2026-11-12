@@ -14,8 +14,8 @@ The former New Card and standalone Export ZIP actions are not part of the curren
 
 ## Clear current article
 
-- With no unsaved edits and no save operation in progress, Clear resets the editor and preview to an empty Article v6 session and clears the active file/card selection.
-- With unsaved edits, show three choices:
+- When the current article is nonempty, Clear shows a confirmation even if the article has no unpaired changes. An already empty editor may be reset directly if no save is in progress.
+- The confirmation offers three choices:
   - **Save**: run the complete paired JSON + ZIP save. Clear only after both files have committed successfully.
   - **Discard**: discard the current unsaved revision without deleting or modifying the last committed files.
   - **Cancel**: preserve the current article, editor, preview and navigation state.
@@ -40,7 +40,8 @@ Cancellation or failure must not change the remembered path, active article or s
 ## State, serialization and concurrency
 
 - Preserve the per-card JSON autosave coordinator and immutable snapshot discipline.
-- Track paired-save completion separately from JSON autosave completion; JSON being clean does not imply that the paired ZIP is current.
+- Track paired-save completion separately from JSON autosave completion; JSON being clean does not imply that the paired ZIP is current. The Save-button star reflects document/page-style changes relative to the current session's paired-save baseline; it persists after JSON autosave and disappears after successful paired save. A newly opened document begins without a star, but this does not verify an existing ZIP.
+- Editing, autosave, settings, native folder selection, overwrite confirmation and paired save must not clear the last valid preview. New pagination replaces it when ready; saving cannot use a stale layout and preview selection is blocked while stale.
 - Serialize writes and associate each operation with a session identity and revision.
 - Clear, card switching and window close must not race a paired save.
 - An in-flight write must not apply to a newer or cleared session.
