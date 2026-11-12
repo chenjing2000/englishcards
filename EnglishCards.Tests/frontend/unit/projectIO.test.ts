@@ -54,6 +54,11 @@ it('preserves invalid desktop settings and saves with the original-preservation 
     expect(settings).toEqual(defaults);
     expect(draft.project.schemaVersion).toBe(6);
     expect(notice).toContain('原设置文件已保留');
+    // Opening a corrupt settings file must not immediately overwrite its bytes.
+    await persistence.save({ ...draft.project, styles: settings });
+    expect(writes).toEqual([]);
+    // An explicit settings replacement still preserves the rejected original.
+    persistence.replaceSettings();
     await persistence.save({ ...draft.project, styles: settings });
     expect(writes.map(write => write.command)).toEqual(['saveSettings']);
     expect(writes[0].payload.preserveOriginal).toBe(true);
