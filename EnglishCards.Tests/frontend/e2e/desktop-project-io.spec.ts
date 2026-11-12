@@ -178,6 +178,27 @@ test('independent desktop errors stack upwards and each close clears only its so
   await expect(page.getByRole('button', { name: '重试保存当前卡片' })).toBeVisible();
 });
 
+test('clean card requires confirmation and cancel keeps the same preview DOM', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await expect.poll(() => page.locator('.preview[data-ready="true"] .card').count()).toBeGreaterThan(0);
+  const before = await page.locator('.preview .card').first().evaluate(node => {
+    (window as Window & { firstPreviewCard?: Element }).firstPreviewCard = node;
+    return node.isConnected;
+  });
+  expect(before).toBe(true);
+  const save = page.getByRole('button', { name: '保存', exact: true });
+  await expect(save).toHaveAttribute('data-unpaired', 'false');
+  await page.getByRole('button', { name: '清空' }).click();
+  const dialog = page.getByRole('dialog', { name: '清空当前文章' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('清空将关闭当前文章');
+  await dialog.getByRole('button', { name: '取消' }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(await page.evaluate(() =>
+    document.querySelector('.preview .card') === (window as Window & { firstPreviewCard?: Element }).firstPreviewCard)).toBe(true);
+  await expect(save).toHaveAttribute('data-unpaired', 'false');
+});
+
 test('Clear offers Save, Discard, Cancel without deleting the source card', async ({ page }) => {
   await page.getByRole('button', { name: 'A.json' }).click();
   const title = page.getByLabel('英文标题', { exact: true });
