@@ -62,6 +62,7 @@ test('unified vocabulary entries retain variants, paired senses and automatic hi
   expect(result.ok(), result.ok() ? '' : await result.text()).toBe(true);
   expect(result.headers()['content-type']).toContain('image/png');
   const png = new Uint8Array(await result.body());
+  expect(png.byteLength).toBeGreaterThan(24);
   expect(Array.from(png.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
   const output = page.locator(`.vocab[data-source="${saved.vocabulary[1].id}"]`);
   expect((await output.allTextContents()).join('')).toContain('n. 记录');
