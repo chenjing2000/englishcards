@@ -41,8 +41,8 @@ app.post('/api/render-page', async (request, response) => {
     }
     const page = await browser.newPage({ viewport: { width: 1440, height: 1800 }, deviceScaleFactor: 1 });
     const renderErrors: string[] = [];
-    page.on('pageerror', error => renderErrors.push(error.message));
-    page.on('requestfailed', request => renderErrors.push(`${request.url()}: ${request.failure()?.errorText}`));
+    page.on?.('pageerror', error => renderErrors.push(error.message));
+    page.on?.('requestfailed', request => renderErrors.push(`${request.url()}: ${request.failure()?.errorText}`));
     await page.goto(`${baseURL}/render.html`);
     try {
       await page.waitForFunction(() => typeof window.renderProject === 'function', { timeout: 15000 });
