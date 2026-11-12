@@ -40,8 +40,15 @@ app.post('/api/render-page', async (request, response) => {
       throw reason;
     }
     const page = await browser.newPage({ viewport: { width: 1440, height: 1800 }, deviceScaleFactor: 1 });
-    await page.goto(`${baseURL}/render`);
-    await page.waitForFunction(() => typeof window.renderProject === 'function');
+    const renderErrors: string[] = [];
+    page.on?.('pageerror', error => renderErrors.push(error.message));
+    page.on?.('requestfailed', request => renderErrors.push(`${request.url()}: ${request.failure()?.errorText}`));
+    await page.goto(`${baseURL}/render.html`);
+    try {
+      await page.waitForFunction(() => typeof window.renderProject === 'function', { timeout: 15000 });
+    } catch (reason) {
+      throw new Error(`渲染入口尚未就绪（${page.url()}）：${renderErrors.join('；') || String(reason)}`);
+    }
     const signature = await page.evaluate(input => window.renderProject(input), project);
     if (signature !== request.body.signature) {
       const diagnostics = await page.evaluate(() => window.renderDiagnostics);
@@ -64,7 +71,7 @@ app.post('/api/render-page', async (request, response) => {
 });
 if (process.argv.includes('--production')) {
   app.use(express.static(frontendDist));
-  app.get('/render', (_request, response) => response.sendFile(resolve(frontendDist, 'index.html')));
+  app.get('/render', (_request, response) => response.sendFile(resolve(frontendDist, 'render.html')));
 } else {
   const { createServer } = await import('vite');
   const vite = await createServer({ root: frontendRoot, configFile: resolve(root, 'tools/vite.config.ts'), server: { middlewareMode: true, host: '127.0.0.1', hmr: false } });
