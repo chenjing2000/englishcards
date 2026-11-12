@@ -86,16 +86,17 @@ export function cacheDraft(project: RenderProject) {
   localStorage.setItem(DRAFT, draftText(projectDocument(project)));
 }
 
-async function loadDesktopFile<T>(
-  command: 'loadSettings',
-  parse: (text: string) => T,
-  fallback: T,
-) {
+/** Read the only desktop settings file; preserve existing files on parse/read failure. */
+async function loadDesktopSettings() {
   try {
-    const text = await desktopRequest<string | null>(command);
-    return { value: text === null ? fallback : parse(text), missing: text === null, rejected: false };
+    const text = await desktopRequest<string | null>('loadSettings');
+    return {
+      value: text === null ? defaults : settingsSchema.parse(JSON.parse(text)),
+      missing: text === null,
+      rejected: false,
+    };
   } catch {
-    return { value: fallback, missing: false, rejected: true };
+    return { value: defaults, missing: false, rejected: true };
   }
 }
 
@@ -148,9 +149,7 @@ export async function loadDesktopData() {
   // File-backed articles are opened explicitly through the Card Library.
   // Desktop starts with an empty unsaved editor, not the sample article fixture.
   const sample: RestoredDraft = { project: createEmptyArticle(), notice: '', cacheBlocked: false };
-  const settings = await loadDesktopFile(
-    'loadSettings', text => settingsSchema.parse(JSON.parse(text)), defaults,
-  );
+  const settings = await loadDesktopSettings();
   const persistence = new DesktopPersistence(
     settings.missing ? null : JSON.stringify(settings.value),
     settings.rejected,
