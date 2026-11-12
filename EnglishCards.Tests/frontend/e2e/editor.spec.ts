@@ -1,6 +1,5 @@
 import { test, expect, type Page } from './fixtures';
 import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
-import { unzipSync } from 'fflate';
 import { selectPreviewText } from './preview-selection';
 
 async function ready(page: Page) { await expect(page.locator('[data-ready="true"]')).toBeVisible(); }
@@ -106,7 +105,7 @@ test('failed import preserves the current article after pagination fails', async
   await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toHaveCount(0);
 });
 
-test('long content and translation paginate without gaps; vocabulary is a single column', async ({ page }) => {
+test('long content and translation paginate without gaps; first page renders as PNG; vocabulary is a single column', async ({ page }) => {
   await page.goto('/'); await ready(page);
   const longText = ('A complete line of English. '.repeat(200)) + 'W'.repeat(800);
   const chinese = '中文段落（标点），混合English123。👨‍👩‍👧‍👦 é '.repeat(170);
@@ -143,7 +142,10 @@ test('long content and translation paginate without gaps; vocabulary is a single
   const exportSnapshot = await page.evaluate(() => window.editor);
   const response = await page.request.post('/api/render-page', { data: { ...exportSnapshot, page: 1 } });
   expect(response.ok(), response.ok() ? '' : await response.text()).toBe(true);
-  const files = unzipSync(new Uint8Array(await response.body()));
-  expect(files['article.json']).toBeTruthy();
-  expect(Object.keys(files).filter(name => name.endsWith('.png')).length).toBe(pages);
+  expect(response.headers()['content-type']).toContain('image/png');
+  const png = new Uint8Array(await response.body());
+  expect(Array.from(png.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+  const image = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  expect(image.getUint32(16)).toBeGreaterThan(0);
+  expect(image.getUint32(20)).toBeGreaterThan(0);
 });
