@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   appendParagraph, commitEntryHead, defaults, editParagraph, emptySense, parseHighlightInput,
   addVocabulary, isValidVocabularySelection, newId, removeEntrySense, removeVocabulary, renumberVocabulary, replaceArticleParagraphs, setArticleText,
-  splitSenseMeaning, toggleHighlight, vocabularyId, type EntryCollection,
+  splitSenseMeaning, toggleHighlight, vocabularyId,
   createEmptyArticle, projectDocument, styleSchema, type RenderProject, type Project, type Sense, type Styles,
 } from '../models/project';
 import { paginate, type Layout } from '../services/pagination';
@@ -564,7 +564,7 @@ export function useEditorViewModel() {
       reportError('vocabulary', `加入词汇失败：${String(reason)}`);
     }
   }
-  function reorder(_key: EntryCollection, index: number, direction: number) {
+  function reorder(index: number, direction: number) {
     update(current => {
       const list = [...current.vocabulary];
       const destination = index + direction;
@@ -593,7 +593,7 @@ export function useEditorViewModel() {
     });
   }
 
-  function setEntryField(_key: EntryCollection, id: string, property: 'word' | 'ipa', value: string) {
+  function setEntryField(id: string, property: 'word' | 'ipa', value: string) {
     update(current => ({
       ...current,
       vocabulary: current.vocabulary.map(item => item.id === id ? { ...item, [property]: value } : item),
@@ -608,9 +608,9 @@ export function useEditorViewModel() {
         : item),
     }));
   }
-  function commitHead(_key: EntryCollection, id: string, value: string): boolean {
+  function commitHead(id: string, value: string): boolean {
     try {
-      const next = commitEntryHead(project, 'vocabulary', id, value);
+      const next = commitEntryHead(project, id, value);
       if (next !== project) update(next);
       reportError('entry', '');
       return true;
@@ -619,7 +619,7 @@ export function useEditorViewModel() {
       return false;
     }
   }
-  function setSenseField(_key: EntryCollection, id: string, index: number, field: keyof Sense, value: string) {
+  function setSenseField(id: string, index: number, field: keyof Sense, value: string) {
     update(current => ({
       ...current,
       vocabulary: current.vocabulary.map(entry => entry.id === id
@@ -635,7 +635,7 @@ export function useEditorViewModel() {
         : entry),
     }));
   }
-  function addSense(_key: EntryCollection, id: string) {
+  function addSense(id: string) {
     update(current => ({
       ...current,
       vocabulary: current.vocabulary.map(entry => entry.id === id
@@ -643,10 +643,10 @@ export function useEditorViewModel() {
         : entry),
     }));
   }
-  function removeSense(_key: EntryCollection, id: string, index: number) {
-    update(current => removeEntrySense(current, 'vocabulary', id, index));
+  function removeSense(id: string, index: number) {
+    update(current => removeEntrySense(current, id, index));
   }
-  function addEntry(_key: EntryCollection = 'vocabulary') {
+  function addEntry() {
     if (project.vocabulary.length >= 999) {
       reportError('vocabulary', 'Vocabulary 最多允许 999 个条目。');
       return;
@@ -655,21 +655,21 @@ export function useEditorViewModel() {
     update(current => ({ ...current, vocabulary: [...current.vocabulary, entry] }));
     setVocabularySelection(entry.id);
   }
-  function removeEntry(_key: EntryCollection, id: string) {
+  function removeEntry(id: string) {
     update(current => removeVocabulary(current, id));
     setVocabularySelection(null);
   }
   function selectVocabulary(id: string) { setVocabularySelection(id); }
   function moveSelectedVocabulary(direction: number) {
     if (!selectedVocabulary) return;
-    reorder('vocabulary', selectedVocabularyIndex, direction);
+    reorder(selectedVocabularyIndex, direction);
   }
   function deleteSelectedVocabulary() {
     if (!selectedVocabulary) return;
     const nextIndex = selectedVocabularyIndex < project.vocabulary.length - 1
       ? selectedVocabularyIndex
       : selectedVocabularyIndex - 1;
-    removeEntry('vocabulary', selectedVocabulary.id);
+    removeEntry(selectedVocabulary.id);
     setVocabularySelection(nextIndex >= 0 ? vocabularyId(nextIndex + 1) : null);
   }
   function insertVocabularyBelow() {
