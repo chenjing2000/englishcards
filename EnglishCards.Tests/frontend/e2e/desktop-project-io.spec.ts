@@ -323,7 +323,7 @@ test('overwrite dialogs and cancellation keep the exact preview page mounted and
 
   await saveButton.click();
   await expect(dialog).toBeVisible();
-  await dialog.getByRole('button', { name: '覆盖' }).click();
+  await dialog.getByRole('button', { name: '覆盖', exact: true }).click();
   await expect(saveButton).toHaveAttribute('data-unpaired', 'false');
   expect(await page.evaluate(() => ({
     cleared: window.phaseEIO.previewAudit!.cleared,
@@ -348,7 +348,7 @@ test('changing render settings marks the ZIP stale without clearing the visible 
 
   await page.getByRole('button', { name: '设置', exact: true }).click();
   const settings = page.getByRole('dialog', { name: '设置' });
-  const font = settings.getByLabel('标题字号');
+  const font = settings.getByLabel('标题字号', { exact: true });
   const original = Number(await font.inputValue());
   await font.fill(String(original + 1));
   await font.blur();
