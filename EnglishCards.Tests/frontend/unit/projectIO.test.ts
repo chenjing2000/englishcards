@@ -31,6 +31,36 @@ it('Phase E desktop bootstrap reads settings without restoring a legacy draft', 
   } finally { vi.unstubAllGlobals(); }
 });
 
+
+it('preserves invalid desktop settings and saves with the original-preservation flag', async () => {
+  const messages = new EventTarget();
+  const writes: { command: string; payload: { text: string; preserveOriginal?: boolean } }[] = [];
+  const reads: string[] = [];
+  vi.stubGlobal('window', { chrome: { webview: {
+    postMessage({ id, command, payload }: { id: number; command: string; payload: { text: string; preserveOriginal?: boolean } }) {
+      if (command.startsWith('load')) reads.push(command);
+      if (command.startsWith('save')) writes.push({ command, payload });
+      const value = command === 'loadSettings'
+        ? JSON.stringify({ ...defaults, pageWidth: -1 })
+        : true;
+      messages.dispatchEvent(new MessageEvent('message', { data: { id, ok: true, value } }));
+    },
+    addEventListener: messages.addEventListener.bind(messages),
+    removeEventListener: messages.removeEventListener.bind(messages),
+  } } });
+  try {
+    const { settings, draft, persistence, notice } = await loadDesktopData();
+    expect(reads).toEqual(['loadSettings']);
+    expect(settings).toEqual(defaults);
+    expect(draft.project.schemaVersion).toBe(6);
+    expect(notice).toContain('原设置文件已保留');
+    await persistence.save({ ...draft.project, styles: settings });
+    expect(writes.map(write => write.command)).toEqual(['saveSettings']);
+    expect(writes[0].payload.preserveOriginal).toBe(true);
+    expect(JSON.parse(writes[0].payload.text)).toEqual(defaults);
+  } finally { vi.unstubAllGlobals(); }
+});
+
 it('rejects a v5 draft and preserves its original bytes in quarantine', () => {
   const raw = JSON.stringify({ article: { ...fixture, schemaVersion: 5 } });
   const store = new Map([['article-editor.draft.v6', raw]]);
