@@ -35,7 +35,7 @@ The later paired JSON + ZIP save and clear workflow was also accepted by the pro
 The final toolbar and file workflow are defined by [COMBINED_ARTICLE_SAVE.md](COMBINED_ARTICLE_SAVE.md).
 
 - Toolbar actions are Clear current article and Save JSON + ZIP (plus Settings); there is no New Card action or standalone Export ZIP action.
-- Clear with unsaved edits offers Save / Discard / Cancel. Save clears only after both JSON and ZIP commit; Discard does not delete committed files; Cancel leaves the session untouched.
+- Clear on a nonempty article offers Save / Discard / Cancel even if it has no new edits. Save clears only after both JSON and ZIP commit; Discard does not delete committed files; Cancel leaves the session untouched.
 - An unfinished save operation blocks clearing until it completes.
 - Save creates same-basename JSON and ZIP from one validated snapshot. If either target exists, use the shared frontend overwrite modal.
 - On success, update the remembered Card Library path and switch the tree to the destination. On cancellation/failure, preserve current path and session.
@@ -53,7 +53,7 @@ The final toolbar and file workflow are defined by [COMBINED_ARTICLE_SAVE.md](CO
 - Vocabulary unifies words, phrases and idioms under `word`.
 - The editor order is Vocabulary → Content → Translation. Content and Translation each use a continuous multi-paragraph editor.
 - Selection-to-Vocabulary is available from the left preview only. Selection must remain within one card and one natural paragraph, contain at least one Latin letter and no Chinese character; duplicates are not added or overwritten.
-- Preview and export use the same Article snapshot and shared pagination/rendering implementation.
+- Preview and export use the same Article snapshot and shared pagination/rendering implementation. Preview stays mounted through edits, autosave, dialogs and paired save; on same-article repagination it is replaced when ready while preserving the reading position. The Save button marks content/style changes awaiting paired JSON + ZIP saving with a nonanimated star.
 
 ## 6. Explicit non-goals
 

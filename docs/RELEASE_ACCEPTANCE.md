@@ -1,7 +1,7 @@
 # EnglishCards — Windows x64 验收记录
 
 **产品基线：** Article v6 + Phase E Card Library + JSON/ZIP paired save
-**最新源码基线：** `822864ff99787395b21b040a0b0fccc0c62e2fc6`
+**最新源码基线：** `839bf7f9e1aedc520776bd81193cbd0667908779`
 **状态：** 项目所有者已确认 Windows/WPF 本地验收通过；外部干净机器与公开发布前置检查仍需单独处理。
 
 ## A. 已完成的 Windows 验收
@@ -31,6 +31,13 @@
 - 覆盖弹窗复用 `phase-e-modal` 与 `phase-e-modal-heading`，不使用原生 WPF MessageBox。
 - 用户实机确认：取消按钮和点击遮罩均可取消覆盖；ESC 不支持取消，该行为按用户决定保留。
 - 后续提交 `822864ff99787395b21b040a0b0fccc0c62e2fc6` 完成联合保存与清空工作流。
+
+### 后续精简及预览稳定性（2026-11-12）
+
+- PR #5 第一批精简、PR #6 第二批词汇接口与校验精简已合并。
+- PR #7 修复编辑、JSON 自动保存、设置、保存及覆盖确认期间的预览空白，保留阅读位置，并加入未联合保存星号；项目所有者报告 Windows 实机验收通过。
+- 合并后 `main` GitHub Actions Windows CI：Vitest **63/63**、Playwright **76/76**、React/TypeScript 构建、Windows .NET 检查全部通过。记录：https://github.com/chenjing2000/englishcards/actions/runs/43160647841 。
+- 星号表明本次会话中 Article v6 内容或页面设置尚未联合保存；JSON 自动保存不清除星号。新打开卡片没有星号不表示 ZIP 配对状态已做磁盘校验。
 
 ## B. 发布环境要求
 
