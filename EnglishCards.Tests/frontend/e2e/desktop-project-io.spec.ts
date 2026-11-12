@@ -192,6 +192,7 @@ test('Clear offers Save, Discard, Cancel without deleting the source card', asyn
   await dialog.getByRole('button', { name: '放弃' }).click();
   await expect(dialog).toHaveCount(0);
   await expect(title).toHaveValue('');
+  await expect(page.locator('.preview .card')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'A.json' })).not.toHaveAttribute('aria-current', 'page');
   const pairWrites = await page.evaluate(() => window.phaseEIO.requests.filter(item => item.command === 'saveArticlePair'));
   expect(pairWrites).toHaveLength(0);
@@ -246,10 +247,6 @@ test('editor preview never empties during edits, JSON autosave, settings dialogs
   await settings.getByRole('button', { name: '关闭设置' }).click();
   await expect(settings).toHaveCount(0);
 
-  const identityBeforeSave = await page.evaluate(() =>
-    document.querySelector('.preview .card') === window.phaseEIO.previewAudit!.initialCard);
-  // A title edit legitimately replaced the preview once, before Save was clicked.
-  expect(identityBeforeSave).toBe(false);
   await expect(saveButton).toBeEnabled();
   await saveButton.click();
   await expect(saveButton).toHaveAttribute('data-unpaired', 'false');
@@ -300,6 +297,33 @@ test('overwrite dialogs and cancellation keep the exact preview page mounted and
     replaced: window.phaseEIO.previewAudit!.replaced,
     sameCard: document.querySelector('.preview .card') === window.phaseEIO.previewAudit!.initialCard,
   }))).toEqual({ cleared: 0, replaced: 0, sameCard: true });
+});
+
+test('changing render settings marks the ZIP stale without clearing the visible preview', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await expect.poll(() => page.locator('.preview[data-ready="true"] .card').count()).toBeGreaterThan(0);
+  const save = page.getByRole('button', { name: '保存', exact: true });
+  await expect(save).toHaveAttribute('data-unpaired', 'false');
+  await page.evaluate(() => {
+    const container = document.querySelector('.preview')!;
+    window.phaseEIO.previewAudit = { cleared: 0, replaced: 0, initialCard: container.querySelector('.card') };
+    new MutationObserver(() => {
+      if (!container.querySelector('.card')) window.phaseEIO.previewAudit!.cleared += 1;
+      window.phaseEIO.previewAudit!.replaced += 1;
+    }).observe(container, { childList: true });
+  });
+
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  const settings = page.getByRole('dialog', { name: '设置' });
+  const font = settings.getByLabel('标题字号');
+  const original = Number(await font.inputValue());
+  await font.fill(String(original + 1));
+  await font.blur();
+  await expect(save).toHaveAttribute('data-unpaired', 'true');
+  await expect(page.locator('.preview')).toHaveAttribute('data-ready', 'true');
+  await settings.getByRole('button', { name: '关闭设置' }).click();
+  expect(await page.evaluate(() => window.phaseEIO.previewAudit!.cleared)).toBe(0);
+  await expect.poll(() => page.locator('.preview .card').count()).toBeGreaterThan(0);
 });
 
 test('settings modal has 560 DIP two-column layout without a divider', async ({ page }) => {
