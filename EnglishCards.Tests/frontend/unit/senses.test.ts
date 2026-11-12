@@ -30,13 +30,13 @@ it('keeps distinct senses and their examples together and rejects missing sense 
 
 it('replaces the previous primary head highlight while committing a new surface form', () => {
   const input = parseProject({ ...fixture, content: { paragraphs: [{ id: 'p001', text: 'ran running run' }] }, vocabulary: [{ id: 'v001', word: '', highlight: [], senses: [{ pos: '', meaning: '', example: '', exampleTranslation: '' }] }] });
-  const first = commitEntryHead(input, 'vocabulary', 'v001', 'ran');
+  const first = commitEntryHead(input, 'v001', 'ran');
   expect(first.vocabulary[0]).toMatchObject({ word: 'ran', highlight: [] });
-  const second = commitEntryHead(first, 'vocabulary', 'v001', 'running');
+  const second = commitEntryHead(first, 'v001', 'running');
   expect(second.vocabulary[0].highlight).toEqual([]);
   expect(collectHighlights(second).map(mark => mark.quote)).toEqual(['running']);
   expect(input.vocabulary[0].word).toBe('');
-  expect(commitEntryHead(second, 'vocabulary', 'v001', 'running')).toBe(second);
+  expect(commitEntryHead(second, 'v001', 'running')).toBe(second);
 });
 
 it('uses unambiguous sense source IDs even when entry IDs contain separators', () => {
@@ -48,9 +48,9 @@ it('removes a sense without mutating the source and protects the final sense', (
   const article = parseProject(fixture);
   const entry = article.vocabulary[0];
   entry.senses.push({ pos: '', meaning: '另一含义', example: 'Another example.', exampleTranslation: '另一个例句。' });
-  const result = removeEntrySense(article, 'vocabulary', entry.id, 0);
+  const result = removeEntrySense(article, entry.id, 0);
   expect(result.vocabulary[0].senses).toEqual([entry.senses[1]]);
   expect(article.vocabulary[0].senses).toHaveLength(2);
   expect(parseProject(JSON.parse(JSON.stringify(result)))).toEqual(result);
-  expect(removeEntrySense(result, 'vocabulary', entry.id, 0)).toBe(result);
+  expect(removeEntrySense(result, entry.id, 0)).toBe(result);
 });
