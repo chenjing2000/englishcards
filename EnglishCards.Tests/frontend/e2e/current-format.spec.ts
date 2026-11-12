@@ -14,7 +14,7 @@ test('v5 and earlier schemas are rejected without replacing the current Article 
     await expect(page.getByRole('alert')).toContainText('只支持 6');
     expect(await page.evaluate(() => window.editor.project)).toEqual(original);
     expect(await page.evaluate(() => localStorage.getItem('article-editor.draft.v6'))).toBe(draft);
-    const result = await request.post('/api/export', { data: { project: input, signature: 'old' } });
+    const result = await request.post('/api/render-page', { data: { project: input, signature: 'old', page: 1 } });
     expect(result.status()).toBe(400);
     expect(await result.text()).toContain('只支持 6');
   }

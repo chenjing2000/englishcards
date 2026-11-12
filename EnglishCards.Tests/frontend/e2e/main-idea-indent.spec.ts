@@ -23,7 +23,7 @@ test('content and translation paragraphs indent only their first line and pagina
   expect((await contentLines.allTextContents()).join('')).toBe(project.content.paragraphs[0].text);
   expect((await translationLines.allTextContents()).join('')).toBe(project.translation.paragraphs[0].text);
   const diagnostics = await page.evaluate(() => window.renderDiagnostics);
-  const result = await request.post('/api/export', { data: { project, signature, diagnostics, page: 1 } });
+  const result = await request.post('/api/render-page', { data: { project, signature, diagnostics, page: 1 } });
   expect(result.ok(), result.ok() ? '' : await result.text()).toBe(true);
 });
 

@@ -6,11 +6,8 @@ internal sealed class UserDataStore(string root)
     : IDisposable
 {
     private string SettingsPath => Path.Combine(root, "settings", "settings.json");
-    private string DraftPath => Path.Combine(root, "drafts", "draft.json");
     private string LastLibraryFolderPath => Path.Combine(root, "settings", "last-library-folder.txt");
     private string? rejectedSettings;
-    private string? rejectedDraft;
-    private bool rejectedDraftUnavailable;
     private FileStream? instanceLease;
     internal string ProfilePath => Path.Combine(root, "cache", "WebView2");
 
@@ -31,7 +28,6 @@ internal sealed class UserDataStore(string root)
     }
 
     internal string LibraryRootPath => root;
-    internal string ProjectsPath => Path.Combine(root, "projects");
     internal string ExportsPath => Path.Combine(root, "exports");
     internal string TempPath => Path.Combine(root, "temp");
 
@@ -39,9 +35,8 @@ internal sealed class UserDataStore(string root)
     {
         try
         {
-            foreach (var path in new[] { root, ProjectsPath, Path.GetDirectoryName(SettingsPath)!,
-                Path.GetDirectoryName(DraftPath)!, ExportsPath, TempPath,
-                Path.Combine(root, "logs"), Path.GetDirectoryName(ProfilePath)! })
+            foreach (var path in new[] { root, Path.GetDirectoryName(SettingsPath)!,
+                ExportsPath, TempPath, Path.Combine(root, "logs"), Path.GetDirectoryName(ProfilePath)! })
                 Directory.CreateDirectory(path);
             var probe = Path.Combine(root, $".write-test-{Guid.NewGuid():N}");
             using (File.Create(probe)) { }
@@ -56,7 +51,6 @@ internal sealed class UserDataStore(string root)
     public void Dispose() => instanceLease?.Dispose();
 
     internal Task<string?> LoadSettingsAsync() => ReadAsync(SettingsPath);
-    internal Task<string?> LoadDraftAsync() => ReadAsync(DraftPath);
 
     internal Task<string> LoadLastLibraryFolderAsync() => LoadDirectoryPreferenceAsync(LastLibraryFolderPath);
 
@@ -106,19 +100,6 @@ internal sealed class UserDataStore(string root)
         return true;
     }
 
-    internal async Task<bool> SaveDraftAsync(string text, bool preserveOriginal)
-    {
-        bool originalMissing = false;
-        if (preserveOriginal && rejectedDraft is null && !rejectedDraftUnavailable)
-        {
-            rejectedDraft = await PreserveAsync(DraftPath);
-            originalMissing = rejectedDraft is null;
-        }
-        await SaveAsync(DraftPath, text);
-        if (originalMissing) rejectedDraftUnavailable = true;
-        return true;
-    }
-
     private Task SaveAsync(string path, string text)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -138,33 +119,11 @@ internal sealed class UserDataStore(string root)
         return backup;
     }
 
-    internal void EnsureRejectedDraftAvailable()
-    {
-        if (rejectedDraftUnavailable || !File.Exists(rejectedDraft ?? DraftPath))
-            throw new IOException("原始草稿已不存在，无法另存。");
-    }
-
-    internal Task ExportRejectedDraftAsync(string destination)
-    {
-        EnsureRejectedDraftAvailable();
-        if (string.Equals(destination, SettingsPath, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(destination, DraftPath, StringComparison.OrdinalIgnoreCase))
-            throw new IOException("请选择其他位置另存原始草稿。");
-        return CopyAtomicallyAsync(rejectedDraft ?? DraftPath, destination);
-    }
-
     internal static Task WriteAtomicallyAsync(string path, string text) =>
         StageAndMoveAsync(path, async stream =>
         {
             await using var writer = new StreamWriter(stream, leaveOpen: true);
             await writer.WriteAsync(text);
-        });
-
-    private static Task CopyAtomicallyAsync(string source, string destination) =>
-        StageAndMoveAsync(destination, async stream =>
-        {
-            await using var input = File.OpenRead(source);
-            await input.CopyToAsync(stream);
         });
 
     private static async Task StageAndMoveAsync(string path, Func<Stream, Task> write)

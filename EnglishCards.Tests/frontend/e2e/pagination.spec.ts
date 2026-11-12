@@ -81,7 +81,7 @@ test('missing fonts stop pagination with a recoverable message, without disablin
   await page.route(/\.(woff2?|ttf)(\?.*)?$/, route => route.abort());
   await page.goto('/');
   await expect(page.getByRole('alert')).toContainText('本地字体加载失败');
-  await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toHaveCount(0);
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '保存 JSON', exact: true }).click();
   expect((await download).suggestedFilename()).toBe('article.json');

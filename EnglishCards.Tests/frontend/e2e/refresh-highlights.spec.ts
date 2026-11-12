@@ -1,6 +1,5 @@
 import { test, expect } from './fixtures';
 import { readFile } from 'node:fs/promises';
-import { unzipSync, strFromU8 } from 'fflate';
 import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
 import { selectPreviewText } from './preview-selection';
 
@@ -59,10 +58,12 @@ test('unified vocabulary entries retain variants, paired senses and automatic hi
   const snapshot = await page.evaluate(() => window.editor);
   const { styles: _settings, ...document } = snapshot.project;
   expect(document).toEqual(saved);
-  const result = await request.post('/api/export', { data: snapshot });
+  const result = await request.post('/api/render-page', { data: { ...snapshot, page: 1 } });
   expect(result.ok(), result.ok() ? '' : await result.text()).toBe(true);
-  const exported = JSON.parse(strFromU8(unzipSync(await result.body())['article.json']));
-  expect(exported).toEqual(saved);
+  expect(result.headers()['content-type']).toContain('image/png');
+  const png = new Uint8Array(await result.body());
+  expect(png.byteLength).toBeGreaterThan(24);
+  expect(Array.from(png.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
   const output = page.locator(`.vocab[data-source="${saved.vocabulary[1].id}"]`);
   expect((await output.allTextContents()).join('')).toContain('n. 记录');
   await page.screenshot({ path: '.build/test-results/multiple-senses.png' });

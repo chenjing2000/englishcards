@@ -1,6 +1,5 @@
 import { test, expect, type Page } from './fixtures';
 import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
-import { unzipSync } from 'fflate';
 import { selectPreviewText } from './preview-selection';
 
 async function ready(page: Page) { await expect(page.locator('[data-ready="true"]')).toBeVisible(); }
@@ -92,22 +91,21 @@ test('preview selection plus adds vocabulary while ordinary preview clicks never
   await expect(translation).not.toBeFocused();
 });
 
-test('failed import cannot re-enable export after pagination fails', async ({ page }) => {
+test('failed import preserves the current article after pagination fails', async ({ page }) => {
   await page.goto('/'); await ready(page);
   await page.evaluate(() => { crypto.subtle.digest = async () => { throw new Error('Simulated layout failure'); }; });
   await page.getByLabel('英文标题', { exact: true }).fill('A changed article');
   await expect(page.getByRole('alert')).toContainText('分页失败');
-  const exportButton = page.getByRole('button', { name: '导出全部 ZIP', exact: true });
-  await expect(exportButton).toBeDisabled();
+  await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toHaveCount(0);
   await page.getByLabel('导入 Article JSON 或 TXT').setInputFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from('{') });
   await expect(page.getByRole('alert')).toContainText('分页失败');
   await page.getByLabel('信息提示栏').getByRole('button', { name: '关闭', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('无法打开文章');
   await expect(page.getByLabel('英文标题', { exact: true })).toHaveValue('A changed article');
-  await expect(exportButton).toBeDisabled();
+  await expect(page.getByRole('button', { name: '导出全部 ZIP', exact: true })).toHaveCount(0);
 });
 
-test('long content and translation paginate without gaps; vocabulary is a single column', async ({ page }) => {
+test('long content and translation paginate without gaps; first page renders as PNG; vocabulary is a single column', async ({ page }) => {
   await page.goto('/'); await ready(page);
   const longText = ('A complete line of English. '.repeat(200)) + 'W'.repeat(800);
   const chinese = '中文段落（标点），混合English123。👨‍👩‍👧‍👦 é '.repeat(170);
@@ -142,9 +140,12 @@ test('long content and translation paginate without gaps; vocabulary is a single
   const vocabLines = page.locator('.vocab[data-source="v001"]');
   expect(await vocabLines.count()).toBeGreaterThan(1);
   const exportSnapshot = await page.evaluate(() => window.editor);
-  const response = await page.request.post('/api/export', { data: exportSnapshot });
+  const response = await page.request.post('/api/render-page', { data: { ...exportSnapshot, page: 1 } });
   expect(response.ok(), response.ok() ? '' : await response.text()).toBe(true);
-  const files = unzipSync(new Uint8Array(await response.body()));
-  expect(files['article.json']).toBeTruthy();
-  expect(Object.keys(files).filter(name => name.endsWith('.png')).length).toBe(pages);
+  expect(response.headers()['content-type']).toContain('image/png');
+  const png = new Uint8Array(await response.body());
+  expect(Array.from(png.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+  const image = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  expect(image.getUint32(16)).toBeGreaterThan(0);
+  expect(image.getUint32(20)).toBeGreaterThan(0);
 });

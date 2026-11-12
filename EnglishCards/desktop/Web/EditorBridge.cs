@@ -13,8 +13,6 @@ namespace EnglishCards;
 
 internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore data, ZipExportService exporter)
 {
-    private const string OpenArticleFilter = "EnglishCards 文章 (*.json;*.txt)|*.json;*.txt|Article JSON (*.json)|*.json|Plain Text (*.txt)|*.txt";
-    private const string SaveArticleFilter = "Article JSON (*.json)|*.json";
     private string? activeCardPath;
     private string? activeFingerprint;
     private long navigation;
@@ -75,7 +73,6 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
             if (!IsCurrentEditor(page)) return;
             object? value = command.GetString() switch
             {
-                "openProject" when payload.ValueKind == JsonValueKind.Null => await OpenProjectAsync(),
                 "openCardFile" when payload.ValueKind == JsonValueKind.String => await OpenCardFileAsync(payload.GetString()!),
                 "activateCardFile" when payload.ValueKind == JsonValueKind.Object => await ActivateCardFileAsync(payload),
                 "saveCardFile" when payload.ValueKind == JsonValueKind.Object => await SaveCardFileAsync(payload),
@@ -86,13 +83,8 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
                 "saveLastCardLibrary" when payload.ValueKind == JsonValueKind.String => await SaveLastCardLibraryAsync(payload.GetString()!),
                 "chooseArticlePairTarget" when payload.ValueKind == JsonValueKind.String => await ChooseArticlePairTargetAsync(payload.GetString()!),
                 "saveArticlePair" when payload.ValueKind == JsonValueKind.Object => await SaveArticlePairAsync(payload),
-                "saveProject" when payload.ValueKind == JsonValueKind.String => await SaveProjectAsync(payload.GetString()!),
                 "loadSettings" when payload.ValueKind == JsonValueKind.Null => await data.LoadSettingsAsync(),
-                "loadDraft" when payload.ValueKind == JsonValueKind.Null => await data.LoadDraftAsync(),
-                "saveSettings" => await SaveUserDataAsync(payload, data.SaveSettingsAsync),
-                "saveDraft" => await SaveUserDataAsync(payload, data.SaveDraftAsync),
-                "saveRejectedDraft" when payload.ValueKind == JsonValueKind.Null => await SaveRejectedDraftAsync(),
-                "exportAllZip" when payload.ValueKind == JsonValueKind.Object => await exporter.ExportAsync(payload, activeCardPath ?? throw new InvalidOperationException("请先打开并保存一张 JSON 卡片。")),
+                "saveSettings" => await SaveSettingsAsync(payload),
                 _ => throw new InvalidDataException("不支持的桌面文件请求。")
             };
             response = new { id, ok = true, value };
@@ -121,15 +113,6 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
     private static bool IsEditor(string source) => string.Equals(source, LocalWebContent.EditorSource, StringComparison.Ordinal);
 
     private bool IsCurrentEditor(long page) => owner.IsLoaded && navigation == page && IsEditor(web.Source);
-
-    private string? ChooseFile(FileDialog dialog) => dialog.ShowDialog(owner) == true ? dialog.FileName : null;
-
-    private async Task<object?> OpenProjectAsync()
-    {
-        var path = ChooseFile(new OpenFileDialog { Filter = OpenArticleFilter, CheckFileExists = true, InitialDirectory = data.ProjectsPath });
-        if (path is null) return null;
-        return new { name = Path.GetFileName(path), text = await File.ReadAllTextAsync(path) };
-    }
 
     // Phase E: a file-backed card has an explicit identity; no save dialog or draft fallback.
     private static string ValidateCardPath(string path)
@@ -293,40 +276,12 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         return new { path, folders, files };
     }
 
-    private async Task<bool?> SaveProjectAsync(string text)
-    {
-        // The editor validates the full schema with parseProject before sending the snapshot.
-        using var document = JsonDocument.Parse(text);
-        var project = document.RootElement;
-        ArticleContractValidator.Validate(project);
-
-        var path = ChooseFile(new SaveFileDialog
-        {
-            Filter = SaveArticleFilter, DefaultExt = ".json", FileName = "article.json", OverwritePrompt = true, InitialDirectory = data.ProjectsPath
-        });
-        if (path is null) return null;
-        await UserDataStore.WriteAtomicallyAsync(path, text);
-        return true;
-    }
-
-    private static Task<bool> SaveUserDataAsync(JsonElement payload, Func<string, bool, Task<bool>> write)
+    private Task<bool> SaveSettingsAsync(JsonElement payload)
     {
         if (payload.ValueKind != JsonValueKind.Object || !payload.TryGetProperty("text", out var text) ||
             text.ValueKind != JsonValueKind.String || !payload.TryGetProperty("preserveOriginal", out var preserve) ||
             preserve.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
-            throw new InvalidDataException("无效的本机数据写入请求。");
-        return write(text.GetString()!, preserve.GetBoolean());
-    }
-
-    private async Task<bool?> SaveRejectedDraftAsync()
-    {
-        data.EnsureRejectedDraftAvailable();
-        var path = ChooseFile(new SaveFileDialog
-        {
-            Filter = SaveArticleFilter, DefaultExt = ".json", FileName = "rejected-draft.json", OverwritePrompt = true, InitialDirectory = data.ProjectsPath
-        });
-        if (path is null) return null;
-        await data.ExportRejectedDraftAsync(path);
-        return true;
+            throw new InvalidDataException("无效的设置保存请求。");
+        return data.SaveSettingsAsync(text.GetString()!, preserve.GetBoolean());
     }
 }

@@ -24,53 +24,6 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content)
         else cancellation?.Cancel();
     }
 
-    internal async Task<bool?> ExportAsync(JsonElement request, string activeCardPath)
-    {
-        if (IsRunning) throw new InvalidOperationException("已有导出任务正在运行。");
-        if (request.ValueKind != JsonValueKind.Object ||
-            !request.TryGetProperty("project", out var project) || project.ValueKind != JsonValueKind.Object ||
-            !request.TryGetProperty("document", out var document) || document.ValueKind != JsonValueKind.Object ||
-            !request.TryGetProperty("signature", out var signatureValue) || signatureValue.ValueKind != JsonValueKind.String ||
-            !request.TryGetProperty("pages", out var pagesValue) || !pagesValue.TryGetInt32(out var pages) || pages < 1)
-            throw new InvalidDataException("导出快照格式无效。");
-        ArticleContractValidator.Validate(document);
-        if (Encoding.UTF8.GetByteCount(project.GetRawText()) > 5 * 1024 * 1024)
-            throw new InvalidDataException("项目数据超过 5 MiB 的导出请求上限。");
-        string signature = signatureValue.GetString()!;
-        if (signature.Length is < 10 or > 512) throw new InvalidDataException("无效的分页签名。");
-        var styles = project.GetProperty("styles");
-        int width = styles.GetProperty("pageWidth").GetInt32();
-        int height = styles.GetProperty("pageHeight").GetInt32();
-        if (width is < 400 or > 4000 || height is < 400 or > 4000)
-            throw new InvalidDataException("页面尺寸超出允许范围。");
-
-        var destination = GetDestinationPath(activeCardPath);
-        if (!File.Exists(activeCardPath))
-            throw new FileNotFoundException("当前 JSON 卡片文件不存在，无法导出。", activeCardPath);
-
-        using var cts = new CancellationTokenSource();
-        cancellation = cts;
-        var progressWindow = new ProgressDialog(owner, "正在导出全部卡片", cts.Cancel);
-        activeProgress = progressWindow;
-        try
-        {
-            progressWindow.Show();
-            await GenerateAsync(destination, project.GetRawText(), document.GetRawText(), signature,
-                pages, width, height, progressWindow, cts.Token);
-            return true;
-        }
-        catch (OperationCanceledException) when (cts.IsCancellationRequested)
-        {
-            return false;
-        }
-        finally
-        {
-            activeProgress = null;
-            cancellation = null;
-            progressWindow.CloseAfterOperation();
-        }
-    }
-
     /// <summary>
     /// Render and commit a JSON + ZIP pair from the same validated Article v6
     /// snapshot. This method does not choose the folder or confirm overwrites;
@@ -144,16 +97,6 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content)
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             { Trace.TraceWarning("ZIP staging cleanup failed: {0}", error); }
         }
-    }
-
-    internal static string GetDestinationPath(string activeCardPath)
-    {
-        if (string.IsNullOrWhiteSpace(activeCardPath))
-            throw new InvalidDataException("当前卡片路径为空，无法确定 ZIP 保存位置。");
-        var fullPath = Path.GetFullPath(activeCardPath);
-        if (!string.Equals(Path.GetExtension(fullPath), ".json", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("当前卡片不是 JSON 文件，无法导出 ZIP。");
-        return Path.ChangeExtension(fullPath, ".zip");
     }
 
     private async Task GenerateAsync(string destination, string projectJson, string documentJson,

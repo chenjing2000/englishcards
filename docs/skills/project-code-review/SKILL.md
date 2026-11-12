@@ -20,10 +20,10 @@ description: Use when a user requests a comprehensive project code review, clean
 本项目采用轻量 MVVM。遵循现有 React / TypeScript 实现，不为套用名称而引入额外框架。
 
 - **Model（`EnglishCards/frontend/src/v6/article.ts`；当前 v5 过渡模型位于 `EnglishCards/frontend/src/models/project.ts`）**：Article v6 结构、严格校验、编号、导入及不依赖界面的数据规则应以 v6 模型为准；完成集成后删除 v5 过渡模型。不得依赖 View、React 组件、DOM、浏览器存储或 HTTP 服务。
-- **ViewModel（`EnglishCards/frontend/src/viewmodels/`）**：持有编辑状态，协调撤销重做、增删排序、选中条目、保存和导出等操作命令；调用 Model 和 Services，向 View 暴露状态和命令。现有自定义 Hook 即 ViewModel，不必改为类。不得直接查找或修改界面 DOM，也不得自行拼接表单 JSX。
+- **ViewModel（`EnglishCards/frontend/src/viewmodels/`）**：持有编辑状态，协调增删排序、选中条目和保存等操作命令；调用 Model 和 Services，向 View 暴露状态和命令。现有自定义 Hook 即 ViewModel，不必改为类。不得直接查找或修改界面 DOM，也不得自行拼接表单 JSX。
 - **View（`EnglishCards/frontend/src/views/`）**：展示和绑定状态、转发编辑命令，管理焦点、光标/选区、滚动、缩放和 DOM 挂载等界面细节。纯界面临时状态可在 View 内；项目数据规则、持久化、历史栈和导出请求不得复制到 View。不要把 View 中所有 `useState` 一律搬走。
 - **Services（`EnglishCards/frontend/src/services/`）**：集中实现文件/草稿 IO、网络请求、分页测量及导出校验等独立能力。分页服务因职责需要可使用 DOM/Canvas，但不拥有编辑器状态，也不引用 View 或 ViewModel。
-- **Server（`tools/test-server/`）**：负责本机 HTTP、后台 Chromium、PNG/ZIP 导出和资源释放；可复用共享模型及校验规则，不混入客户端状态或 UI 控件逻辑。
+- **Server（`tools/test-server/`）**：负责本机 HTTP、后台 Chromium 单页 PNG 渲染及资源释放，供布局诊断与自动化测试使用；不提供浏览器 ZIP 打包。Windows 桌面版 ZIP 生成与 JSON + ZIP 联合保存由 WPF `ZipExportService` 负责。可复用共享模型及校验规则，不混入客户端状态或 UI 控件逻辑。
 - **依赖与入口**：View 调用 ViewModel；ViewModel 调用 Model / Services；Services 可依赖 Model；Model 不反向依赖其他层。`EnglishCards/frontend/src/main.tsx` 仅作应用与渲染入口。避免跨层循环依赖，不为消除少量重复添加 DI 容器、事件总线或通用仓储。
 - **修改边界**：新增能力放入相应职责目录，复用现有直接清晰的调用链。已有分层合理时只做局部修改；必要的迁移同步调整导入和调用方，保持已确认的 Article v6、EXE 同级 userdata、撤销重做、草稿、预览与 ZIP 导出契约，按受影响路径验证。
 - **格式同步**：调整项目字段或导入规则时，同时检查 `docs/skills/article-to-englishcards/SKILL.md` 的 JSON 契约、完整示例和校验脚本，使用实际 `parseArticleV6` 验证，避免 skill 与程序各维护一套互相矛盾的格式。
