@@ -48,11 +48,9 @@ Example request:
 
 The paired-save command must receive one complete Article v6 document. The host must not trust a caller-supplied path without validating it, and overwrite must be explicitly approved by the frontend after the user confirms the shared overwrite dialog.
 
-## Legacy/internal commands present in the host
+## Removed desktop commands
 
-The current host source also registers `openProject`, `saveProject`, `loadDraft`, `saveDraft`, `saveRejectedDraft`, and `exportAllZip`. Their presence in the host switch does not restore the former user-facing import, global-draft recovery, standalone JSON save or standalone ZIP export workflow.
-
-The current Card Library UI must use the file-specific and paired-save commands above. It must not route ordinary use through the old generic open/save/draft/export commands. These legacy/internal registrations are documented here for implementation transparency; their eventual removal is a separate source-code task and is outside a documentation-only change.
+The current `EditorBridge.cs` command switch does **not** register `openProject`, `saveProject`, `loadDraft`, `saveDraft`, `saveRejectedDraft` or `exportAllZip`. These historical names must not be treated as available host operations. Browser-only development workflows are separate from the desktop bridge.
 
 ## Ordering and navigation
 
