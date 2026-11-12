@@ -40,8 +40,15 @@ app.post('/api/render-page', async (request, response) => {
       throw reason;
     }
     const page = await browser.newPage({ viewport: { width: 1440, height: 1800 }, deviceScaleFactor: 1 });
-    await page.goto(`${baseURL}/render`);
-    await page.waitForFunction(() => typeof window.renderProject === 'function');
+    const renderErrors: string[] = [];
+    page.on('pageerror', error => renderErrors.push(error.message));
+    page.on('requestfailed', request => renderErrors.push(`${request.url()}: ${request.failure()?.errorText}`));
+    await page.goto(`${baseURL}/render.html`);
+    try {
+      await page.waitForFunction(() => typeof window.renderProject === 'function', { timeout: 15000 });
+    } catch (reason) {
+      throw new Error(`渲染入口尚未就绪（${page.url()}）：${renderErrors.join('；') || String(reason)}`);
+    }
     const signature = await page.evaluate(input => window.renderProject(input), project);
     if (signature !== request.body.signature) {
       const diagnostics = await page.evaluate(() => window.renderDiagnostics);
