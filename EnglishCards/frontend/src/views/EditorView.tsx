@@ -100,9 +100,14 @@ export default function EditorView() {
         if (vm.needsClearConfirmation) setClearOpen(true);
         else void vm.clearArticle();
       }}><ToolbarIcon name="clear" /></button>
-    <button type="button" aria-label="保存" title="保存 JSON 与 ZIP"
-      disabled={!ready || exporting || vm.opening || clearBusy}
-      onClick={() => { void vm.savePair(confirmOverwrite); }}><ToolbarIcon name="save" /></button>
+    <button type="button" aria-label="保存"
+      title={vm.hasUnpairedChanges ? '保存 JSON 与 ZIP（有未联合保存的修改）' : '保存 JSON 与 ZIP'}
+      data-unpaired={vm.hasUnpairedChanges}
+      disabled={!settingsReady || vm.previewCleared || exporting || vm.opening || clearBusy}
+      onClick={() => { void vm.savePair(confirmOverwrite); }}>
+      <ToolbarIcon name="save" />
+      {vm.hasUnpairedChanges && <span className="save-unpaired-star" aria-hidden="true">*</span>}
+    </button>
   </div>;
 
   return <div className="app-shell" inert={vm.desktop && (!settingsReady || vm.closing)}>
@@ -152,8 +157,9 @@ export default function EditorView() {
         {!settingsOpen && <VocabularyActions viewModel={vm} focusField={setFocusId} />}
         {!vm.desktop && <NotificationBar error={error} warning={warning} closeError={vm.clearError} />}
       </div>
-    </aside>} left={<CardPreview layout={vm.desktop && vm.emptyArticle ? undefined : layout}
-      ready={ready && (!vm.desktop || !vm.emptyArticle)} content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection}
+    </aside>} left={<CardPreview layout={vm.desktop && vm.previewCleared ? undefined : layout}
+      ready={ready && (!vm.desktop || !vm.previewCleared)} documentEpoch={vm.documentEpoch}
+      content={project.content.paragraphs} onAddSelection={vm.addVocabularyFromSelection}
       actions={vm.desktop ? null : <ProjectActions open={vm.open} save={vm.save} />}
       notices={vm.desktop ? <PreviewNotices errors={vm.errors} warning={warning} closeError={vm.clearError} /> : null} />} />
     </div>
