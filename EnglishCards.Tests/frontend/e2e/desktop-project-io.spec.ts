@@ -178,6 +178,18 @@ test('independent desktop errors stack upwards and each close clears only its so
   await expect(page.getByRole('button', { name: '重试保存当前卡片' })).toBeVisible();
 });
 
+test('reopening the unchanged current card retains the exact preview DOM', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await expect.poll(() => page.locator('.preview[data-ready="true"] .card').count()).toBeGreaterThan(0);
+  await page.locator('.preview .card').first().evaluate(node => {
+    (window as Window & { firstPreviewCard?: Element }).firstPreviewCard = node;
+  });
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await expect(page.locator('.preview')).toHaveAttribute('data-ready', 'true');
+  expect(await page.evaluate(() =>
+    document.querySelector('.preview .card') === (window as Window & { firstPreviewCard?: Element }).firstPreviewCard)).toBe(true);
+});
+
 test('clean card requires confirmation and cancel keeps the same preview DOM', async ({ page }) => {
   await page.getByRole('button', { name: 'A.json' }).click();
   await expect.poll(() => page.locator('.preview[data-ready="true"] .card').count()).toBeGreaterThan(0);
