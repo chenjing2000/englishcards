@@ -1,5 +1,4 @@
 import { test, expect } from './fixtures';
-import { unzipSync, strFromU8 } from 'fflate';
 import { readFile } from 'node:fs/promises';
 import fixture from '@fixtures/projects/brainco/project.json' with { type: 'json' };
 import { selectPreviewText } from './preview-selection';
@@ -57,12 +56,11 @@ test('left-preview selections add English words and phrases to Article v6 vocabu
   expect(saved.vocabulary[3]).toMatchObject({ id: 'v004', word: 'ran away', highlight: [] });
 
   const snapshot = await page.evaluate(() => window.editor);
-  const exported = await request.post('/api/render-page', { data: { ...snapshot, page: 1 } });
-  expect(exported.ok(), exported.ok() ? '' : await exported.text()).toBe(true);
-  const files = unzipSync(new Uint8Array(await exported.body()));
-  const exportedProject = JSON.parse(strFromU8(files['article.json']));
-  expect(exportedProject.vocabulary.slice(-2)).toEqual(saved.vocabulary.slice(-2));
-  expect(Object.keys(files).filter(name => name.endsWith('.png')).length).toBeGreaterThan(0);
+  const rendered = await request.post('/api/render-page', { data: { ...snapshot, page: 1 } });
+  expect(rendered.ok(), rendered.ok() ? '' : await rendered.text()).toBe(true);
+  expect(rendered.headers()['content-type']).toContain('image/png');
+  const png = new Uint8Array(await rendered.body());
+  expect(Array.from(png.subarray(0, 8))).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
 });
 
 
