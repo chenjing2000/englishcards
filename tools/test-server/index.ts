@@ -64,7 +64,7 @@ app.post('/api/render-page', async (request, response) => {
 });
 if (process.argv.includes('--production')) {
   app.use(express.static(frontendDist));
-  app.get('/render', (_request, response) => response.sendFile(resolve(frontendDist, 'index.html')));
+  app.get('/render', (_request, response) => response.sendFile(resolve(frontendDist, 'render.html')));
 } else {
   const { createServer } = await import('vite');
   const vite = await createServer({ root: frontendRoot, configFile: resolve(root, 'tools/vite.config.ts'), server: { middlewareMode: true, host: '127.0.0.1', hmr: false } });
