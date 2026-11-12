@@ -360,6 +360,11 @@ export function useEditorViewModel() {
     setOpening(true);
     try {
       const { path: openedPath, article } = await openCardFile(path);
+      if (openedPath === activeCardPath && serializedCard(article) === serializedCard(project)) {
+        // Reopening identical bytes must not replace a live preview or reset the viewport.
+        reportError('card-open', '');
+        return true;
+      }
       const session = createCardSaveCoordinator(openedPath, article);
       clearTimeout(cardTimer.current);
       cardSession.current = session;
