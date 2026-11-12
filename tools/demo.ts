@@ -67,7 +67,7 @@ try {
   let repeatIdentical = true;
   for (let index = 1; index <= pageCount; index++) {
     const payload = { project, signature, diagnostics, page: index };
-    const first = await page.request.post(`${baseURL}/api/render-page`, { data: payload });
+    const first = await page.request.post(`${baseURL}/api/render-page`, { data: payload, timeout: 120000 });
     if (!first.ok()) throw new Error(`第 ${index} 页渲染失败：${await first.text()}`);
     const bytes = await first.body();
     checkPng(bytes, pageWidth, pageHeight, index);
@@ -75,7 +75,7 @@ try {
     await writeFile(resolve(output, fileName), bytes);
     hashes[fileName] = createHash('sha256').update(bytes).digest('hex');
 
-    const second = await page.request.post(`${baseURL}/api/render-page`, { data: payload });
+    const second = await page.request.post(`${baseURL}/api/render-page`, { data: payload, timeout: 120000 });
     if (!second.ok()) throw new Error(`第 ${index} 页重复渲染失败：${await second.text()}`);
     const repeated = await second.body();
     checkPng(repeated, pageWidth, pageHeight, index);
