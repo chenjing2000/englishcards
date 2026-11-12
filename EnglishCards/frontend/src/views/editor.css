@@ -155,6 +155,15 @@
   outline:2px solid #007175;outline-offset:2px;
 }
 .editor-panel .phase-c-heading .phase-e-actions svg{width:20px;height:20px;display:block}
+.editor-panel .phase-c-heading .phase-e-actions button[aria-label="保存"]{position:relative}
+/* Keep the save icon visually steady as pagination and native save gates toggle. */
+.editor-panel .phase-c-heading .phase-e-actions button[aria-label="保存"][data-has-content="true"]:disabled{
+  opacity:1;
+}
+.editor-panel .phase-c-heading .phase-e-actions .save-unpaired-star{
+  position:absolute;top:0;right:3px;color:#bc6d0e;font-size:21px;font-weight:800;
+  line-height:1;pointer-events:none;
+}
 
 
 /* Phase E: bottom-center toasts within the preview, stacked from bottom upward. */

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import type { Layout } from '../services/pagination';
 import { isValidVocabularySelection, type Paragraph } from '../models/project';
 
-type Props = { layout?: Layout; ready: boolean; content: Paragraph[]; onAddSelection: (paragraphId: string, start: number, end: number) => void; actions: ReactNode; notices?: ReactNode };
+type Props = { layout?: Layout; ready: boolean; documentEpoch: number; content: Paragraph[]; onAddSelection: (paragraphId: string, start: number, end: number) => void; actions: ReactNode; notices?: ReactNode };
 type ActiveSelection = { paragraphId: string; start: number; end: number; left: number; top: number };
 type ZoomAnchor = { card: HTMLElement; y: number; clientY: number };
 
@@ -46,18 +46,19 @@ function selectionCandidate(selection: Selection | null, content: Paragraph[]): 
   };
 }
 
-export default function CardPreview({ layout, ready, content, onAddSelection, actions, notices }: Props) {
+export default function CardPreview({ layout, ready, documentEpoch, content, onAddSelection, actions, notices }: Props) {
   const scroll = useRef<HTMLDivElement>(null), preview = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const [activeSelection, setActiveSelection] = useState<ActiveSelection | null>(null);
   const currentZoom = useRef(zoom);
   const anchor = useRef<ZoomAnchor | null>(null);
+  const displayedEpoch = useRef<number | null>(null);
 
   function updateSelection() {
-    setActiveSelection(selectionCandidate(window.getSelection(), content));
+    setActiveSelection(ready ? selectionCandidate(window.getSelection(), content) : null);
   }
 
-  useEffect(() => { setActiveSelection(null); }, [layout?.signature]);
+  useEffect(() => { setActiveSelection(null); }, [layout?.signature, ready]);
 
   useEffect(() => {
     const hide = () => setActiveSelection(null);
@@ -111,23 +112,50 @@ export default function CardPreview({ layout, ready, content, onAddSelection, ac
   }
 
   useLayoutEffect(() => {
-    // The preview DOM is populated imperatively rather than by React. When
-    // clearing a card, dropping the layout must also remove the old DOM pages.
-    if (!layout || !ready) {
-      preview.current?.replaceChildren();
+    // A temporarily stale preview is still visible. Only an explicit absence
+    // of layout (for example, clearing the article) may remove its DOM.
+    const container = preview.current;
+    const viewport = scroll.current;
+    if (!container || !viewport) return;
+    if (!layout) {
+      if (container.childElementCount) container.replaceChildren();
+      displayedEpoch.current = null;
       anchor.current = null;
       setActiveSelection(null);
-      if (scroll.current) scroll.current.scrollTop = 0;
+      viewport.scrollTop = 0;
       return;
     }
+
+    // Remember the viewport's center in the currently displayed page before
+    // replacing all pages in one DOM operation.
+    const oldCards = [...container.querySelectorAll<HTMLElement>('.card')];
+    const center = viewport.getBoundingClientRect().top + viewport.clientHeight / 2;
+    const oldIndex = oldCards.findIndex(card => card.getBoundingClientRect().bottom >= center);
+    const oldCard = oldCards[Math.max(0, oldIndex)];
+    const oldRect = oldCard?.getBoundingClientRect();
+    const fraction = oldRect?.height ? (center - oldRect.top) / oldRect.height : 0;
+    const sameArticle = displayedEpoch.current === documentEpoch;
+
     const wrappers = layout.pages.map(card => {
       const wrapper = document.createElement('div'); wrapper.className = 'card-wrapper';
       wrapper.style.setProperty('--page-width', card.style.width); wrapper.style.setProperty('--page-height', card.style.height);
       wrapper.append(card); return wrapper;
     });
-    preview.current!.replaceChildren(...wrappers);
+    container.replaceChildren(...wrappers);
+    displayedEpoch.current = documentEpoch;
+    anchor.current = null;
+    setActiveSelection(null);
     clampZoomToAvailableWidth();
-  }, [layout, ready]);
+
+    if (!sameArticle) {
+      viewport.scrollTop = 0;
+    } else if (oldRect && wrappers.length) {
+      const index = Math.min(Math.max(0, oldIndex), wrappers.length - 1);
+      const nextCard = wrappers[index].querySelector<HTMLElement>('.card');
+      const nextRect = nextCard?.getBoundingClientRect();
+      if (nextRect) viewport.scrollTop += nextRect.top + fraction * nextRect.height - center;
+    }
+  }, [layout, documentEpoch]);
 
   useLayoutEffect(() => {
     const element = scroll.current;
@@ -195,7 +223,7 @@ export default function CardPreview({ layout, ready, content, onAddSelection, ac
       onMouseDown={event => event.preventDefault()}
       onClick={event => {
         event.stopPropagation();
-        onAddSelection(activeSelection.paragraphId, activeSelection.start, activeSelection.end);
+        if (ready) onAddSelection(activeSelection.paragraphId, activeSelection.start, activeSelection.end);
         setActiveSelection(null);
         window.getSelection()?.removeAllRanges();
       }}>

@@ -10,6 +10,8 @@ declare global {
       corruptNextOpen: boolean;
       failDirectoryRead: boolean;
       failNextPair: boolean;
+      existingPairFiles: string[];
+      previewAudit?: { cleared: number; replaced: number; initialCard: Element | null };
     };
   }
 }
@@ -20,7 +22,7 @@ test.beforeEach(async ({ page }) => {
     const cards: Record<string, unknown> = {
       'C:/cards/A.json': { ...initial, title: 'Card A' },
     };
-    window.phaseEIO = { requests: [], failNextSave: false, corruptNextOpen: false, failDirectoryRead: false, failNextPair: false };
+    window.phaseEIO = { requests: [], failNextSave: false, corruptNextOpen: false, failDirectoryRead: false, failNextPair: false, existingPairFiles: [] };
     const respond = (id: number, value: unknown, error?: string) =>
       events.dispatchEvent(new MessageEvent('message', {
         data: error ? { id, ok: false, error } : { id, ok: true, value },
@@ -60,7 +62,7 @@ test.beforeEach(async ({ page }) => {
           }
         }
         if (command === 'chooseArticlePairTarget') {
-          value = { path: 'D:/Saved Cards/' + String(payload), folder: 'D:/Saved Cards', existingFiles: [] };
+          value = { path: 'D:/Saved Cards/' + String(payload), folder: 'D:/Saved Cards', existingFiles: window.phaseEIO.existingPairFiles };
         }
         if (command === 'saveArticlePair') {
           if (window.phaseEIO.failNextPair) {
@@ -176,6 +178,39 @@ test('independent desktop errors stack upwards and each close clears only its so
   await expect(page.getByRole('button', { name: '重试保存当前卡片' })).toBeVisible();
 });
 
+test('reopening the unchanged current card retains the exact preview DOM', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await expect.poll(() => page.locator('.preview[data-ready="true"] .card').count()).toBeGreaterThan(0);
+  await page.locator('.preview .card').first().evaluate(node => {
+    (window as Window & { firstPreviewCard?: Element }).firstPreviewCard = node;
+  });
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await expect(page.locator('.preview')).toHaveAttribute('data-ready', 'true');
+  expect(await page.evaluate(() =>
+    document.querySelector('.preview .card') === (window as Window & { firstPreviewCard?: Element }).firstPreviewCard)).toBe(true);
+});
+
+test('clean card requires confirmation and cancel keeps the same preview DOM', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await expect.poll(() => page.locator('.preview[data-ready="true"] .card').count()).toBeGreaterThan(0);
+  const before = await page.locator('.preview .card').first().evaluate(node => {
+    (window as Window & { firstPreviewCard?: Element }).firstPreviewCard = node;
+    return node.isConnected;
+  });
+  expect(before).toBe(true);
+  const save = page.getByRole('button', { name: '保存', exact: true });
+  await expect(save).toHaveAttribute('data-unpaired', 'false');
+  await page.getByRole('button', { name: '清空' }).click();
+  const dialog = page.getByRole('dialog', { name: '清空当前文章' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('清空将关闭当前文章');
+  await dialog.getByRole('button', { name: '取消' }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(await page.evaluate(() =>
+    document.querySelector('.preview .card') === (window as Window & { firstPreviewCard?: Element }).firstPreviewCard)).toBe(true);
+  await expect(save).toHaveAttribute('data-unpaired', 'false');
+});
+
 test('Clear offers Save, Discard, Cancel without deleting the source card', async ({ page }) => {
   await page.getByRole('button', { name: 'A.json' }).click();
   const title = page.getByLabel('英文标题', { exact: true });
@@ -190,6 +225,7 @@ test('Clear offers Save, Discard, Cancel without deleting the source card', asyn
   await dialog.getByRole('button', { name: '放弃' }).click();
   await expect(dialog).toHaveCount(0);
   await expect(title).toHaveValue('');
+  await expect(page.locator('.preview .card')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'A.json' })).not.toHaveAttribute('aria-current', 'page');
   const pairWrites = await page.evaluate(() => window.phaseEIO.requests.filter(item => item.command === 'saveArticlePair'));
   expect(pairWrites).toHaveLength(0);
@@ -212,6 +248,115 @@ test('Paired save failure retains the article and successful retry switches the 
   await expect(page.getByRole('button', { name: 'Card A.json' })).toHaveAttribute('aria-current', 'page');
   const request = await page.evaluate(() => window.phaseEIO.requests.find(item => item.command === 'saveArticlePair'));
   expect((request!.payload as { fileName: string }).fileName).toBe('Card A.json');
+});
+
+
+test('editor preview never empties during edits, JSON autosave, settings dialogs or paired save', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await expect.poll(() => page.locator('.preview[data-ready="true"] .card').count()).toBeGreaterThan(0);
+  const saveButton = page.getByRole('button', { name: '保存', exact: true });
+  await expect(saveButton).toHaveAttribute('data-unpaired', 'false');
+
+  await page.evaluate(() => {
+    const container = document.querySelector('.preview')!;
+    window.phaseEIO.previewAudit = { cleared: 0, replaced: 0, initialCard: container.querySelector('.card') };
+    new MutationObserver(() => {
+      if (!container.querySelector('.card')) window.phaseEIO.previewAudit!.cleared += 1;
+      window.phaseEIO.previewAudit!.replaced += 1;
+    }).observe(container, { childList: true });
+  });
+
+  await page.getByLabel('英文标题', { exact: true }).fill('Card A revised');
+  await expect(saveButton).toHaveAttribute('data-unpaired', 'true');
+  await expect.poll(() => page.evaluate(() =>
+    window.phaseEIO.requests.some(item => item.command === 'saveCardFile'))).toBe(true);
+  // JSON autosave is not a matching ZIP export.
+  await expect(saveButton).toHaveAttribute('data-unpaired', 'true');
+  await expect(page.locator('.preview')).toHaveAttribute('data-ready', 'true');
+
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  const settings = page.getByRole('dialog', { name: '设置' });
+  await expect(settings).toBeVisible();
+  await settings.getByRole('button', { name: '关闭设置' }).click();
+  await expect(settings).toHaveCount(0);
+
+  await expect(saveButton).toBeEnabled();
+  await saveButton.click();
+  await expect(saveButton).toHaveAttribute('data-unpaired', 'false');
+  await expect(page.locator('.preview')).toHaveAttribute('data-ready', 'true');
+  const audit = await page.evaluate(() => ({
+    cleared: window.phaseEIO.previewAudit!.cleared,
+    cardStillRendered: !!document.querySelector('.preview .card'),
+  }));
+  expect(audit.cleared).toBe(0);
+  expect(audit.cardStillRendered).toBe(true);
+});
+
+test('overwrite dialogs and cancellation keep the exact preview page mounted and retain the save star', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await expect.poll(() => page.locator('.preview[data-ready="true"] .card').count()).toBeGreaterThan(0);
+  await page.getByLabel('英文标题', { exact: true }).fill('Card A revised');
+  const saveButton = page.getByRole('button', { name: '保存', exact: true });
+  await expect(saveButton).toHaveAttribute('data-unpaired', 'true');
+  await expect(page.locator('.preview')).toHaveAttribute('data-ready', 'true');
+  await page.evaluate(() => {
+    window.phaseEIO.existingPairFiles = ['Card A revised.json', 'Card A revised.zip'];
+    const container = document.querySelector('.preview')!;
+    window.phaseEIO.previewAudit = { cleared: 0, replaced: 0, initialCard: container.querySelector('.card') };
+    new MutationObserver(() => {
+      if (!container.querySelector('.card')) window.phaseEIO.previewAudit!.cleared += 1;
+      window.phaseEIO.previewAudit!.replaced += 1;
+    }).observe(container, { childList: true });
+  });
+
+  await saveButton.click();
+  const dialog = page.getByRole('dialog', { name: '确认覆盖' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: '取消' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(saveButton).toHaveAttribute('data-unpaired', 'true');
+  expect(await page.evaluate(() => ({
+    cleared: window.phaseEIO.previewAudit!.cleared,
+    replaced: window.phaseEIO.previewAudit!.replaced,
+    sameCard: document.querySelector('.preview .card') === window.phaseEIO.previewAudit!.initialCard,
+  }))).toEqual({ cleared: 0, replaced: 0, sameCard: true });
+
+  await saveButton.click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: '覆盖', exact: true }).click();
+  await expect(saveButton).toHaveAttribute('data-unpaired', 'false');
+  expect(await page.evaluate(() => ({
+    cleared: window.phaseEIO.previewAudit!.cleared,
+    replaced: window.phaseEIO.previewAudit!.replaced,
+    sameCard: document.querySelector('.preview .card') === window.phaseEIO.previewAudit!.initialCard,
+  }))).toEqual({ cleared: 0, replaced: 0, sameCard: true });
+});
+
+test('changing render settings marks the ZIP stale without clearing the visible preview', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await expect.poll(() => page.locator('.preview[data-ready="true"] .card').count()).toBeGreaterThan(0);
+  const save = page.getByRole('button', { name: '保存', exact: true });
+  await expect(save).toHaveAttribute('data-unpaired', 'false');
+  await page.evaluate(() => {
+    const container = document.querySelector('.preview')!;
+    window.phaseEIO.previewAudit = { cleared: 0, replaced: 0, initialCard: container.querySelector('.card') };
+    new MutationObserver(() => {
+      if (!container.querySelector('.card')) window.phaseEIO.previewAudit!.cleared += 1;
+      window.phaseEIO.previewAudit!.replaced += 1;
+    }).observe(container, { childList: true });
+  });
+
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  const settings = page.getByRole('dialog', { name: '设置' });
+  const font = settings.getByLabel('标题字号', { exact: true });
+  const original = Number(await font.inputValue());
+  await font.fill(String(original + 1));
+  await font.blur();
+  await expect(save).toHaveAttribute('data-unpaired', 'true');
+  await expect(page.locator('.preview')).toHaveAttribute('data-ready', 'true');
+  await settings.getByRole('button', { name: '关闭设置' }).click();
+  expect(await page.evaluate(() => window.phaseEIO.previewAudit!.cleared)).toBe(0);
+  await expect.poll(() => page.locator('.preview .card').count()).toBeGreaterThan(0);
 });
 
 test('settings modal has 560 DIP two-column layout without a divider', async ({ page }) => {

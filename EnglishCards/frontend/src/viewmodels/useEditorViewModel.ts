@@ -18,6 +18,9 @@ import { cardFileName, chooseArticlePairTarget, createCardSaveCoordinator, defau
 
 type ParagraphCollection = 'content' | 'translation';
 const stringify = (project: Project) => JSON.stringify(projectDocument(project), null, 2);
+// The paired-save baseline must cover both Article v6 data and all page styles.
+const pairedSnapshot = (project: RenderProject) =>
+  JSON.stringify([serializedCard(project), project.styles]);
 
 export function useEditorViewModel() {
   const desktop = isDesktop();
@@ -63,7 +66,10 @@ export function useEditorViewModel() {
     if (boot.rejected && !boot.cacheBlocked) showWarning(boot.notice);
   }, []);
   const [lastFile, setLastFile] = useState('');
-  const [rendered, setRendered] = useState<{ project: RenderProject; layout: Layout } | null>(null);
+  const [rendered, setRendered] = useState<{ project: RenderProject; layout: Layout; documentEpoch: number } | null>(null);
+  // A new document starts a new preview identity; editing the same document does not.
+  const documentEpoch = useRef(0);
+  const [previewCleared, setPreviewCleared] = useState(desktop);
   const [exporting, setExporting] = useState(false);
   const [opening, setOpening] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -156,14 +162,23 @@ export function useEditorViewModel() {
   const settingsQueue = useRef(Promise.resolve());
   const pendingSettingsSaves = useRef(0);
   const settingsRevision = useRef(0);
-  const ready = settingsReady && !opening && rendered?.project === previewProject;
+  const previewCurrent = settingsReady && !previewCleared &&
+    rendered?.project === previewProject && rendered?.documentEpoch === documentEpoch.current;
+  const ready = previewCurrent && !opening;
   const hasFileChanges = cardSession.current ? cardSaveStatus !== 'clean' : lastFile !== stringify(project);
   const emptyArticle = !project.title.trim() && !project.identityTag.trim()
     && project.vocabulary.length === 0 && project.content.paragraphs.length === 0
     && project.translation.paragraphs.length === 0;
-  const needsClearConfirmation = hasFileChanges || invalidCardSnapshot.current
-    || Object.keys(wordDrafts).length > 0
-    || (!emptyArticle && lastPairedSnapshot.current !== serializedCard(project));
+  const hasUnpairedChanges = !emptyArticle &&
+    (lastPairedSnapshot.current !== pairedSnapshot(previewProject));
+  // Even a clean file-backed card needs confirmation before discarding its view.
+  const needsClearConfirmation = !emptyArticle || hasFileChanges || invalidCardSnapshot.current
+    || Object.keys(wordDrafts).length > 0 || hasUnpairedChanges;
+
+  // An explicit clear stays blank until the user actually introduces content.
+  useEffect(() => {
+    if (desktop && previewCleared && !emptyArticle) setPreviewCleared(false);
+  }, [desktop, previewCleared, emptyArticle]);
 
   function update(next: Project | ((current: RenderProject) => Project)) {
     setProject(current => {
@@ -293,14 +308,15 @@ export function useEditorViewModel() {
   }, [desktop]);
 
   useEffect(() => {
-    if (!settingsReady) return;
+    if (!settingsReady || (desktop && previewCleared)) return;
     const valid = styleSchema.safeParse(project.styles);
-    if (!valid.success) { setRendered(null); return; }
+    if (!valid.success) { reportError('pagination', '页面设置无效，暂时保留上一次有效预览。'); return; }
     let cancelled = false;
+    const epoch = documentEpoch.current;
     const timer = setTimeout(() => {
       paginate(previewProject).then(layout => {
-        if (cancelled) return;
-        setRendered({ project: previewProject, layout });
+        if (cancelled || epoch !== documentEpoch.current) return;
+        setRendered({ project: previewProject, layout, documentEpoch: epoch });
         window.editor = { project: previewProject, signature: layout.signature, diagnostics: layout.diagnostics };
         reportError('pagination', '');
         if (layout.warnings.length) showWarning(layout.warnings.join(' '));
@@ -309,7 +325,7 @@ export function useEditorViewModel() {
       });
     }, 120);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [previewProject, settingsReady]);
+  }, [previewProject, settingsReady, previewCleared, desktop]);
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
@@ -344,6 +360,11 @@ export function useEditorViewModel() {
     setOpening(true);
     try {
       const { path: openedPath, article } = await openCardFile(path);
+      if (openedPath === activeCardPath && serializedCard(article) === serializedCard(project)) {
+        // Reopening identical bytes must not replace a live preview or reset the viewport.
+        reportError('card-open', '');
+        return true;
+      }
       const session = createCardSaveCoordinator(openedPath, article);
       clearTimeout(cardTimer.current);
       cardSession.current = session;
@@ -351,11 +372,14 @@ export function useEditorViewModel() {
       invalidCardSnapshot.current = false;
       wordDraftsRef.current = {};
       setWordDrafts({});
+      documentEpoch.current += 1;
       update(article);
+      setPreviewCleared(false);
       setLastFile(stringify(article));
       setVocabularySelection(null);
       setCardSaveStatus('clean');
-      lastPairedSnapshot.current = null;
+      // New sessions start clean without claiming that a pre-existing ZIP was verified.
+      lastPairedSnapshot.current = pairedSnapshot({ ...article, styles: latest.current.project.styles });
       reportError('card-open', '');
       return true;
     } catch (reason) {
@@ -375,11 +399,13 @@ export function useEditorViewModel() {
     cardSession.current = null;
     invalidCardSnapshot.current = false;
     lastPairedSnapshot.current = null;
+    documentEpoch.current += 1;
     setActiveCardPath(null);
     setCardSaveStatus('clean');
     wordDraftsRef.current = {};
     setWordDrafts({});
     update(empty);
+    setPreviewCleared(true);
     setRendered(null);
     setLastFile(stringify(empty));
     setVocabularySelection(null);
@@ -436,11 +462,12 @@ export function useEditorViewModel() {
       invalidCardSnapshot.current = false;
       wordDraftsRef.current = {};
       setWordDrafts({});
-      update(saved);
+      // Avoid recreating the editor/preview for a byte-equivalent saved snapshot.
+      if (serializedCard(saved) !== serializedCard(snapshot)) update(saved);
       setLastFile(stringify(saved));
       setActiveCardPath(result.path);
       setCardSaveStatus('clean');
-      lastPairedSnapshot.current = serializedCard(saved);
+      lastPairedSnapshot.current = pairedSnapshot({ ...saved, styles: snapshot.styles });
       setVocabularySelection(null);
       changeLibraryRoot(result.folder);
       reportError('pair-save', '');
@@ -707,6 +734,7 @@ export function useEditorViewModel() {
 
   return {
     project, warning, error, errors, settingsReady, ready, exporting, opening, desktop, closing,
+    previewCleared, previewCurrent, documentEpoch: rendered?.documentEpoch ?? 0, hasUnpairedChanges,
     layout: rendered?.layout, rejectedDraft: boot.rejected,
     open, openCardPath, retryCardSave, cardSaveStatus, activeCardPath,
     clearArticle, savePair, needsClearConfirmation, emptyArticle,
