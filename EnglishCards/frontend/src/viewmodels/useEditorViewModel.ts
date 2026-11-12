@@ -171,7 +171,8 @@ export function useEditorViewModel() {
     && project.translation.paragraphs.length === 0;
   const hasUnpairedChanges = !emptyArticle &&
     (lastPairedSnapshot.current !== pairedSnapshot(previewProject));
-  const needsClearConfirmation = hasFileChanges || invalidCardSnapshot.current
+  // Even a clean file-backed card needs confirmation before discarding its view.
+  const needsClearConfirmation = !emptyArticle || hasFileChanges || invalidCardSnapshot.current
     || Object.keys(wordDrafts).length > 0 || hasUnpairedChanges;
 
   // An explicit clear stays blank until the user actually introduces content.
