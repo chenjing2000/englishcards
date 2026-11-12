@@ -166,7 +166,9 @@ export default function EditorView() {
     {vm.desktop && clearOpen && <div className="phase-e-modal-backdrop" role="presentation">
       <section role="dialog" aria-modal="true" aria-label="清空当前文章" className="phase-e-modal phase-e-clear-dialog">
         <div className="phase-e-modal-heading"><h2>清空当前文章？</h2></div>
-        <p className="phase-e-clear-description">当前文章存在尚未完成的联合保存。请选择保存、放弃或取消。</p>
+        <p className="phase-e-clear-description">{vm.hasUnpairedChanges
+          ? '当前文章存在尚未完成的联合保存。请选择保存、放弃或取消。'
+          : '清空将关闭当前文章。请选择保存、放弃或取消。'}</p>
         <div className="phase-e-clear-actions">
           <button type="button" disabled={clearBusy} onClick={() => {
             setClearBusy(true);
