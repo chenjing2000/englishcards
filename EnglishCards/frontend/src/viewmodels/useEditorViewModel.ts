@@ -303,7 +303,7 @@ export function useEditorViewModel() {
   }, [desktop]);
 
   useEffect(() => {
-    if (!settingsReady) return;
+    if (!settingsReady || (desktop && previewCleared)) return;
     const valid = styleSchema.safeParse(project.styles);
     if (!valid.success) { reportError('pagination', '页面设置无效，暂时保留上一次有效预览。'); return; }
     let cancelled = false;
@@ -320,7 +320,7 @@ export function useEditorViewModel() {
       });
     }, 120);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [previewProject, settingsReady]);
+  }, [previewProject, settingsReady, previewCleared, desktop]);
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
