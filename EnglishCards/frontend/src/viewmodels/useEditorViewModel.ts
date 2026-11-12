@@ -174,8 +174,12 @@ export function useEditorViewModel() {
   const needsClearConfirmation = hasFileChanges || invalidCardSnapshot.current
     || Object.keys(wordDrafts).length > 0 || hasUnpairedChanges;
 
+  // An explicit clear stays blank until the user actually introduces content.
+  useEffect(() => {
+    if (desktop && previewCleared && !emptyArticle) setPreviewCleared(false);
+  }, [desktop, previewCleared, emptyArticle]);
+
   function update(next: Project | ((current: RenderProject) => Project)) {
-    setPreviewCleared(false);
     setProject(current => {
       const result = typeof next === 'function' ? next(current) : next;
       if (result === current) return current;
@@ -364,6 +368,7 @@ export function useEditorViewModel() {
       setWordDrafts({});
       documentEpoch.current += 1;
       update(article);
+      setPreviewCleared(false);
       setLastFile(stringify(article));
       setVocabularySelection(null);
       setCardSaveStatus('clean');
