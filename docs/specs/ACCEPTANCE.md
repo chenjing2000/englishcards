@@ -23,12 +23,19 @@ Status: **Current acceptance reference.** Historical migration gates are superse
 
 ## C. Clear current article
 
-14. With no unsaved edits and no save operation in progress, Clear resets the editor and preview and clears the active file/card selection.
-15. With unsaved edits, Clear offers Save / Discard / Cancel.
+14. For a nonempty article, Clear requires Save / Discard / Cancel confirmation even when the current session has no unpaired changes; Cancel preserves the active document and preview.
+15. Discard or a successful paired Save may clear the article; an empty editor with no pending work may clear directly.
 16. Save completes the paired JSON + ZIP operation before clearing; a failed or cancelled save must not clear the article.
 17. Discard drops only the unsaved in-memory revision and does not delete committed files.
 18. Cancel preserves the current article, preview and navigation state.
 19. An in-flight save blocks Clear until it has completed; stale asynchronous work must not reactivate the previous article.
+
+## C1. Preview continuity and save indicator
+
+- Editing, JSON autosave, settings dialogs, folder selection, paired save and overwrite confirmation/cancellation must not temporarily clear a previously valid preview.
+- New pagination replaces the old preview only after completion; preserve the viewing position for the same article. Explicit clear may empty the preview; a genuinely different article resets to its first page.
+- Stale preview content is not eligible for paired ZIP export or selection-based edits.
+- Desktop Save displays a nonanimated star when the Article or output-affecting page styles differ from the current session's paired-save baseline. JSON autosave does not remove the star; successful paired save does. On opening a file, absence of a star does not claim an existing ZIP has been verified.
 
 ## D. Paired JSON + ZIP save
 
