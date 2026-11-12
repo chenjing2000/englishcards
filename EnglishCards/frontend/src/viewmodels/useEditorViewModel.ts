@@ -389,12 +389,12 @@ export function useEditorViewModel() {
     invalidCardSnapshot.current = false;
     lastPairedSnapshot.current = null;
     documentEpoch.current += 1;
-    setPreviewCleared(true);
     setActiveCardPath(null);
     setCardSaveStatus('clean');
     wordDraftsRef.current = {};
     setWordDrafts({});
     update(empty);
+    setPreviewCleared(true);
     setRendered(null);
     setLastFile(stringify(empty));
     setVocabularySelection(null);
