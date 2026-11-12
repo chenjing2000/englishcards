@@ -51,6 +51,9 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install chromium
 
+      - name: Verify browser render demo
+        run: npm run demo
+
       - name: Run Playwright end-to-end tests
         run: npm run test:e2e
 
