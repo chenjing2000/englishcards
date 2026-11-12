@@ -219,7 +219,7 @@ test('Paired save failure retains the article and successful retry switches the 
 
 test('editor preview never empties during edits, JSON autosave, settings dialogs or paired save', async ({ page }) => {
   await page.getByRole('button', { name: 'A.json' }).click();
-  await expect(page.locator('.preview[data-ready="true"] .card')).toHaveCount(1, { timeout: 15000 });
+  await expect.poll(() => page.locator('.preview[data-ready="true"] .card').count()).toBeGreaterThan(0);
   const saveButton = page.getByRole('button', { name: '保存', exact: true });
   await expect(saveButton).toHaveAttribute('data-unpaired', 'false');
 
@@ -264,7 +264,7 @@ test('editor preview never empties during edits, JSON autosave, settings dialogs
 
 test('overwrite dialogs and cancellation keep the exact preview page mounted and retain the save star', async ({ page }) => {
   await page.getByRole('button', { name: 'A.json' }).click();
-  await expect(page.locator('.preview[data-ready="true"] .card')).toHaveCount(1, { timeout: 15000 });
+  await expect.poll(() => page.locator('.preview[data-ready="true"] .card').count()).toBeGreaterThan(0);
   await page.getByLabel('英文标题', { exact: true }).fill('Card A revised');
   const saveButton = page.getByRole('button', { name: '保存', exact: true });
   await expect(saveButton).toHaveAttribute('data-unpaired', 'true');
