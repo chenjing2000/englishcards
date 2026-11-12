@@ -17,7 +17,6 @@ export {
 export type { Article, Paragraph, Sense, VocabularyItem };
 export type Project = Article;
 export type RenderProject = Article & { styles: Styles };
-export type EntryCollection = 'vocabulary';
 
 export const emptySense = createEmptySense;
 export const newId = () => crypto.randomUUID();
@@ -128,7 +127,7 @@ export function addVocabulary(article: Article, selected: string): Article {
   return addArticleVocabulary(article, selected);
 }
 
-export function commitEntryHead(article: Article, _key: EntryCollection, entryId: string, value: string): Article {
+export function commitEntryHead(article: Article, entryId: string, value: string): Article {
   const entry = article.vocabulary.find(item => item.id === entryId);
   if (!entry || entry.word === value) return article;
   const normalized = normalizeVocabulary(value);
@@ -149,7 +148,7 @@ export function commitEntryHead(article: Article, _key: EntryCollection, entryId
   return { ...article, vocabulary: renumberVocabulary(next) };
 }
 
-export function removeEntrySense(article: Article, _key: EntryCollection, id: string, index: number): Article {
+export function removeEntrySense(article: Article, id: string, index: number): Article {
   const entry = article.vocabulary.find(item => item.id === id);
   if (!entry || entry.senses.length <= 1 || index < 0 || index >= entry.senses.length) return article;
   return {

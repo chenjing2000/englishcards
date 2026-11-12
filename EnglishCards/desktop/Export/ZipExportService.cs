@@ -39,7 +39,10 @@ internal sealed class ZipExportService(Window owner, LocalWebContent content)
             !request.TryGetProperty("pages", out var pagesValue) || !pagesValue.TryGetInt32(out var pages) || pages < 1)
             throw new InvalidDataException("保存快照格式无效。");
 
+        // Validate the complete Article v6 document exactly once, at the save-service boundary.
         ArticleContractValidator.Validate(document);
+        if (string.IsNullOrWhiteSpace(document.GetProperty("title").GetString()))
+            throw new InvalidDataException("请先填写英文标题，再保存 JSON 和 ZIP。");
         if (Encoding.UTF8.GetByteCount(project.GetRawText()) > 5 * 1024 * 1024)
             throw new InvalidDataException("文章数据超过 5 MiB 的保存请求上限。");
         string signature = signatureValue.GetString()!;

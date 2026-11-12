@@ -229,11 +229,6 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
             !payload.TryGetProperty("overwriteApproved", out var approvedValue) ||
             approvedValue.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
             throw new InvalidDataException("保存请求缺少文章、目标路径或覆盖确认状态。");
-        ArticleContractValidator.Validate(document);
-        var title = document.GetProperty("title").GetString();
-        if (string.IsNullOrWhiteSpace(title))
-            throw new InvalidDataException("请先填写英文标题，再保存 JSON 和 ZIP。");
-
         var name = nameValue.GetString()!;
         ValidatePairFileName(name);
         var path = ValidateCardPath(pathValue.GetString()!);

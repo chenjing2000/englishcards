@@ -61,11 +61,11 @@ it('replaces the old head highlight on rename while preserving independent varia
     id: 'v001', word: 'only for', ipa: '', highlight: ['only for', 'solely for'],
     senses: [{ pos: '', meaning: '', example: '', exampleTranslation: '' }],
   }];
-  const renamed = commitEntryHead(input, 'vocabulary', 'v001', 'only');
+  const renamed = commitEntryHead(input, 'v001', 'only');
   expect(renamed.vocabulary[0]).toMatchObject({ word: 'only', highlight: ['solely for'] });
   expect(collectHighlights(renamed).map(mark => mark.quote)).toEqual(['only', 'solely for']);
   expect(collectHighlights(input).map(mark => mark.quote)).toEqual(['only for', 'solely for']);
-  const cleared = commitEntryHead(renamed, 'vocabulary', 'v001', '');
+  const cleared = commitEntryHead(renamed, 'v001', '');
   expect(cleared.vocabulary[0].highlight).toEqual(['solely for']);
 });
 
