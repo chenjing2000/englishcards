@@ -10,6 +10,8 @@ declare global {
       corruptNextOpen: boolean;
       failDirectoryRead: boolean;
       failNextPair: boolean;
+      existingPairFiles: string[];
+      previewAudit?: { cleared: number; replaced: number; initialCard: Element | null };
     };
   }
 }
@@ -20,7 +22,7 @@ test.beforeEach(async ({ page }) => {
     const cards: Record<string, unknown> = {
       'C:/cards/A.json': { ...initial, title: 'Card A' },
     };
-    window.phaseEIO = { requests: [], failNextSave: false, corruptNextOpen: false, failDirectoryRead: false, failNextPair: false };
+    window.phaseEIO = { requests: [], failNextSave: false, corruptNextOpen: false, failDirectoryRead: false, failNextPair: false, existingPairFiles: [] };
     const respond = (id: number, value: unknown, error?: string) =>
       events.dispatchEvent(new MessageEvent('message', {
         data: error ? { id, ok: false, error } : { id, ok: true, value },
@@ -60,7 +62,7 @@ test.beforeEach(async ({ page }) => {
           }
         }
         if (command === 'chooseArticlePairTarget') {
-          value = { path: 'D:/Saved Cards/' + String(payload), folder: 'D:/Saved Cards', existingFiles: [] };
+          value = { path: 'D:/Saved Cards/' + String(payload), folder: 'D:/Saved Cards', existingFiles: window.phaseEIO.existingPairFiles };
         }
         if (command === 'saveArticlePair') {
           if (window.phaseEIO.failNextPair) {
@@ -212,6 +214,92 @@ test('Paired save failure retains the article and successful retry switches the 
   await expect(page.getByRole('button', { name: 'Card A.json' })).toHaveAttribute('aria-current', 'page');
   const request = await page.evaluate(() => window.phaseEIO.requests.find(item => item.command === 'saveArticlePair'));
   expect((request!.payload as { fileName: string }).fileName).toBe('Card A.json');
+});
+
+
+test('editor preview never empties during edits, JSON autosave, settings dialogs or paired save', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await expect(page.locator('.preview[data-ready="true"] .card')).toHaveCount(1, { timeout: 15000 });
+  const saveButton = page.getByRole('button', { name: '保存', exact: true });
+  await expect(saveButton).toHaveAttribute('data-unpaired', 'false');
+
+  await page.evaluate(() => {
+    const container = document.querySelector('.preview')!;
+    window.phaseEIO.previewAudit = { cleared: 0, replaced: 0, initialCard: container.querySelector('.card') };
+    new MutationObserver(() => {
+      if (!container.querySelector('.card')) window.phaseEIO.previewAudit!.cleared += 1;
+      window.phaseEIO.previewAudit!.replaced += 1;
+    }).observe(container, { childList: true });
+  });
+
+  await page.getByLabel('英文标题', { exact: true }).fill('Card A revised');
+  await expect(saveButton).toHaveAttribute('data-unpaired', 'true');
+  await expect.poll(() => page.evaluate(() =>
+    window.phaseEIO.requests.some(item => item.command === 'saveCardFile'))).toBe(true);
+  // JSON autosave is not a matching ZIP export.
+  await expect(saveButton).toHaveAttribute('data-unpaired', 'true');
+  await expect(page.locator('.preview')).toHaveAttribute('data-ready', 'true');
+
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  const settings = page.getByRole('dialog', { name: '设置' });
+  await expect(settings).toBeVisible();
+  await settings.getByRole('button', { name: '关闭设置' }).click();
+  await expect(settings).toHaveCount(0);
+
+  const identityBeforeSave = await page.evaluate(() =>
+    document.querySelector('.preview .card') === window.phaseEIO.previewAudit!.initialCard);
+  // A title edit legitimately replaced the preview once, before Save was clicked.
+  expect(identityBeforeSave).toBe(false);
+  await expect(saveButton).toBeEnabled();
+  await saveButton.click();
+  await expect(saveButton).toHaveAttribute('data-unpaired', 'false');
+  await expect(page.locator('.preview')).toHaveAttribute('data-ready', 'true');
+  const audit = await page.evaluate(() => ({
+    cleared: window.phaseEIO.previewAudit!.cleared,
+    cardStillRendered: !!document.querySelector('.preview .card'),
+  }));
+  expect(audit.cleared).toBe(0);
+  expect(audit.cardStillRendered).toBe(true);
+});
+
+test('overwrite dialogs and cancellation keep the exact preview page mounted and retain the save star', async ({ page }) => {
+  await page.getByRole('button', { name: 'A.json' }).click();
+  await expect(page.locator('.preview[data-ready="true"] .card')).toHaveCount(1, { timeout: 15000 });
+  await page.getByLabel('英文标题', { exact: true }).fill('Card A revised');
+  const saveButton = page.getByRole('button', { name: '保存', exact: true });
+  await expect(saveButton).toHaveAttribute('data-unpaired', 'true');
+  await expect(page.locator('.preview')).toHaveAttribute('data-ready', 'true');
+  await page.evaluate(() => {
+    window.phaseEIO.existingPairFiles = ['Card A revised.json', 'Card A revised.zip'];
+    const container = document.querySelector('.preview')!;
+    window.phaseEIO.previewAudit = { cleared: 0, replaced: 0, initialCard: container.querySelector('.card') };
+    new MutationObserver(() => {
+      if (!container.querySelector('.card')) window.phaseEIO.previewAudit!.cleared += 1;
+      window.phaseEIO.previewAudit!.replaced += 1;
+    }).observe(container, { childList: true });
+  });
+
+  await saveButton.click();
+  const dialog = page.getByRole('dialog', { name: '确认覆盖' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: '取消' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(saveButton).toHaveAttribute('data-unpaired', 'true');
+  expect(await page.evaluate(() => ({
+    cleared: window.phaseEIO.previewAudit!.cleared,
+    replaced: window.phaseEIO.previewAudit!.replaced,
+    sameCard: document.querySelector('.preview .card') === window.phaseEIO.previewAudit!.initialCard,
+  }))).toEqual({ cleared: 0, replaced: 0, sameCard: true });
+
+  await saveButton.click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: '覆盖' }).click();
+  await expect(saveButton).toHaveAttribute('data-unpaired', 'false');
+  expect(await page.evaluate(() => ({
+    cleared: window.phaseEIO.previewAudit!.cleared,
+    replaced: window.phaseEIO.previewAudit!.replaced,
+    sameCard: document.querySelector('.preview .card') === window.phaseEIO.previewAudit!.initialCard,
+  }))).toEqual({ cleared: 0, replaced: 0, sameCard: true });
 });
 
 test('settings modal has 560 DIP two-column layout without a divider', async ({ page }) => {
