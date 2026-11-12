@@ -10,7 +10,7 @@ import { paginate, type Layout } from '../services/pagination';
 import {
   cacheDraft, download, loadDesktopData, loadSettings, saveSettings,
   openProject, saveProject, restoreDraft,
-  type DesktopPersistence, type DesktopSaveResult,
+  type DesktopPersistence,
 } from '../services/projectIO';
 import { desktopRequest, isDesktop } from '../services/desktopBridge';
 import { CardSaveCoordinator, type CardSaveStatus } from '../services/cardSaveCoordinator';
@@ -262,16 +262,14 @@ export function useEditorViewModel() {
     }
   }, [desktop, project]);
 
-  function reportDesktopSave(result: DesktopSaveResult) {
-    reportError('settings-save', result.settingsError);
-
-  }
   useEffect(() => {
     const store = desktopStore.current;
     if (!settingsReady || !store || preparingClose.current) return;
     let current = true;
     desktopTimer.current = setTimeout(() => {
-      void store.save(project).then(result => { if (current) reportDesktopSave(result); });
+      void store.save(project).then(result => {
+        if (current) reportError('settings-save', result.settingsError);
+      });
     }, 300);
     return () => { current = false; clearTimeout(desktopTimer.current); };
   }, [project, settingsReady]);
@@ -297,7 +295,7 @@ export function useEditorViewModel() {
           return { pending: true, errors: ['当前卡片仍有未提交的输入或未能成功保存。'] };
         const result = await desktopStore.current?.save(latest.current.project);
         if (!result) return { pending: false, errors: [] };
-        reportDesktopSave(result);
+        reportError('settings-save', result.settingsError);
         return { pending: result.pending, errors: [result.settingsError].filter(Boolean) };
       } finally {
         preparingClose.current = false;
@@ -716,12 +714,12 @@ export function useEditorViewModel() {
     return entry.id;
   }
   function setStyle<K extends keyof Styles>(key: K, value: Styles[K]) {
-    update(current => ({ ...current, styles: { ...current.styles, [key]: value } } as Project));
+    update(current => ({ ...current, styles: { ...current.styles, [key]: value } }));
   }
   function replaceStyles(styles: Styles) {
     desktopStore.current?.replaceSettings();
     savedSettings.current = '';
-    update(current => ({ ...current, styles: { ...styles } } as Project));
+    update(current => ({ ...current, styles: { ...styles } }));
   }
   function resetStyles() { replaceStyles(defaults); }
   function clearError(source?: string) {
