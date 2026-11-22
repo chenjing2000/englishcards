@@ -10,13 +10,13 @@ Before changing this repository:
 
 ## Current product contract
 
-- This branch implements **A1 only** of the approved read-only Script reader. The complete design is at PR #11, branch `docs/readonly-reader-design-handoff-20261122`, commit `58f309e` (`docs/handoff.md` and `docs/Implementation Plan.md`). A2, A3, B, C1 and C2 are not authorized by approval of A1.
+- A1 has been merged and owner-accepted. This branch implements **A2 only** on top of the approved read-only Script reader. The complete design is at PR #11, branch `docs/readonly-reader-design-handoff-20261122`, commit `58f309e` (`docs/handoff.md` and `docs/Implementation Plan.md`). Only A1/A2 are authorized; A3, B, C1 and C2 remain out of scope.
 - Keep Windows x64 WPF + .NET 10 + WebView2 + React/TypeScript, Framework-dependent single-file publish, and EXE-sibling `userdata/`. Do not read, migrate or delete legacy LocalAppData.
 - Production opens native `filetype: "script"` JSON, with optional native Vocabulary and Translation. Reject Article v6; do not convert Script into Article or add compatibility writes.
 - Script uses nested paragraph/sentence arrays. Display sentence `text`, never reconstructed timed-unit text. Empty title stays empty; missing/invalid/null timings must not block reading.
 - A1 uses one displayed reading page and previous/next controls. Old editing, clear, Article autosave and paired JSON + ZIP commands are removed from production.
 - PNG, MP4 and playback are unavailable in A1. Vocabulary insertion and per-Script settings persistence belong to A3, not A1.
-- Keep existing lazy directory browsing in A1. Script filtering, single-Script auto-open and expanded refresh/session semantics belong to A2.
+- A2 keeps root-hidden lazy browsing, filters exact top-level filetype=script, and auto-opens a sole directly listed Script only without an active Script. Tree refresh and same-root selection must preserve the active document, page and messages; successful different-root selection invalidates the previous session. No recursive indexing, book.json requirement or media scans.
 - Reuse the existing pagination measurement engine; future reading/PNG and Script-only MP4 receive separate content/layout inputs rather than duplicated algorithms.
 - User changes, especially `EnglishCards/desktop/Assets/clover_icon.ico`, must never be overwritten. Develop through a separate branch and PR; never merge without explicit approval.
 

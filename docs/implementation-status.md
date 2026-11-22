@@ -1,3 +1,14 @@
+# A2 开发分支实施状态（2026-11-23）
+
+A1 已由所有者验收，Windows CI [Run 45031632098](https://github.com/chenjing2000/englishcards/actions/runs/45031632098) 成功后，通过 PR #12 合并为 `ba3b5f2`。本分支只继续获批 A2，不包含 A3、生词保存、媒体播放或导出。
+
+A2 复用原有逐层目录树：仅列出本层顶层 `filetype: "script"` 的 JSON（支持大写扩展名），稳定排序，隐藏产物目录及实际内部数据目录；折叠释放子级，重新展开重新读取。没有当前或待打开 Script 时，本层唯一 Script 自动打开。已有阅读不受目录操作、同路径根刷新影响；取消或读取失败保留旧会话，不同根成功切换会使旧扫描、打开及通知失效。
+
+定向验证：原生阅读模型 **5/5**，浏览器交互 **18/18**（A1 7 项、A2 11 项，无跳过、失败或重试），宿主原生只读/目录检查 **12/12**，React/TypeScript 构建和依赖系统运行库的单文件发布通过。原始日志位于 `.build/cards-a2/`。真实发布版 WPF/WebView2 验证通过 13 项检查、4 页阅读：144 DPI（150%）、.NET 10.0.14、WebView2 157.0.4341.60；覆盖自动打开、目录筛选、翻到第 2 页后折叠/重开目录仍保留同一文档与页码，以及正文、译文和源文件不变。全部使用隔离验收数据，证据为 `.build/cards-a2/smoke-7f3fb8c6179a4b91a675d5a0c865060e/verification.json` 与 `reader.png`。独立只读代理完成代码、测试、文档和 CI 复核，无确认必修问题。A2 所有者验收及新 PR 的 Windows CI 尚待完成；其他 DPI、干净机器、媒体和导出不在本次通过范围。不以历史 Article 测试数量作为新版验收证据；误运行一次通用 Vitest 时有 4 项旧 export.test.ts 的 Article 输入失败（65 项通过），该历史输入与 A1 起使用的 ReaderDocument 测试渲染入口不匹配，本次未修改旧导出测试，也不声称全库测试通过。
+
+复跑：`npm.cmd test -- reader.test.ts`、`npm.cmd run build`、独立端口 `npm.cmd run test:e2e`、`dotnet run --project EnglishCards.Tests/dotnet/EnglishCards.Tests.csproj -c Release -- --a2`；发布后 `./tools/test-desktop.ps1 -ExpectedDpi 144`。A2 仅提交开发 PR 等待验收，不合并、不启动 A3。
+
+---
 # A1 开发分支实施状态（2026-11-22）
 
 本分支仅落实获批 A1：Script 原生数据入口、可选 Vocabulary/Translation、单页只读阅读；保留现有懒加载目录树，PNG/MP4/播放操作不可用。生词写入与每 Script 设置、A2 目录语义、B 媒体及 C 导出均未完成。

@@ -1,14 +1,14 @@
 # EnglishCards
 
-本开发分支为 Windows x64 **只读 Script 阅读器 A1**：WPF + .NET 10 + WebView2 + React/TypeScript。设计依据是 [PR #11](https://github.com/chenjing2000/englishcards/pull/11) 的最新实施文档；本 PR 不合并设计 PR，也不代表 A2 及后续功能已实施。
+本开发分支为 Windows x64 **只读 Script 阅读器 A1 + A2**：WPF + .NET 10 + WebView2 + React/TypeScript。设计依据是 [PR #11](https://github.com/chenjing2000/englishcards/pull/11) 的最新实施文档；A1 已合并并通过所有者验收；本 PR 只落实 A2，不合并设计 PR，也不代表 A3/B/C 已实施。
 
 ## 当前范围
 
 - 从现有目录树明确选择 Script JSON，显示其句子 text；可选显示同目录的原生 Vocabulary 与 Translation。
 - 单页阅读，上一页/下一页与页码；标题可为空，时间戳不影响正文完整性。
 - 不再编辑、清空、自动保存原文或执行 JSON + ZIP 联合保存，不接受 Article v6 作为生产输入。
-- PNG、MP4、播放与停止在 A1 不可用；新增生词、每 Script 设置属于 A3，不能用 A1 验收其写入功能。
-- 目录筛选、0/1/多个 Script 自动打开及完整刷新语义留到 A2。媒体与导出分别留到 B/C。
+- PNG、MP4、播放与停止在 A1/A2 不可用；新增生词、每 Script 设置属于 A3，不能用 A1 验收其写入功能。
+- 目录按层加载，仅显示 Script JSON；无当前 Script 时，本层只有一个便自动打开，多个等待选择。折叠重开和同路径根刷新保持当前阅读；取消/失败保留旧会话，不同根成功选择才切换。媒体与导出分别留到 B/C。
 - [项目契约](docs/project-contract.md) 记录当前范围；[实施状态](docs/implementation-status.md) 分开记录自动化和实机证据。
 
 ## 运行要求
@@ -33,7 +33,7 @@ npm.cmd ci
 npm.cmd test -- reader.test.ts
 npm.cmd run build
 npm.cmd run test:e2e
-dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Release -- --a1
+dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Release -- --a2
 ```
 
 发布：
