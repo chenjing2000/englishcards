@@ -16,6 +16,9 @@ internal static class ReaderVerification
     internal static async Task PrepareAsync(string root, CancellationToken ct)
     {
         Directory.CreateDirectory(root);
+        Directory.CreateDirectory(Path.Combine(root, "refresh"));
+        Directory.CreateDirectory(Path.Combine(root, "export"));
+        await File.WriteAllTextAsync(Path.Combine(root, "refresh", "before.json"), """{"filetype":"script"}""", ct);
         await File.WriteAllTextAsync(Path.Combine(root, FileName), JsonSerializer.Serialize(new
         {
             filetype = "script", title = "",
@@ -45,8 +48,21 @@ internal static class ReaderVerification
         var sourcePath = Path.Combine(data.LibraryRootPath, FileName);
         var sourceBefore = await File.ReadAllBytesAsync(sourcePath, ct);
         await WaitAsync($"Array.from(document.querySelectorAll('.library-file')).some(b => b.textContent === '{FileName}')");
-        await web.ExecuteScriptAsync($"Array.from(document.querySelectorAll('.library-file')).find(b => b.textContent === '{FileName}').click()");
         await WaitAsync("document.querySelectorAll('.preview .card').length === 1 && !document.querySelector('button[aria-label=\"下一页\"]').disabled");
+        Check(await web.ExecuteScriptAsync("Array.from(document.querySelectorAll('.library-file')).map(b => b.textContent).join(',') === 'a1-script.json' && !Array.from(document.querySelectorAll('.library-folder')).some(b => ['export','logs','settings','cache','temp','exports'].includes(b.textContent.trim()))") == "true", "A2 filtered root and single Script automatic open");
+        await web.ExecuteScriptAsync("document.querySelector('button[aria-label=\"下一页\"]').click()");
+        await WaitAsync("document.querySelector('output[aria-label=\"页码\"]').textContent.startsWith('2 / ')");
+        await web.ExecuteScriptAsync("window.verifiedDocument = window.reader; document.querySelector('.library-folder[aria-label=\"目录 refresh\"]').click()");
+        await WaitAsync("Array.from(document.querySelectorAll('.library-file')).some(b => b.textContent === 'before.json')");
+        await File.WriteAllTextAsync(Path.Combine(data.LibraryRootPath, "refresh", "after.json"), """{"filetype":"script"}""", ct);
+        File.Delete(Path.Combine(data.LibraryRootPath, "refresh", "before.json"));
+        await web.ExecuteScriptAsync("document.querySelector('.library-folder[aria-label=\"目录 refresh\"]').click()");
+        await WaitAsync("!Array.from(document.querySelectorAll('.library-file')).some(b => b.textContent === 'before.json')");
+        await web.ExecuteScriptAsync("document.querySelector('.library-folder[aria-label=\"目录 refresh\"]').click()");
+        await WaitAsync("Array.from(document.querySelectorAll('.library-file')).some(b => b.textContent === 'after.json')");
+        Check(await web.ExecuteScriptAsync("window.reader === window.verifiedDocument && document.querySelector('output[aria-label=\"页码\"]').textContent.startsWith('2 / ')") == "true", "A2 lazy collapse/reopen refresh preserves document and page");
+        await web.ExecuteScriptAsync("document.querySelector('button[aria-label=\"上一页\"]').click()");
+        await WaitAsync("document.querySelector('output[aria-label=\"页码\"]').textContent.startsWith('1 / ')");
         Check(await web.ExecuteScriptAsync("document.querySelector('button[aria-label=\"上一页\"]').disabled && !document.querySelector('.text-line[data-kind=\"title\"]')") == "true", "empty title and first-page boundary");
         Check(await web.ExecuteScriptAsync("!document.querySelector('input,textarea,[contenteditable=\"true\"]') && ['PNG','MP4','播放','停止'].every(name => Array.from(document.querySelectorAll('button')).some(b => b.textContent === name && b.disabled))") == "true", "read-only controls and unavailable future actions");
         // Test evidence only; production PNG export remains unavailable in A1.
@@ -76,7 +92,7 @@ internal static class ReaderVerification
         Check(expectedDpi == 0 || Math.Abs(dpi - expectedDpi) < 1, "requested display DPI");
         await File.WriteAllTextAsync(Path.Combine(output, "verification.json"), JsonSerializer.Serialize(new
         {
-            scope = "A1 real WPF/WebView2 reader; no PNG or media export", passed = true, checks, pages, dpi,
+            scope = "A1/A2 real WPF/WebView2 reader and lazy tree; no PNG or media export", passed = true, checks, pages, dpi,
             webView2Runtime = web.Environment.BrowserVersionString, dotnet = Environment.Version.ToString(),
             isolatedDataRoot = data.LibraryRootPath
         }, App.ReportFormat), ct);

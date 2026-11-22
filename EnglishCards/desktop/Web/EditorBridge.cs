@@ -71,7 +71,7 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
             object? value = command.GetString() switch
             {
                 "openScriptFile" when payload.ValueKind == JsonValueKind.String => await ScriptFileReader.OpenAsync(payload.GetString()!),
-                "listCardDirectory" when payload.ValueKind == JsonValueKind.String => ListCardDirectory(payload.GetString()!),
+                "listCardDirectory" when payload.ValueKind == JsonValueKind.String => await Task.Run(() => ListCardDirectory(payload.GetString()!, data.LibraryRootPath)),
                 "chooseCardLibrary" when payload.ValueKind == JsonValueKind.Null => await ChooseCardLibraryAsync(),
                 "defaultCardLibrary" when payload.ValueKind == JsonValueKind.Null => data.LibraryRootPath,
                 "lastCardLibrary" when payload.ValueKind == JsonValueKind.Null => await data.LoadLastLibraryFolderAsync(),
@@ -123,19 +123,39 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
         return true;
     }
 
-    private static object ListCardDirectory(string directory)
+    private static object ListCardDirectory(string directory, string userDataRoot)
     {
         if (string.IsNullOrWhiteSpace(directory) || !Path.IsPathFullyQualified(directory))
             throw new InvalidDataException("无效的卡片目录。");
         var path = Path.GetFullPath(directory);
+        bool internalRoot = string.Equals(Path.TrimEndingDirectorySeparator(path),
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(userDataRoot)), StringComparison.OrdinalIgnoreCase);
         var folders = Directory.EnumerateDirectories(path)
+            .Where(folder => !IsHiddenDirectory(Path.GetFileName(folder), internalRoot))
             .Select(folder => new { path = folder, name = Path.GetFileName(folder) })
-            .OrderBy(item => item.name, StringComparer.OrdinalIgnoreCase).ToArray();
-        var files = Directory.EnumerateFiles(path, "*.json")
-            .Where(file => string.Equals(Path.GetExtension(file), ".json", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(item => item.name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.name, StringComparer.Ordinal).ToArray();
+        var files = Directory.EnumerateFiles(path)
+            .Where(file => string.Equals(Path.GetExtension(file), ".json", StringComparison.OrdinalIgnoreCase) && IsScript(file))
             .Select(file => new { path = file, name = Path.GetFileName(file) })
-            .OrderBy(item => item.name, StringComparer.OrdinalIgnoreCase).ToArray();
+            .OrderBy(item => item.name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.name, StringComparer.Ordinal).ToArray();
         return new { path, folders, files };
     }
 
+    private static bool IsHiddenDirectory(string name, bool internalRoot) =>
+        name.Equals("cache", StringComparison.OrdinalIgnoreCase) || name.Equals("export", StringComparison.OrdinalIgnoreCase) ||
+        (internalRoot && new[] { "settings", "logs", "exports", "temp", "drafts" }.Contains(name, StringComparer.OrdinalIgnoreCase));
+
+    private static bool IsScript(string file)
+    {
+        try
+        {
+            using var stream = File.OpenRead(file);
+            using var json = JsonDocument.Parse(stream);
+            return json.RootElement.ValueKind == JsonValueKind.Object &&
+                json.RootElement.TryGetProperty("filetype", out var type) && type.ValueKind == JsonValueKind.String && type.GetString() == "script";
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException) { return false; }
+    }
 }
