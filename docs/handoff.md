@@ -47,10 +47,10 @@ PR #3（旧 UI/New Card/ZIP 方案）**已关闭且未合并**，不要从该 PR
 
 ## 4. Git 与分支状态
 
-- 2026-11-22 在 GitHub 核对：远程**仅剩 `main`**；无开放 PR；历史 PR 的记录仍可在 GitHub 查看。
+- 2026-11-22 旧版收尾时曾核对远程仅剩 `main`、无开放 PR；**此后已创建 [Draft PR #11](https://github.com/chenjing2000/englishcards/pull/11)**，位于 `docs/readonly-reader-design-handoff-20261122`，只承载下一版只读阅读器设计文档，尚未合并。
 - 用户本机路径：`C:\Projects\EnglishCards`。远程分支清理已核对；**本机分支、工作区是否干净及是否已同步最新提交，需在新会话中用 Git 命令重新确认，不能凭远程状态推断。**
 - 此前历史分支使用过 Squash Merge，若本机尚残留历史分支，需先检查未推送提交／未提交修改，再决定删除；**勿对 main 强制重置**。
-- 本交接文件本身将产生新文档提交，故下次新会话读到的 `main` 提交号应比上方“已验收代码提交”更新；不要把文档提交当作未经验证的程序改造。
+- PR #11 的设计文档提交不代表 `main` 已改变，更不代表新版功能已经实现；下次会话以最新 GitHub 分支／PR 状态为准。
 
 ## 5. 下一会话建议流程
 
@@ -71,7 +71,7 @@ PR #3（旧 UI/New Card/ZIP 方案）**已关闭且未合并**，不要从该 PR
 
 ## 6. 重要入口
 
-- [README](../README.md)；[实施状态](implementation-status.md)；[Windows 验收](RELEASE_ACCEPTANCE.md)
+- [README](../README.md)；[只读 Script 阅读器实施方案](Implementation%20Plan.md)；[实施状态](implementation-status.md)；[Windows 验收](RELEASE_ACCEPTANCE.md)
 - [联合保存流程](specs/COMBINED_ARTICLE_SAVE.md)；[卡片馆规格](specs/PHASE_E_CARD_LIBRARY.md)；[Bridge 接口](specs/EDITOR_BRIDGE_CONTRACT.md)
 - 主要前端状态：`EnglishCards/frontend/src/viewmodels/useEditorViewModel.ts`；
   浏览器／桌面设置服务：`EnglishCards/frontend/src/services/projectIO.ts`；
@@ -81,43 +81,42 @@ PR #3（旧 UI/New Card/ZIP 方案）**已关闭且未合并**，不要从该 PR
 
 ---
 
-## 7. 待实施：只读 Script 阅读器改造方案（2026-11-22 讨论基线）
+## 7. 待实施：只读 Script 阅读器改造（2026-11-22 最新讨论基线）
 
-> **状态：仅方案讨论，尚未修改生产代码或现行正式契约，未执行新功能测试。** 上述 Article v6、编辑器、JSON + ZIP 联合保存和验收记录仍描述当前 main 的实际行为。本节记录用户对下一版的决定，不可宣称已实现；实施前需对照 ReadArticles、ScriptToVideo 的最新代码与现有 EnglishCards 源码再次核对。保持第一性原理与最小改动，能删除旧编辑链路就不要新增兼容层；独立分支/PR，未经用户验收不合并。性能与无关测试仍暂停。
+> **状态：设计已记录，尚未修改生产代码或正式契约，未执行新版功能测试。** 上文第 1～6 节记录当前 Article v6 的实际行为；本节仅概述未来版本，具体工作分解、依赖、验收与待论证问题以 [Implementation Plan.md](Implementation%20Plan.md) 为准。坚持最小修改，删除废弃编辑链路，不设旧 Article v6 兼容层。未经明确批准不创建实施 PR、不合并代码，性能与无关测试仍暂停。
 
-### 7.1 数据与目录加载
+### 7.1 数据、目录树及打开行为
 
-- **只有**顶层 \`filetype: "script"\` 的 JSON 必需；Script 数据直接采用 \`script-timestamp-aligner\` Skill 的 Script JSON 结构：\`title\` 字段必需、允许空字符串（为空时不显示标题，不用文件名补标题）；\`paragraphs\` 为段落 → 句子，每句含 \`text\` / \`timed_units\`。正文永远由 \`text\` 显示，不反向拼接 \`timed_units\`；时间戳 \`null\` 的单元正常显示但不随播放进度高亮。
-- \`filetype: "vocabulary"\` 与 \`filetype: "translation"\` 均可选；Vocabulary 直接采用 ReadArticles 的 Vocabulary Enrichment Skill 格式（\`words\`、\`word\`、\`family\`、英美音标、\`meanings\`），不转换或写回旧 Article v6；Translation JSON 固定两个字段：\`{"filetype":"translation","text":"..."}\`，\`text\` 为保留换行的纯文本。
-- 同一目录允许同一 \`filetype\` 的多个 JSON。目录树**只显示 Script JSON**；参照 ReadArticles 的逐层 Lazy Tree：展开目录时仅枚举该目录直接包含的子目录和 JSON、仅检查 JSON 顶层 \`filetype\`，不递归扫描下级目录，不提前加载音视频。隐藏 \`cache/\`、\`export/\` 等程序产物目录。目录树不得依赖 JSON 文件名后缀判断是否 Script。
-- 当前展开/选定目录有 **1 个 Script** 时自动加载；有 **2 个及以上 Script** 时预览为空，等待用户明确点击，**点击哪个就打开哪个**，废除 Script 按文件名排序取第一个的规则。对已选定的同一 Script，普通目录刷新不应随意清空预览。
-- 可选 Vocabulary / Translation 若存在多个，按确定性的文件名顺序默认打开第一个，并以 ReadArticles 风格的**普通浮窗**提示选用了哪个；其余文件不删除。选词加号始终写入**当前实际打开的 Vocabulary 文件**，而非固定名 \`vocabulary.json\`。若当前目录一个 \`filetype: "vocabulary"\` 文件都没有，则首次添加生词时创建 \`<script>.vocabulary.json\`（\`<script>\` 为当前 Script 文件名去掉最后的 \`.json\`，如 \`lesson.script.json\` → \`lesson.script.vocabulary.json\`），随后作为当前生词本。原文与 Translation 始终只读。
-- 预览中的蓝色圆形加号及选区行为参考 ReadArticles 的 \`web/icons/selection-add.svg\`、\`reader.js\`：仅允许有效 Script 句内选词/短语，验证原文位置、规范化与重复词；新增立即对活动 Vocabulary 执行受控原子持久化（外部修改冲突保护），磁盘保存成功才确认 UI 成功，导出阶段不再额外生成或保存 Vocabulary。
+- 唯一必需文件是顶层 `filetype: "script"` 的 JSON：沿用 ScriptTimestamp／`script-timestamp-aligner` Skill 的 `title`、`paragraphs`（段落 → 句子 → `text` / `timed_units`）结构；`title` 必需但允许空字符串；正文总是由 `text` 显示，时间戳 `null` 的文字不参与播放高亮。可选 Vocabulary 使用 ReadArticles Vocabulary Enrichment Skill 的 `words/word/family/音标/meanings` 格式；可选 Translation 固定为 `{"filetype":"translation","text":"..."}`，其纯文本保留换行。
+- 卡片馆根目录**不是树节点**，选择后只显示根目录内部的直属子目录与 Script 文件；逐层 Lazy Loading，展开时仅检查该层直属 JSON 的顶层 `filetype`，不依据文件名后缀猜测类型，不递归扫描；隐藏 `cache/`、`export/` 等程序产物目录。借鉴 ReadArticles 的展开、折叠、请求失效与重试行为，尽量复用 EnglishCards 已有目录树。
+- 目录折叠后重新展开可重新枚举该层；同路径再次选择卡片馆可刷新根目录。**只要已有 Script 打开，目录折叠／展开／刷新不得主动重新加载、切换、清空或重新分页该 Script，也不得重新加载／停止其媒体。** 无 Script 打开时，当前目录只有一个 Script 则自动打开；有多个时等待用户点选，不能默认取第一个。明确点击某个不同 Script 才切换阅读对象。
+- 同目录可有多个 Vocabulary／Translation：按确定性文件名顺序打开第一个，以 ReadArticles 风格普通浮窗提示，不删除其他文件。选词加号只能在 Script 有效句内出现，校验原文位置、规范化与重复词；新增立即原子持久化到**当前打开的 Vocabulary** 并保护外部修改冲突，保存成功才提示成功。目录完全没有 Vocabulary 时首次加词才创建 `<script>.vocabulary.json`（`<script>` 为去掉最后 `.json` 的 Script 文件名）。Script、Translation 只读，导出时不额外保存 Vocabulary。
 
-### 7.2 页面、媒体、通知与操作界面
+### 7.2 主界面、媒体与通知生命周期
 
-- 删除右侧中英文及词汇编辑栏和编辑用分割条，只保留左侧卡片馆与右侧只读阅读区。卡片馆底部左对齐固定按钮：**设置、清空、导出 PNG、导出 MP4**。设置窗口按 ReadArticles 的分组样式排列，保留底部保存/取消/恢复默认按钮；Script/Translation 禁止在程序内编辑，选词新增 Vocabulary 是唯一受控内容写入入口。
-- 预览区一次只显示 **1 张卡片**，提供前/后翻页及页码；正文分页仍按 Script → 可选 Vocabulary → 可选 Translation 排列。底部播放器进度条、播放/暂停、停止、定位、快捷键与普通/警告/错误浮窗参照 ReadArticles，尽量复用现有 EnglishCards 分页和通知实现。
-- 只有**点击播放**时才从选中 Script 所在目录的直接文件中按后缀优先级 **.mp4 → .mkv → .m4a → .mp3 → .wav** 查找候选；同后缀按文件名排序尝试，失败继续下一个，首个成功打开并解码的文件成为唯一媒体源；不按 Script 文件名同 stem 限制媒体、无自动拼接或递归查找。媒体播放中途失败不自动切源，文章切换/清空时取消旧加载与播放。借鉴 ScriptToVideo 的媒体探测、带 Range 的本地媒体访问及生命周期保护。
-- 若选中**视频**：同一播放器固定在每张阅读卡片顶部，翻页只变更正文、不得重建或重载视频；页面高度为卡片高度减视频区域，保持合适宽高比与正文可用空间。若选中**音频**：再从同目录按 **.png → .jpg → .jpeg** 顺序、同扩展名文件名升序选第一张有效图片，仅在第一页显示；无图片则不显示图片区。没有媒体不妨碍文字阅读与 PNG 导出。静态 Vocabulary 高亮与 Script 有效时间戳的播放进度高亮分开处理。
+- 删除右侧编辑栏和编辑分割条。左侧**顶部**为「选择卡片馆」文字按钮，右侧紧邻 ReadArticles `ui/icons/setting.svg` 同款图标设置按钮（Tooltip「设置」）；左侧**目录树底部仅保留 PNG 和 MP4**，PNG Tooltip **「保存」**，MP4 Tooltip「导出 MP4」。**删除「清空」按钮，不新增刷新按钮。** 设置窗口参考 ReadArticles 分组布局，保留恢复默认／取消／保存。
+- 右侧只显示一张阅读卡片，含上一页、下一页、页码、播放／暂停切换、停止、可拖动进度条及选词时的蓝色圆形加号；共 9 个主界面功能按钮（左侧 4、阅读区 5，加号按需出现），进度条不另算按钮。分页顺序 Script → 可选 Vocabulary → 可选 Translation；借鉴 ReadArticles 的播放快捷键、普通／警告／错误浮窗。
+- **每次真正加载／切换 Script 时即开始检索媒体并逐个尝试打开、解码，不等待用户点击播放。** 仅在该 Script 所在目录的直属文件中按 **.mp4 → .mkv → .m4a → .mp3 → .wav**、同后缀文件名升序依次尝试；首个成功解码者成为当前会话唯一媒体，立即停止后续尝试，加载就绪但**不自动播放**；全部失败或无候选则无媒体。不能只以文件存在／可读取元数据视为解码成功；不按 Script 同名 stem 限制，不递归、不拼接。为避免阻塞文字预览，媒体尝试可异步执行，但必须绑定 Script 会话；媒体确定后按实际视频／音频布局完成或更新分页，导出也使用已选定的媒体文件，不另选其他候选。
+- **切换到不同 Script**：结束旧会话，停止并释放旧媒体、取消失效异步请求，**关闭／清除所有旧的普通、警告、错误消息浮窗**，然后加载新 Script／设置／Vocabulary／Translation／媒体。旧会话迟到的通知和媒体回调不得污染新会话。重复点击当前同一 Script 或普通目录刷新不主动重载媒体。切换到不同卡片馆时结束旧 Script；选择同一路径仅刷新树且保留已有 Script／媒体。进行中的文件持久化和导出任务须按其安全关闭／取消规则处理，不能把关闭浮窗误当成任务已取消。
+- 视频播放器固定在每张卡片的顶部位置，翻页只更新正文，**不得重建或重新加载播放器**；正文使用减去视频区域后的可用高度。只选中音频时按 **.png → .jpg → .jpeg** 及同后缀名称顺序选择有效图片，仅第一页显示；无媒体仍可读文及导出 PNG。静态 Vocabulary 高亮和有效时间戳驱动的动态高亮独立。
 
-### 7.3 每 Script 配置与视频逐页时长
+### 7.3 设置与逐页默认时长
 
-- 每篇 Script 的文章级样式、播放与视频导出设置分别保存于 **\`<Script所在目录>/export/<Script文件名去掉最后.json>/settings.json\`**，如 \`lesson.script.json\` 对应 \`export/lesson.script/settings.json\`。Script 重命名即新配置身份，不自动迁移旧配置；相同文件名在相同目录下读取旧配置，所在目录不同则独立。加载 Script 时同时读取配置，先应用页面样式再计算分页；配置不存在则采用/建立默认配置，目录不可写不应阻止只读阅读。全局卡片馆路径等与文章无关的信息仍由程序级设置管理；用户持久配置不放在可清理的 \`cache/\`。
-- 视频导出设置下方提供**有表头的四列表格**：\`页码 | 停留时间 (s) | 页码 | 停留时间 (s)\`。总页数为 N，左组依页码升序展示 \`1…ceil(N/2)\`，右组依页码升序展示其余页；奇数页时左组多一页，右组末行留空。页码不可编辑，时长是文本输入框，仅接受 ASCII \`0–9\` 和至多一个小数点，最多 **3 位小数**；界面单位 s，内部单位 ms。
-- 每页数据字段严格命名 **\`DefaultDurationMs\`**（程序建议）和 **\`ModifiedDurationMs\`**（用户修改）；首次创建时二者相等。含有效时间戳的页面按实际媒体/Script 时间区间计算建议值，**没有有效时间戳的页面默认 \`DefaultDurationMs = 0\`**（废除此前 3 秒统一停留值）。同页含 Vocabulary 不另加时间。配置恢复/分页或媒体信息变化时应重新校验默认值、避免把旧页码设置错误复用到新页面。
-- **只在用户按 Enter 或输入框失去焦点时提交并校正编辑**：若输入已清空或解析值小于同页 \`DefaultDurationMs\`，则把 \`ModifiedDurationMs\` 设为该 \`DefaultDurationMs\`，立即更新表格并显示 ReadArticles 风格的**普通消息**；例如默认 3132 ms 显示 \`3.132\`，默认 0 ms 显示 \`0.0\`。输入未提交时允许临时空值或末尾小数点；保存/导出必须为有效非负整数毫秒。已保存值因最新默认值变大而不合法，也须钳位且提示。用户可将某页设为 0，只要该页默认也是 0。
-- **\`ModifiedDurationMs = 0\` 的页面跳过 MP4 渲染，但仍保留在单页阅读和 PNG 导出；其他正时长页不受影响，MP4 正常导出**。若所有页面均为 0，则需提示无可渲染画面，不生成无效 MP4。MP4 的页码/时间表**以视频版分页为准**，不与重新分页后的 PNG 页码混用。需要用冻结帧/静音和明确的源时间轴到导出时间轴映射保护音画同步，不能直接改 Script 原时间戳、裁掉朗读或擅自改变语速；具体跨页时间锚点和插入停留的算法仍需专项实现与实机验证。
+- 每个 Script 的持久设置存储在 `<Script所在目录>/export/<script>/settings.json`；Script 更名即视为新配置身份，不迁移旧配置；不同目录独立。加载时先读取设置、应用文章样式再分页；没有文件时使用默认设置，不因只读打开就必须写盘；目录不可写不阻碍阅读。
+- 视频导出设置下方为有表头的四列表格：**页码 | 停留时间 (s) | 页码 | 停留时间 (s)**；按页码依次分入两组，左侧 `1…ceil(N/2)`、右侧其余，奇数页右下留空。页码不能编辑，界面秒最多 3 位小数，内部整数毫秒；N 为视频布局页数，与 PNG 重新分页不同。
+- 字段严格命名 **`DefaultDurationMs`** 和 **`ModifiedDurationMs`**，首次后者等于前者。**默认时长不是各单词朗读长度之和**：每页的结束锚点取该页**最后一个具有有效时间戳的单词的结束时间** `T_i`；若末尾单词为 `null`，向本页前面寻找最后一个有效结束时间。前置锚点 `T_prev` 是此前最近一个有有效时间戳页面的结束锚点，初始为 `0 ms`；则 `DefaultDurationMs_i = T_i - T_prev`。**整页无有效时间戳时默认 0 ms，且不更新前置锚点**，供下一个有锚点的页面使用。时间差自然包含单词间的停顿；Vocabulary／Translation 独立页面不增加时长。统一以整数毫秒计算，非递增／异常时间戳须校验提示，不得产生负默认时长。
+- 仅在输入框 **Enter 或失焦**时提交与校正：只接受 ASCII 数字、至多一个小数点、最多 3 位小数；编辑中可暂时清空或以小数点结尾。空值或小于同页 `DefaultDurationMs` 的输入恢复为默认值并显示 ReadArticles 普通浮窗，3132 ms 显示 `3.132`、0 ms 显示 `0.0`；保存及导出必须满足 **`ModifiedDurationMs ≥ DefaultDurationMs`** 且为非负整数毫秒。分页／媒体／设置变化后重新核对默认值与用户值，不能盲目复用旧页号。
+- **任何 `ModifiedDurationMs = 0` 的页面均不出现在 MP4 中**，无论其内容、`null` 时间戳或原始媒体是否含该段朗读；仍保留于阅读和 PNG。没有其他跳过条件，也不因音频情况自动为零时长页增时长。全部为 0 时提示并不生成无效 MP4；正时长页继续导出。原始媒体与导出媒体的跨页时间轴映射、延长与尾段处理仍需 C2 专项论证，不能把单一时长下限误当作已经证明全音频可无损容纳。
 
-### 7.4 缓存及两类导出
+### 7.4 导出路径与边界
 
-- 同目录为每个 Script 隔离 \`cache/<script>/\` 与 \`export/<script>/\`（\`<script>\` 同上，指文件名去掉最后 \`.json\`）；缓存按实际需求分 \`render/\`、\`media/\`、\`temp/\` 等任务目录，按需创建，不创建无用空目录；原 Script、音视频和 Translation 不得修改。导出 MP4 不放回源目录根部，以免被下一次媒体优先级搜索选中。
-- **不再导出 ZIP，也不联合保存 JSON + ZIP。** PNG 直接导出到 \`export/<script>/images/page-001.png\` 等，生成全部静态分页图片（不是只生成当前预览页），保留现有 EnglishCards 的独立 WebView2 页面捕获、尺寸与 PNG 格式验证；临时批次先完整生成再安全替换正式 \`images/\`，避免多页/少页两次导出混杂。
-- PNG 遇到**视频**时，提取视频**第 1 帧**只放在**第一页顶部**，随后以无视频占位的静态布局**重新分页**，后续 PNG 不再重复视频首帧；遇音频加图片也只在第一页显示图片。首帧提取不得重置正在播放的视频。PNG 页数与 MP4 页数因此可以不同。
-- MP4 复用 ScriptToVideo 的 Remotion 编码、媒体探测、进度/取消、子进程生命周期、临时输出验证及不覆盖既有文件的安全提交思路，但不照搬其不同的 ScriptToVideo v3 数据格式、同名媒体限制、revised/TXT/project 三文件编辑保存链。MP4 最终输出放在 \`export/<script>/\`，按逐页 \`ModifiedDurationMs\` 时序生成；导出依赖检测仅在使用 MP4 功能时进行，不应阻断普通阅读/PNG 导出。
+- 每个 Script 使用隔离的 `cache/<script>/`（按需创建任务子目录）和 `export/<script>/`，持久设置不放缓存。原 Script、Translation、音视频不修改；Vocabulary 仅由明确加词入口修改。MP4 不写回 Script 根目录，以免误入媒体候选。
+- **PNG 不打包 ZIP，也不再保存 Article v6 JSON＋ZIP 组合**：全部页面直接存入 `export/<script>/images/page-001.png` 等，复用现有独立 WebView2 捕获、图片尺寸及格式验证；先完整生成临时批次再安全替换正式图片目录，旧文件不得残留。视频只提取**第 1 帧**放在 PNG 第一页，后续无视频占位且重新静态分页；音频配图也仅第一页显示；提帧不能影响正在播放的视频。PNG 与视频版页数可不同。
+- MP4 使用本 Script 会话已确定的媒体，借鉴 ScriptToVideo 的 Remotion、进度／取消、输出验证与安全提交，不照搬其 v3 数据模型、同名媒体约束或编辑保存链。导出依赖检测只在 MP4 功能调用时进行；无相关依赖不得阻断文字阅读、Vocabulary 或 PNG。
+- **待专项论证而非已定规则**：当零时长页、缺失时间戳或媒体尾部使最终画面总时长与原媒体不一致时，如何保留原朗读并确定音画映射；此处不擅自增加禁止导出、自动补时、改变零时长跳页等新业务限制。
 
-### 7.5 开发和验收边界
+### 7.5 分阶段实施与验收
 
-- 目标阶段：A 数据格式、目录懒加载、单页只读预览及当前生词本写入；B 媒体播放、浮窗、顶部视频/图片与时间戳高亮；C PNG 目录导出、MP4 逐页时间轴和安全提交。每阶段先检查对应源码及约束，再在独立分支/PR 实现；未经明确批准不合并。
-- 验收至少覆盖：多/单 Script 自动/手动选择、无 Vocabulary/Translation、重复 Vocabulary 选择、加号持久化/冲突保护、标题空字符串、\`null\` 时间戳、目录非递归扫描、媒体查找优先级及解码回退、视频翻页不断流、设置随 Script 文件名变化、四列表格数字约束/回车失焦钳位及浮窗、0 ms 页面跳过 MP4、PNG 首帧及重新分页、图片批次原子性、MP4 音画同步/取消与原文件不变。
-- 当前 main 的 \`AGENTS.md\`、\`docs/project-contract.md\`、\`docs/specs/\` 尚描述 Article v6；这是**待实施版本差异**，不是文档冲突已经解决。实施时按批准阶段同步更新正式契约，并且不将此前的自动化测试通过误报为新方案验收。
+- **A**：只读 Script／可选文件、既有 Lazy Tree 最小修改、单页预览、最新按钮、Vocabulary 即时持久化及基础独立设置；**B**：Script 打开时即选择并加载媒体、播放／浮窗生命周期、顶部视频／首图及有效时间戳高亮；**C1**：PNG 目录导出与静态重分页；**C2**：明确页间锚点及完整导出时间轴后实现四列表格、零时长跳过及 MP4 安全提交。阶段实施须另获授权，暂停无关及性能测试。
+- 验收包括：根不显示为节点、单／多 Script 选择、目录刷新不干扰当前文章或播放、自动按格式解码回退、媒体随 Script 切换重选且不自动播放、切换时清掉全部旧浮窗且无迟到通知、空标题／`null` 文字、活动 Vocabulary 写入及冲突保护、页间结束锚点差与中间无时间戳页、时长输入钳位／消息、零时长页**无条件**跳过、视频翻页不断流、PNG 首帧及重分页、安全提交和 MP4 音画同步专项验收。
+- 现行 `main` 的 `AGENTS.md`、`docs/project-contract.md` 与 `docs/specs/` 仍描述 Article v6；只有未来得到代码实施批准后才按阶段更新正式契约。旧 CI 结果不代表新方案已通过验收。
