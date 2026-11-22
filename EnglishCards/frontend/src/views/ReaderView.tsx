@@ -31,7 +31,7 @@ export default function ReaderView() {
   const styles = document?.styles ?? defaults;
   const settingsButton = <button className="reader-settings-button" type="button" title="设置" aria-label="设置" onClick={() => setSettings(true)}><img src={settingIcon} alt="" /></button>;
   return <div className="reader-shell">
-    <CardLibrary root={root} activePath={activePath} revision={revision} onRootChange={vm.changeLibraryRoot}
+    <CardLibrary root={root} rootContents={vm.rootContents} onLoaded={vm.directoryLoaded} activePath={activePath} revision={revision} onRootChange={vm.changeLibraryRoot}
       onOpen={path => { void vm.open(path); }} onError={reportError} settings={settingsButton}
       actions={<><button type="button" title="保存" disabled>PNG</button><button type="button" title="导出 MP4" disabled>MP4</button></>} />
     <main className="reader-main" aria-label="Script 阅读区">

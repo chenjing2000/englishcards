@@ -46,7 +46,25 @@ internal static class ReaderChecks
             try { await Open(article); } catch (InvalidDataException) { rejected = true; }
             Check(rejected, "Article v6 rejected without migration");
             Check(Directory.GetFiles(directory, "*.zip").Length == 0 && Directory.GetFiles(directory, "*.tmp").Length == 0, "Reader creates no ZIP or staged source writes");
-            Console.WriteLine($"A1 checks passed: {checks}");
+            var bridge = typeof(EnglishCards.MainWindow).Assembly.GetType("EnglishCards.EditorBridge", true)!;
+            var list = bridge.GetMethod("ListCardDirectory", BindingFlags.NonPublic | BindingFlags.Static)!;
+            JsonElement List(string path) => JsonSerializer.SerializeToElement(list.Invoke(null, [path, Path.Combine(directory, "internal")])!);
+            await File.WriteAllTextAsync(Path.Combine(directory, "zz-script.JSON"), """{"filetype":"script"}""");
+            await File.WriteAllTextAsync(Path.Combine(directory, "nested-only.json"), """{"nested":{"filetype":"script"}}""");
+            await File.WriteAllTextAsync(Path.Combine(directory, "wrong-case.json"), """{"filetype":"Script"}""");
+            await File.WriteAllTextAsync(Path.Combine(directory, "not-json.txt"), """{"filetype":"script"}""");
+            foreach (var name in new[] { "cache", "export", "logs", "settings", "external-userdata", "internal" }) Directory.CreateDirectory(Path.Combine(directory, name));
+            Directory.CreateDirectory(Path.Combine(directory, "external-userdata", "logs"));
+            foreach (var name in new[] { "logs", "settings", "exports", "temp", "cache", "lessons" }) Directory.CreateDirectory(Path.Combine(directory, "internal", name));
+            await File.WriteAllTextAsync(Path.Combine(directory, "nested", "not-recursed.json"), """{"filetype":"script"}""");
+            await File.WriteAllTextAsync(Path.Combine(directory, "array.json"), """[{"filetype":"script"}]""");
+            await File.WriteAllTextAsync(Path.Combine(directory, "numeric-type.json"), """{"filetype":1}""");
+            var listing = List(directory);
+            Check(listing.GetProperty("files").EnumerateArray().Select(item => item.GetProperty("name").GetString()).SequenceEqual(new[] { "lesson.json", "zz-script.JSON" }), "A2 only immediate JSON with exact top-level Script type, sorted");
+            Check(listing.GetProperty("folders").EnumerateArray().Select(item => item.GetProperty("name").GetString()).SequenceEqual(new[] { "external-userdata", "internal", "logs", "nested", "settings" }), "A2 generated directories hidden, legitimate logs and settings retained");
+            Check(List(Path.Combine(directory, "internal")).GetProperty("folders").EnumerateArray().Select(item => item.GetProperty("name").GetString()).SequenceEqual(new[] { "lessons" }), "A2 actual internal userdata directories hidden by identity");
+            Check(List(Path.Combine(directory, "external-userdata")).GetProperty("folders").GetArrayLength() == 1, "A2 external userdata name does not hide legitimate logs");
+            Console.WriteLine($"Reader checks passed: {checks}");
         }
         finally { Directory.Delete(directory, recursive: true); }
     }
