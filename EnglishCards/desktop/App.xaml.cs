@@ -28,6 +28,7 @@ public partial class App : Application
             string dataRoot = output is null
                 ? Path.Combine(AppContext.BaseDirectory, "userdata")
                 : Path.Combine(output, $"user-data-{Guid.NewGuid():N}");
+            if (output is not null) await ReaderVerification.PrepareAsync(dataRoot, timeout.Token);
             await window.InitializeAsync(dataRoot, saveOnClose: output is null, timeout.Token);
             if (output is null)
                 return;

@@ -1,3 +1,11 @@
+# A1 只读阅读器 Bridge 边界
+
+A1 生产宿主只接收 `openScriptFile`、目录读取/选择、卡片馆位置读取/保存及程序设置读取命令。Script 与可选配套文件只读，不再注册 Article 编辑、激活/自动保存、联合保存和 ZIP 命令。消息来源、导航限制与排队回复保护继续有效。A3 Vocabulary 写入与每 Script 设置命令尚未实现。
+
+下文保留的是 Article v6 历史接口说明，用于追溯旧测试与保护机制，**不是 A1 可调用命令表**。
+
+---
+
 # Editor Bridge Contract
 
 ## Authority and scope

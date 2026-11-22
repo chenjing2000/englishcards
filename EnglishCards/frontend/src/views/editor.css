@@ -209,3 +209,17 @@
 .phase-e-overwrite-content ul{margin:8px 0;padding:10px 12px 10px 30px;border-radius:8px;background:#f1f4f5;max-height:180px;overflow:auto}
 .phase-e-overwrite-content li{margin:3px 0}
 .phase-e-overwrite-actions button:last-child{background:#d3e5eb;border-color:#b9d4de;color:#27495b}
+.reader-shell{display:flex;height:100vh;overflow:hidden;background:#edf0f3;color:#233044}
+.reader-shell .card-library{display:flex;flex-direction:column;width:260px;flex:0 0 260px;min-width:0;padding:14px 10px;border-right:1px solid #d8dde5;background:#fff}
+.reader-library-heading{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.reader-library-heading .choose-library-button{flex:1;margin:0}
+.reader-settings-button{width:32px;height:32px;padding:4px;border:0;border-radius:50%;background:transparent;flex:none}
+.reader-settings-button img{width:24px;height:24px;display:block}
+.reader-settings-button:hover{background:#e8f3fb}.reader-settings-button:active{background:#d2e9f8}
+.reader-shell .library-tree{flex:1;overflow:auto}.reader-library-actions{display:flex;gap:8px;padding-top:12px;margin-top:auto}
+.reader-main{display:flex;flex:1;min-width:0;flex-direction:column;overflow:hidden}
+.reader-navigation{display:flex;align-items:center;justify-content:center;gap:12px;padding:10px;background:#fff;border-bottom:1px solid #d8dde5}
+.reader-navigation output{min-width:65px;text-align:center}.reader-stage{display:flex;flex:1;min-height:0;overflow:auto;justify-content:center;align-items:center;padding:20px}
+.reader-page-frame{position:relative;flex-shrink:0}.reader-shell .preview{position:absolute;inset:0;padding:0;margin:0;display:block;gap:0}.reader-shell .card{margin:0}
+.reader-message{display:flex;gap:12px;justify-content:space-between;padding:8px 14px;background:#fff3cd;white-space:pre-wrap}
+.reader-shell button:disabled{opacity:.45;cursor:default}

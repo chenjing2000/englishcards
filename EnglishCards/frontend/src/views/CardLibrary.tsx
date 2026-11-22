@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
-import { chooseCardLibrary, listCardDirectory, saveLastCardLibrary, type LibraryDirectory } from '../services/cardFileIO';
+import { useEffect, useState, type ReactNode } from 'react';
+import { chooseCardLibrary, listCardDirectory, saveLastCardLibrary, type LibraryDirectory } from '../services/cardLibraryIO';
 import plusIcon from '../assets/icons/tree/plus.svg';
 import minusIcon from '../assets/icons/tree/minus.svg';
 
 type LibraryProps = {
+  settings: ReactNode;
+  actions: ReactNode;
   root: string;
   activePath: string | null;
   revision: number;
@@ -76,7 +78,7 @@ function DirectoryNode({
   </div>;
 }
 
-export default function CardLibrary({ root, activePath, revision, onRootChange, onOpen, onError }: LibraryProps) {
+export default function CardLibrary({ root, activePath, revision, onRootChange, onOpen, onError, settings, actions }: LibraryProps) {
   async function pick() {
     try {
       const selected = await chooseCardLibrary();
@@ -91,8 +93,8 @@ export default function CardLibrary({ root, activePath, revision, onRootChange, 
   }
 
   return <aside className="card-library" aria-label="卡片馆">
-    <button type="button" className="choose-library-button"
-      onClick={() => void pick()} title={root || '选择卡片馆目录'}>选择卡片馆</button>
+    <div className="reader-library-heading"><button type="button" className="choose-library-button"
+      onClick={() => void pick()} title={root || '选择卡片馆目录'}>选择卡片馆</button>{settings}</div>
     {root
       ? <div className="library-tree" role="tree" aria-label="JSON 卡片目录树">
           <DirectoryNode key={root} path={root}
@@ -100,5 +102,6 @@ export default function CardLibrary({ root, activePath, revision, onRootChange, 
             root revision={revision} activePath={activePath} onOpen={onOpen} onError={onError} />
         </div>
       : <p className="library-empty">选择卡片馆后，在目录树中打开 JSON 卡片。</p>}
+    <div className="reader-library-actions">{actions}</div>
   </aside>;
 }

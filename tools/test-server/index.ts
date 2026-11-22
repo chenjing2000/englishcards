@@ -2,7 +2,7 @@ import express from 'express';
 import { chromium } from '@playwright/test';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseRenderProject } from '../../EnglishCards/frontend/src/models/project';
+import { parseReaderDocument } from '../../EnglishCards/frontend/src/models/reader';
 import { SettingsStore } from './settingsStore';
 import { describeLayoutMismatch, type LayoutDiagnostics } from '../../EnglishCards/frontend/src/services/layoutVerification';
 
@@ -30,7 +30,7 @@ app.post('/api/render-page', async (request, response) => {
   let result: Buffer | undefined;
   let failure = '';
   try {
-    const project = parseRenderProject(request.body.project);
+    const project = parseReaderDocument(request.body.project);
     const requested = request.body.page as number | undefined;
     if (!Number.isInteger(requested) || requested! < 1) throw new Error('页码无效。');
     try { browser = await chromium.launch(); }
@@ -71,7 +71,7 @@ app.post('/api/render-page', async (request, response) => {
 });
 if (process.argv.includes('--production')) {
   app.use(express.static(frontendDist));
-  app.get('/render', (_request, response) => response.sendFile(resolve(frontendDist, 'render.html')));
+  app.get('/render', (_request, response) => response.sendFile(resolve(frontendDist, 'render.html'), { dotfiles: 'allow' }));
 } else {
   const { createServer } = await import('vite');
   const vite = await createServer({ root: frontendRoot, configFile: resolve(root, 'tools/vite.config.ts'), server: { middlewareMode: true, host: '127.0.0.1', hmr: false } });
