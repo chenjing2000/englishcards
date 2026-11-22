@@ -10,14 +10,15 @@ Before changing this repository:
 
 ## Current product contract
 
-- Product: Windows x64 desktop application using WPF + .NET 10 + WebView2 + React/TypeScript. Do not migrate to Tauri, Electron, or pure WPF.
-- The only supported Article format is strict Article `schemaVersion: 6`. Reject v5 and earlier; do not silently migrate, dual-write, or retain a production v5 path.
-- Article fields are `schemaVersion`, `id`, `title`, `identityTag`, `content.paragraphs`, `vocabulary`, and `translation.paragraphs`. Paragraph groups each allow at most 999 entries; Vocabulary allows at most 999 entries. Vocabulary uses `word` for words, phrases, and idioms.
-- Card Library opens independent JSON files from a lazily browsed directory tree. There is no legacy global-draft auto-recovery and no desktop JSON/TXT import UI.
-- The toolbar offers Clear current article and Save JSON + ZIP (alongside Settings). Save produces same-basename JSON and ZIP from one validated Article v6 snapshot. Nonempty articles require clear confirmation; preview remains displayed during normal edits, JSON autosave and paired-save dialogs. The Save-button star reflects changes not yet committed to a paired JSON + ZIP save in the current session. See [combined save](docs/specs/COMBINED_ARTICLE_SAVE.md) and [Phase E](docs/specs/PHASE_E_CARD_LIBRARY.md).
-- Saving blocks card switching; blocked clicks are discarded, not queued.
-- User data lives in EXE-sibling `userdata/`. Do not migrate, read, or delete legacy `%LOCALAPPDATA%\\EnglishCards` data. Keep the Framework-dependent single-file publish model.
-- .NET 10 Desktop Runtime x64 and WebView2 Evergreen are end-user prerequisites. Node/npm, Vite, Playwright and Chromium are development tools only.
+- This branch implements **A1 only** of the approved read-only Script reader. The complete design is at PR #11, branch `docs/readonly-reader-design-handoff-20261122`, commit `58f309e` (`docs/handoff.md` and `docs/Implementation Plan.md`). A2, A3, B, C1 and C2 are not authorized by approval of A1.
+- Keep Windows x64 WPF + .NET 10 + WebView2 + React/TypeScript, Framework-dependent single-file publish, and EXE-sibling `userdata/`. Do not read, migrate or delete legacy LocalAppData.
+- Production opens native `filetype: "script"` JSON, with optional native Vocabulary and Translation. Reject Article v6; do not convert Script into Article or add compatibility writes.
+- Script uses nested paragraph/sentence arrays. Display sentence `text`, never reconstructed timed-unit text. Empty title stays empty; missing/invalid/null timings must not block reading.
+- A1 uses one displayed reading page and previous/next controls. Old editing, clear, Article autosave and paired JSON + ZIP commands are removed from production.
+- PNG, MP4 and playback are unavailable in A1. Vocabulary insertion and per-Script settings persistence belong to A3, not A1.
+- Keep existing lazy directory browsing in A1. Script filtering, single-Script auto-open and expanded refresh/session semantics belong to A2.
+- Reuse the existing pagination measurement engine; future reading/PNG and Script-only MP4 receive separate content/layout inputs rather than duplicated algorithms.
+- User changes, especially `EnglishCards/desktop/Assets/clover_icon.ico`, must never be overwritten. Develop through a separate branch and PR; never merge without explicit approval.
 
 ## Documentation authority and reading order
 

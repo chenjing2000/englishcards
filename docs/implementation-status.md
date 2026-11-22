@@ -1,3 +1,15 @@
+# A1 开发分支实施状态（2026-11-22）
+
+本分支仅落实获批 A1：Script 原生数据入口、可选 Vocabulary/Translation、单页只读阅读；保留现有懒加载目录树，PNG/MP4/播放操作不可用。生词写入与每 Script 设置、A2 目录语义、B 媒体及 C 导出均未完成。
+
+旧编辑、清空、Article 自动保存和 JSON+ZIP 主路径从生产入口撤去；历史测试与专属导出实现移入 `EnglishCards.Tests/legacy-article/`、`EnglishCards.Tests/frontend/legacy-e2e/` 保留，不作为新入口兼容层。A1 定向验证：原生模型 5/5、浏览器交互 7/7、宿主只读文件检查 8/8，前端构建及依赖系统运行库的单文件发布通过。实际发布版 WPF/WebView2 在 144 DPI（150%）完成目录点击、四页翻页、完整正文还原、译文换行、边界按钮和源文件未修改检查。实际 WebView2 157.0.4341.60、.NET 10.0.14；验收数据全部隔离。该测试实际发现并修复宿主快照 PascalCase/camelCase 不一致。开发用生产渲染诊断 `npm.cmd run demo` 也已通过：原生 Script 输入、1200×1600、重复字节一致、无外部网络请求。该入口起初因 `.build` 固定页面被 Express 的 dotfile 默认规则拦截，已只对固定 render.html 放行；它是测试诊断，不表示 A1 的 PNG 导出按钮可用。旧 CI 数量不作为 A1 验收证据。仅创建开发 PR，不自动合并。
+
+复跑命令：`npm.cmd test -- reader.test.ts`、`npm.cmd run build`、独立端口的 `npm.cmd run test:e2e -- readonly-reader.spec.ts`、`dotnet run --project EnglishCards.Tests/dotnet/EnglishCards.Tests.csproj -c Release -- --a1`；构建发布后 `./tools/test-desktop.ps1 -ExpectedDpi 144`。本地证据与截图位于 `.build/desktop/verification/bfb06408ab8846a0a61f57d7504b60e6/`。GitHub 新 PR CI 以实际运行结果为准，本记录不宣称其他 DPI、干净机器、媒体/导出或所有者验收已通过。
+
+---
+
+以下为 Article v6 历史实施与验收记录，不代表只读阅读器已经验证：
+
 # EnglishCards 当前实施状态
 
 **状态基准：** 2026-11-12

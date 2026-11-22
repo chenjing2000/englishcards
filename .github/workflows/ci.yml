@@ -42,8 +42,8 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci
 
-      - name: Run frontend unit tests
-        run: npm test
+      - name: Run A1 reader model tests
+        run: npm test -- reader.test.ts
 
       - name: Build React frontend
         run: npm run build
@@ -51,14 +51,14 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install chromium
 
-      - name: Verify browser render demo
+      - name: Verify shared reader render diagnostics (development only)
         run: npm run demo
 
-      - name: Run Playwright end-to-end tests
+      - name: Run A1 reader end-to-end tests
         run: npm run test:e2e
 
-      - name: Run Windows .NET tests
-        run: dotnet run --project EnglishCards.Tests/dotnet/EnglishCards.Tests.csproj -c Release
+      - name: Run A1 Windows readonly file checks
+        run: dotnet run --project EnglishCards.Tests/dotnet/EnglishCards.Tests.csproj -c Release -- --a1
 
       - name: Upload Playwright diagnostics
         if: always()

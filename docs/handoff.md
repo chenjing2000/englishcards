@@ -1,3 +1,9 @@
+# A1 开发分支交接补充（2026-11-22）
+
+本分支已实施 A1 只读 Script 入口，详见当前 [项目契约](project-contract.md) 和 [实施状态](implementation-status.md)。A2/A3/B/C 尚未实施。完整未来设计仍引用 PR #11 的最新实施方案；未经用户批准不合并 PR。下文为 main 在只读改造前的 Article v6 交接记录，仅用于历史追溯，不覆盖本分支当前契约，也不能作为新版测试证据。
+
+---
+
 # EnglishCards 开发交接（HANDOFF）
 
 **交接日期：** 2026-11-22  
