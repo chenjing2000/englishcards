@@ -55,12 +55,11 @@ try {
     externalRequests.push(route.request().url());
     return route.abort();
   });
-  await page.goto(baseURL);
-  await page.waitForSelector('.preview[data-ready="true"]');
-  await page.waitForFunction(() => window.editor?.diagnostics?.pages > 0);
-  await page.screenshot({ path: resolve(output, 'editor.png') });
-
-  const { project, signature, diagnostics } = await page.evaluate(() => window.editor);
+  await page.goto(baseURL + '/render');
+  await page.waitForFunction(() => typeof window.renderProject === 'function');
+  const project = { script: { filetype: 'script' as const, title: 'Readonly reader', paragraphs: [[{ text: 'A native Script sentence.', timed_units: [] }]] }, styles: defaults };
+  const { signature, diagnostics } = await page.evaluate(async project => ({ signature: await window.renderProject(project), diagnostics: window.renderDiagnostics! }), project);
+  await page.screenshot({ path: resolve(output, 'reader.png') });
   const pageCount = diagnostics.pages;
   const { pageWidth, pageHeight } = project.styles;
   const hashes: Record<string, string> = {};

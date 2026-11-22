@@ -1,13 +1,15 @@
-import { collectHighlights, layoutKey, senseSourceId, type HighlightRange, type RenderProject as Project, type Styles, styleSchema } from '../models/project';
+import { type Styles, settingsSchema as styleSchema } from '../models/settings';
+import { readerBlocks, type ReaderDocument as Project, type Block } from '../models/reader';
+const layoutKey = (kind: string, id: string) => JSON.stringify([kind, id]);
+type HighlightRange = { paragraphId: string; start: number; end: number };
 import type { LayoutDiagnostics, LayoutRecord } from './layoutVerification';
 
-export type Block = { id: string; text: string; kind: string; indent?: boolean; gap?: number; runs?: { start: number; end: number; kind: string; edit?: string }[] };
+export type { Block } from '../models/reader';
 export type Line = { block: Block; start: number; end: number; indent: boolean; height: number };
 export type Layout = { pages: HTMLElement[]; signature: string; warnings: string[]; diagnostics: LayoutDiagnostics };
 const FONT = '"Nunito Sans", "Microsoft YaHei UI", "Microsoft YaHei", "DengXian", sans-serif';
-const VOCABULARY_LABELS = { example: '例句：', exampleTranslation: '翻译：' } as const;
 const LABELS = {
-  header: 'ENGLISH READING', footer: 'ARTICLE · VOCABULARY · TRANSLATION',
+  header: 'ENGLISH READING', footer: 'SCRIPT · VOCABULARY · TRANSLATION',
   vocabulary: 'VOCABULARY', translation: 'CHINESE TRANSLATION · 中文译文',
 };
 
@@ -48,13 +50,13 @@ function appendText(element: HTMLElement, project: Project, block: Block, start:
       if (run) {
         const span = document.createElement('span');
         Object.assign(span.style, typography({ ...block, kind: run.kind === 'meaning' ? 'vocab-meaning' : run.kind }, project.styles), { lineHeight: 'inherit' });
-        span.dataset.edit = run.edit ?? `${block.id}:${run.kind}`; span.textContent = value; content.append(span);
+        span.textContent = value; content.append(span);
       } else content.append(document.createTextNode(value));
     }
   }
 }
 
-export function measureLines(project: Project, block: Block, width: number, host: HTMLElement, fitWidth = width, highlights = collectHighlights(project)): Line[] {
+export function measureLines(project: Project, block: Block, width: number, host: HTMLElement, fitWidth = width, highlights: HighlightRange[] = []): Line[] {
   const measure = document.createElement('div');
   Object.assign(measure.style, typography(block, project.styles), { width: `${width}px`, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', textIndent: block.indent ? '2em' : '0' });
   appendText(measure, project, block, 0, block.text.length, highlights);
@@ -144,22 +146,19 @@ function renderLine(project: Project, line: Line, width: number, highlights: Hig
 
 export async function paginate(project: Project): Promise<Layout> {
   styleSchema.parse(project.styles);
-  const highlights = collectHighlights(project);
+  const highlights: HighlightRange[] = [];
+  const blocks = readerBlocks(project);
   const host = document.createElement('div'); host.className = 'measurement';
   Object.assign(host.style, { position: 'absolute', left: '-20000px', top: '0', visibility: 'hidden' });
   document.body.append(host);
   try {
-    const fontText = [
-      ...Object.values(LABELS), ...Object.values(VOCABULARY_LABELS), '0123456789/', project.identityTag, project.title,
-      ...project.content.paragraphs.map(item => item.text), ...project.translation.paragraphs.map(item => item.text),
-      ...project.vocabulary.map(item => item.word + (item.ipa ?? '') + item.senses.flatMap(sense => Object.values(sense)).join('')),
-    ].join('');
+    const fontText = [...Object.values(LABELS), '0123456789/', ...blocks.map(block => block.text)].join('');
     try {
       await Promise.all([
         document.fonts.load('400 36px "Nunito Sans"', fontText),
         document.fonts.load('800 36px "Nunito Sans"', fontText),
       ]);
-    } catch { throw new Error('本地字体加载失败。请按 README 重新安装依赖并构建，再刷新页面；项目仍可保存 JSON。'); }
+    } catch { throw new Error('本地字体加载失败。请按 README 重新安装依赖并构建，再刷新页面；请重新打开程序后重试。'); }
     await document.fonts.ready;
     // CJK glyphs intentionally use the target Windows system font fallback.
     // Only the bundled Nunito Sans web fonts are part of the app's font readiness gate.
@@ -185,7 +184,7 @@ export async function paginate(project: Project): Promise<Layout> {
       const eyebrow = document.createElement('div'); eyebrow.className = 'eyebrow'; eyebrow.textContent = LABELS.header;
       const header = document.createElement('header'); header.className = 'page-header';
       Object.assign(header.style, { top: `${styles.marginTop}px`, left: `${styles.marginX}px`, right: `${styles.marginX}px` });
-      const identity = document.createElement('span'); identity.className = 'eyebrow identity-tag'; identity.textContent = project.identityTag;
+      const identity = document.createElement('span'); identity.className = 'eyebrow identity-tag'; identity.textContent = '';
       eyebrow.style.fontSize = identity.style.fontSize = `${styles.headerSize}px`;
       header.append(eyebrow, identity);
       pageBody = document.createElement('main'); pageBody.className = 'page-body';
@@ -220,38 +219,7 @@ export async function paginate(project: Project): Promise<Layout> {
       const lines = measureLines(project, value, width, host, width, highlights);
       lines.forEach((line, index) => addRow([line], width, index === 0 ? (value.gap ?? 0) : 0));
     }
-    block({ id: 'title', text: project.title, kind: 'title', gap: 0 });
-    project.content.paragraphs.forEach(item => block({ ...item, kind: 'article', indent: true, gap: styles.paragraphGap }));
-    if (project.vocabulary.length) {
-      block({ id: 'vocab-heading', text: LABELS.vocabulary, kind: 'vocab-heading', gap: 25 });
-      for (const entry of project.vocabulary) {
-        let text = '';
-        const runs: NonNullable<Block['runs']> = [];
-        function append(value: string, kind: string, edit?: string, separator = ' ') {
-          if (!value) return;
-          if (text && !text.endsWith('\n')) text += separator;
-          const start = text.length;
-          text += value;
-          runs.push({ start, end: text.length, kind, edit });
-        }
-        append(entry.word, 'word', `${entry.id}:word`);
-        append(entry.ipa ?? '', 'ipa', `${entry.id}:ipa`);
-        entry.senses.forEach((sense, senseIndex) => {
-          if (text) text += '\n';
-          if (sense.pos) append(sense.pos, 'pos', senseSourceId(entry.id, senseIndex, 'pos'));
-          append(sense.meaning, 'vocab-meaning', senseSourceId(entry.id, senseIndex, 'meaning'));
-          for (const field of ['example', 'exampleTranslation'] as const) {
-            if (!sense[field]) continue;
-            if (text) text += '\n';
-            append(VOCABULARY_LABELS[field], 'vocab-label', senseSourceId(entry.id, senseIndex, field));
-            append(sense[field], 'vocab-example', senseSourceId(entry.id, senseIndex, field), '');
-          }
-        });
-        block({ id: entry.id, text, kind: 'vocab', runs, gap: 15 });
-      }
-    }
-    block({ id: 'translation-heading', text: LABELS.translation, kind: 'section-heading', gap: 25 });
-    project.translation.paragraphs.forEach(item => block({ ...item, kind: 'translation', indent: true, gap: styles.paragraphGap }));
+    blocks.forEach(block);
     for (const [id, source] of coverage) {
       let cursor = 0;
       for (const piece of source.pieces) { if (piece.start !== cursor) throw new Error(`分页连续性错误：${id}`); cursor = piece.end; }

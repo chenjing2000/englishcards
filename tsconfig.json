@@ -12,5 +12,5 @@
       "@test-server/*": ["tools/test-server/*"]
     }
   },
-  "include": ["EnglishCards/frontend/src", "EnglishCards.Tests/frontend", "tools", "skills"]
+  "include": ["EnglishCards/frontend/src", "EnglishCards.Tests/frontend/unit", "EnglishCards.Tests/frontend/e2e", "tools", "skills"]
 }

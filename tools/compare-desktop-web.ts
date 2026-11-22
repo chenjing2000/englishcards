@@ -25,7 +25,7 @@ try {
     const directory = resolve(runDirectory, name);
     const webOutput = resolve(directory, 'web');
     await mkdir(webOutput, { recursive: true });
-    const { project, signature, diagnostics } = JSON.parse(await readFile(resolve(directory, 'preview.json'), 'utf8')) as Window['editor'];
+    const { project, signature, diagnostics } = JSON.parse(await readFile(resolve(directory, 'preview.json'), 'utf8')) as { project: Window['reader']['document']; signature: string; diagnostics: import('../EnglishCards/frontend/src/services/layoutVerification').LayoutDiagnostics };
     const { pageWidth, pageHeight } = project.styles;
     await page.setViewportSize({ width: Math.max(1440, pageWidth), height: Math.max(1800, pageHeight) });
     await page.goto(origin + '/render');
