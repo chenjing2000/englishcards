@@ -46,8 +46,9 @@ test('A1 reads exact native sentence text with one visible page and no editing o
   await expect(page.getByRole('button', { name: '清空', exact: true })).toHaveCount(0);
   await expect(page.locator('.reader-library-heading').getByRole('button', { name: '设置', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await expect(page.getByRole('dialog')).toContainText('A3');
-  await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('正文字号');
+  await expect(page.getByLabel('正文字号')).toHaveValue(String(defaults.bodySize));
+  await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
   const calls = await page.evaluate(() => (window as unknown as { calls: string[] }).calls);
   expect(calls.filter(command => command === 'openScriptFile')).toHaveLength(1);
   expect(calls.every(command => ['lastCardLibrary', 'listCardDirectory', 'openScriptFile'].includes(command))).toBe(true);
