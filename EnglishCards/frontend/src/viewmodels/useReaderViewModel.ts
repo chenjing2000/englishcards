@@ -56,6 +56,14 @@ export function useReaderViewModel() {
     const source = currentFiles.current, generation = opening.current;
     savingRef.current = true; setSaving(true);
     try {
+      // Validate the new layout before writing, so a render failure never masquerades as a failed save.
+      const candidate = { word: word.trim(), family: [], phonetic_uk: '', phonetic_us: '',
+        meanings: [{ pos: partOfSpeech.trim(), meaning: meaning.trim() }] };
+      const proposed = { ...source.document, vocabulary: parseVocabulary({
+        filetype: 'vocabulary', words: [...(source.document.vocabulary?.words ?? []), candidate],
+      }) };
+      const nextLayout = await paginate(proposed);
+      if (generation !== opening.current || currentFiles.current !== source) return false;
       const saved = await addVocabularyWord({
         scriptPath: source.path, vocabularyPath: source.vocabularyPath, expectedText: source.vocabularyText,
         word, meaning, partOfSpeech,
@@ -63,8 +71,6 @@ export function useReaderViewModel() {
       if (generation !== opening.current || currentFiles.current !== source) return false;
       const vocabulary = parseVocabulary(JSON.parse(saved.text));
       const nextDocument = { ...source.document, vocabulary };
-      const nextLayout = await paginate(nextDocument);
-      if (generation !== opening.current || currentFiles.current !== source) return false;
       const nextFiles = { ...source, document: nextDocument, vocabularyPath: saved.path, vocabularyText: saved.text };
       currentFiles.current = nextFiles;
       setDocument(nextDocument); setLayout(nextLayout);
