@@ -54,11 +54,11 @@ jobs:
       - name: Verify shared reader render diagnostics (development only)
         run: npm run demo
 
-      - name: Run A1 and A2 reader end-to-end tests
+      - name: Run reader end-to-end tests
         run: npm run test:e2e
 
-      - name: Run A1 and A2 Windows readonly file checks
-        run: dotnet run --project EnglishCards.Tests/dotnet/EnglishCards.Tests.csproj -c Release -- --a2
+      - name: Run A1 to A3 Windows reader file checks
+        run: dotnet run --project EnglishCards.Tests/dotnet/EnglishCards.Tests.csproj -c Release -- --a3
 
       - name: Upload Playwright diagnostics
         if: always()
