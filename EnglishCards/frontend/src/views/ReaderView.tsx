@@ -70,6 +70,7 @@ export default function ReaderView() {
   const [selected, setSelected] = useState<Pick | null>(null);
   const [adding, setAdding] = useState(false);
   const [meaning, setMeaning] = useState('');
+  const [wordError, setWordError] = useState('');
   const [partOfSpeech, setPartOfSpeech] = useState('');
   const [scale, setScale] = useState(1);
   const stage = useRef<HTMLDivElement>(null);
@@ -112,13 +113,14 @@ export default function ReaderView() {
     }
     setDraftError('');
     if (await vm.saveStyles(parsed.data)) setSettings(false);
+    else setDraftError('设置未保存。请检查文件是否被外部修改，或重新打开 Script 后重试。');
   }
   async function commitWord() {
     if (!selected || !meaning.trim() || vm.saving) return;
     if (await vm.addWord(selected.word, meaning, partOfSpeech)) {
-      setAdding(false); setSelected(null); setMeaning(''); setPartOfSpeech('');
+      setAdding(false); setSelected(null); setMeaning(''); setPartOfSpeech(''); setWordError('');
       window.getSelection()?.removeAllRanges();
-    }
+    } else setWordError('生词未保存。请检查重复词、文件是否被外部修改，或重新打开 Script 后重试。');
   }
   const settingsButton = <button className="reader-settings-button" type="button" title="设置" aria-label="设置"
     onClick={openSettings} disabled={!reader}><img src={settingIcon} alt="" /></button>;
@@ -140,16 +142,17 @@ export default function ReaderView() {
         </div> : <p>请选择卡片馆中的 Script JSON。</p>}
       </div>
       {selected && !adding && <button className="reader-add-word" type="button" aria-label="添加生词" title="添加到生词本"
-        style={{ left: selected.left, top: selected.top }} onClick={() => { setAdding(true); setMeaning(''); setPartOfSpeech(''); }}>+</button>}
+        style={{ left: selected.left, top: selected.top }} onClick={() => { setAdding(true); setMeaning(''); setPartOfSpeech(''); setWordError(''); }}>+</button>}
       {Object.entries(messages).filter(([, text]) => text).map(([source, text]) => <div role="status" className="reader-message" key={source}>
         <span>{text}</span><button type="button" aria-label="关闭提示" onClick={() => reportError(source, '')}>关闭</button>
       </div>)}
     </main>
     {adding && selected && <div className="phase-e-modal-backdrop"><section role="dialog" aria-modal="true" aria-label="添加生词" className="phase-e-modal reader-edit-modal">
       <h2>添加生词：{selected.word}</h2>
-      <label>词性 <input value={partOfSpeech} maxLength={40} placeholder="如 n. / v." onChange={event => setPartOfSpeech(event.target.value)} /></label>
-      <label>释义 <input autoFocus value={meaning} maxLength={500} placeholder="输入释义" onChange={event => setMeaning(event.target.value)}
+      <label>词性 <input value={partOfSpeech} maxLength={40} placeholder="如 n. / v." onChange={event => { setPartOfSpeech(event.target.value); setWordError(''); }} /></label>
+      <label>释义 <input autoFocus value={meaning} maxLength={500} placeholder="输入释义" onChange={event => { setMeaning(event.target.value); setWordError(''); }}
         onKeyDown={event => { if (event.key === 'Enter') void commitWord(); }} /></label>
+      {wordError && <p role="alert" className="reader-settings-error">{wordError}</p>}
       <div className="reader-modal-actions"><button disabled={vm.saving} onClick={() => { setAdding(false); setSelected(null); }}>取消</button>
         <button disabled={vm.saving || !meaning.trim()} onClick={() => void commitWord()}>保存</button></div>
     </section></div>}
