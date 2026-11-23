@@ -15,7 +15,7 @@ A1 已通过所有者实机验收，并在 Windows CI 成功后通过 PR #12 合
 **仓库：** https://github.com/chenjing2000/englishcards  
 **正式分支：** `main`  
 **交接前已验收的代码提交：** `c7013a8454932c476308791583311cb5149928ae`（PR #10）  
-**状态：** 前三批代码精简及文档收尾已完成；用户已明确要求**暂停性能与其他测试工作**，待新会话提出具体开发需求。
+**状态：** 旧版 Article v6 的三批精简与文档收尾已完成；2026-11-22 已讨论新一版只读 Script 阅读器、绝对翻页时刻与 PNG/MP4 分范围导出方案，**尚未实施**（见第 7 节）。此前暂停的性能与无关测试仍暂停。
 
 > 本文件为跨会话开发状态摘要，不是第二套产品规格。产品和架构约束以 [项目总契约](project-contract.md)、[AGENTS.md](../AGENTS.md) 以及现行 [专项规格](specs/) 为准。任何新的代码改动前先核对 GitHub 最新 `main`；本段提交号是交接时的已验收代码基线，不包括本次文档提交。
 
@@ -58,10 +58,10 @@ PR #3（旧 UI/New Card/ZIP 方案）**已关闭且未合并**，不要从该 PR
 
 ## 4. Git 与分支状态
 
-- 2026-11-22 在 GitHub 核对：远程**仅剩 `main`**；无开放 PR；历史 PR 的记录仍可在 GitHub 查看。
+- 2026-11-22 旧版收尾时曾核对远程仅剩 `main`、无开放 PR；**此后已创建 [Draft PR #11](https://github.com/chenjing2000/englishcards/pull/11)**，位于 `docs/readonly-reader-design-handoff-20261122`，只承载下一版只读阅读器设计文档，尚未合并。
 - 用户本机路径：`C:\Projects\EnglishCards`。远程分支清理已核对；**本机分支、工作区是否干净及是否已同步最新提交，需在新会话中用 Git 命令重新确认，不能凭远程状态推断。**
 - 此前历史分支使用过 Squash Merge，若本机尚残留历史分支，需先检查未推送提交／未提交修改，再决定删除；**勿对 main 强制重置**。
-- 本交接文件本身将产生新文档提交，故下次新会话读到的 `main` 提交号应比上方“已验收代码提交”更新；不要把文档提交当作未经验证的程序改造。
+- PR #11 的设计文档提交不代表 `main` 已改变，更不代表新版功能已经实现；下次会话以最新 GitHub 分支／PR 状态为准。
 
 ## 5. 下一会话建议流程
 
@@ -82,9 +82,23 @@ PR #3（旧 UI/New Card/ZIP 方案）**已关闭且未合并**，不要从该 PR
 
 ## 6. 重要入口
 
-- [README](../README.md)；[实施状态](implementation-status.md)；[Windows 验收](RELEASE_ACCEPTANCE.md)
+- [README](../README.md)；[只读 Script 阅读器实施方案](Implementation%20Plan.md)；[实施状态](implementation-status.md)；[Windows 验收](RELEASE_ACCEPTANCE.md)
 - [联合保存流程](specs/COMBINED_ARTICLE_SAVE.md)；[卡片馆规格](specs/PHASE_E_CARD_LIBRARY.md)；[Bridge 接口](specs/EDITOR_BRIDGE_CONTRACT.md)
 - 主要前端状态：`EnglishCards/frontend/src/viewmodels/useEditorViewModel.ts`；
   浏览器／桌面设置服务：`EnglishCards/frontend/src/services/projectIO.ts`；
   文件及 JSON 自动保存：`cardFileIO.ts`、`cardSaveCoordinator.ts`。
 - Windows 宿主：`EnglishCards/desktop/`；测试：`EnglishCards.Tests/`；开发工具：`tools/`。
+
+
+---
+
+## 7. 待实施：只读 Script 阅读器改造（2026-11-22 设计基线）
+
+> **状态：仅设计，尚未修改生产代码或正式契约。** 上文第 1～6 节为当前 Article v6 实际状态；**唯一详细实施规格**见 [Implementation Plan.md](Implementation%20Plan.md)。PR #11 仅修改这两份设计文档，未经授权不启动代码阶段、不合并；无关与性能测试继续暂停。
+
+- **数据与阅读**：必需 `filetype: "script"`；可选 Vocabulary、Translation。只读 Script／Translation；选词只向**当前打开的 Vocabulary** 原子保存，无生词本则首次加词时创建。单页阅读按 Script → Vocabulary → Translation 呈现。目录树隐藏根节点，逐层懒加载；展开／刷新不得影响已打开 Script 或媒体。
+- **界面与媒体**：左上选卡片馆＋设置、左下 PNG（Tooltip「保存」）＋MP4（「导出 MP4」）；无清空、刷新按钮。阅读区单页、上一页／下一页、播放／暂停、停止、进度与选词加号。切换不同 Script 时自动按既定扩展名顺序逐个尝试解码媒体、成功后不自动播放；切换释放旧媒体并清除全部旧提示，旧异步结果无效。视频固定在卡片顶部，翻页不断流；音频配图仅首页。
+- **三种内容范围**：**阅读与 PNG** 均包含 Script、可选 Vocabulary 和 Translation；PNG 独立静态分页，视频首帧／音频配图仅第一页，批次安全导出且不生成 ZIP。**MP4 只接受 Script 原文、当前已选媒体和必需的视频设置**；无需读取、校验、转换 Vocabulary／Translation，不渲染其视频页面，不设置内容开关。共用现有分页引擎，按内容及布局生成不同结果，**只有 Script 视频分页**用于 MP4 页码和翻页时间；Vocabulary／Translation 的变化不得触发 MP4 重新计算。
+- **MP4 翻页**：`AutoPageTurnMs` 只读、`UserPageTurnMs` 可编辑，均为相对媒体起点的**绝对时间**；不再记录旧的逐页停留时长。设置窗口内打开独立三列模态子窗，居中标题「视频翻页时间设置」，表头「页码 | 默认翻页时间 /s | 自定义翻页时间 /s」，所有内容水平、垂直居中；相对于设置窗口居中。非末页有有效时间戳时采用前后有效词时间中点，无有效时间戳时继承上一页；末页有时间单元（全 `null` 也算）使用媒体终点，无单元则继承。用户时间不得早于自动值或上页用户时刻；相邻用户时刻相等时跳过零时长 Script 页。
+- **异常与安全**：含时间单元但媒体未成功加载、缺后续有效词起点或无法取得末页媒体结束时间时，弹出可关闭的警告消息，提示用户修复 Script／媒体；不杜撰时间，不用未确定时刻导出 MP4，但阅读及 PNG 不受阻。用户修复后重新打开 Script。保留导出取消、输出验证和原有文件保护；**MP4 自定义翻页与原始媒体音画映射仍待 C2 专项确定**。
+- **阶段**：A 为只读阅读、目录与 Vocabulary／基础设置；B 为媒体、播放和高亮；C1 为三类内容的 PNG；C2 为**仅 Script** 视频分页、时间弹窗、MP4 渲染及安全导出。正式规则、验收及代码核查入口全部以实施计划为准；当前 `main`、`AGENTS.md` 和正式产品契约仍是 Article v6。
