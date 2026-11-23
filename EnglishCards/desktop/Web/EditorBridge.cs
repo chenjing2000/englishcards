@@ -77,6 +77,12 @@ internal sealed class EditorBridge(Window owner, CoreWebView2 web, UserDataStore
                 "lastCardLibrary" when payload.ValueKind == JsonValueKind.Null => await data.LoadLastLibraryFolderAsync(),
                 "saveLastCardLibrary" when payload.ValueKind == JsonValueKind.String => await SaveLastCardLibraryAsync(payload.GetString()!),
                 "loadSettings" when payload.ValueKind == JsonValueKind.Null => await data.LoadSettingsAsync(),
+                "addVocabularyWord" when payload.ValueKind == JsonValueKind.Object =>
+                    await ReaderFileWrites.AddVocabularyAsync(payload.Deserialize<ReaderFileWrites.VocabularyEdit>(ResponseFormat)
+                        ?? throw new InvalidDataException("缺少生词数据。")),
+                "saveScriptSettings" when payload.ValueKind == JsonValueKind.Object =>
+                    await ReaderFileWrites.SaveSettingsAsync(payload.Deserialize<ReaderFileWrites.SettingsEdit>(ResponseFormat)
+                        ?? throw new InvalidDataException("缺少设置数据。")),
                 _ => throw new InvalidDataException("不支持的桌面文件请求。")
             };
             response = new { id, ok = true, value };

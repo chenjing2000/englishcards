@@ -223,3 +223,18 @@
 .reader-page-frame{position:relative;flex-shrink:0}.reader-shell .preview{position:absolute;inset:0;padding:0;margin:0;display:block;gap:0}.reader-shell .card{margin:0}
 .reader-message{display:flex;gap:12px;justify-content:space-between;padding:8px 14px;background:#fff3cd;white-space:pre-wrap}
 .reader-shell button:disabled{opacity:.45;cursor:default}
+
+
+/* A3 selection and independent Script styles; existing reader pagination remains unchanged. */
+.reader-add-word{position:fixed;z-index:130;display:flex;align-items:center;justify-content:center;
+  width:32px;height:32px;min-width:32px;padding:0;border:0;border-radius:50%;
+  color:white;background:#2386db;font-weight:800;font-size:22px;box-shadow:0 2px 9px #183a6b55}
+.reader-add-word:hover{background:#176bb8;border:0}
+.reader-edit-modal{max-width:min(640px,calc(100vw - 40px));max-height:calc(100vh - 48px);
+  display:flex;flex-direction:column;overflow:hidden;padding:16px 22px 20px;gap:12px}
+.reader-edit-modal h2{margin:0 0 8px;font-size:18px}
+.reader-edit-modal label{display:flex;flex-direction:column;gap:6px;color:#364a50;font-size:13px}
+.reader-edit-modal input{width:100%;padding:7px;border:1px solid #bac6c9;border-radius:5px}
+.reader-style-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;overflow-y:auto;padding:4px}
+.reader-modal-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:8px}
+.reader-settings-error{color:#ab3232;margin:0;font-size:13px}

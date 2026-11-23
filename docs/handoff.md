@@ -1,3 +1,9 @@
+# A3 开发分支交接补充（2026-11-23）
+
+A1（PR #12）与 A2（PR #13）已合并到 `main`。当前 [Draft PR #14](https://github.com/chenjing2000/englishcards/pull/14) 从最新 `main` 实施 **A3：选词新增 Vocabulary、当前活动生词本原子保存与外部变更冲突检查、每 Script 基础样式设置的读取／显式保存**。播放及 PNG/MP4 仍禁用；B/C 尚未实施。详细规则遵循 PR #11 的 `docs/Implementation Plan.md`。当前分支代码与测试已提交；所有者 Windows 实机验收、最终 CI 以各自结果为准，**未经批准不合并或启动 B**。本段以下 A1/A2 交接记录为历史开发背景，不代表当前 A3 未实施。
+
+---
+
 # A2 开发分支交接补充（2026-11-23）
 
 A1 已通过所有者实机验收，并在 Windows CI 成功后通过 PR #12 合并为 `ba3b5f2`。本分支仅继续获批 A2：按层筛选 Script 的目录树、单文件自动打开，以及目录和异步打开期间的阅读会话保护。A3/B/C 尚未实施。当前范围和验证证据分别见 [项目契约](project-contract.md) 与 [实施状态](implementation-status.md)。A2 开发 PR 仍须等待所有者验收，未经明确批准不得合并。

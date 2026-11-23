@@ -39,3 +39,38 @@ describe('A1 native readonly input', () => {
     expect(() => parseTranslation({ filetype: 'translation', text: ['wrong'] })).toThrow();
   });
 });
+
+
+import { readScriptFiles } from '@frontend/services/readerIO';
+
+describe('A3 companion identity and settings', () => {
+  const base = { path: 'C:/books/lesson.script.json',
+    text: JSON.stringify({ filetype: 'script', title: '', paragraphs: [[{ text: 'One sentence.' }]] }),
+    notices: [] };
+  it('keeps exact active Vocabulary source and original contents for safe updates', () => {
+    const raw = JSON.stringify({ filetype: 'vocabulary', words: [] });
+    const opened = readScriptFiles({ ...base, vocabulary: { path: 'C:/books/active.json', text: raw } });
+    expect(opened.vocabularyPath).toBe('C:/books/active.json');
+    expect(opened.vocabularyText).toBe(raw);
+    expect(opened.document.vocabulary?.words).toEqual([]);
+    expect(opened.settingsText).toBe(null);
+  });
+  it('does not invent a Vocabulary on open', () => {
+    const opened = readScriptFiles(base);
+    expect(opened.vocabularyPath).toBe(null);
+    expect(opened.document.vocabulary).toBeUndefined();
+  });
+  it('loads valid settings without changing Script data', () => {
+    const opened = readScriptFiles({ ...base, settingsText: JSON.stringify({ bodySize: 39 }) });
+    expect(opened.settingsValid).toBe(true);
+    expect(opened.document.styles.bodySize).toBe(39);
+    expect(opened.document.script.paragraphs[0][0].text).toBe('One sentence.');
+  });
+  it('preserves corrupt settings source, warns and refuses it as valid', () => {
+    const opened = readScriptFiles({ ...base, settingsText: '{invalid' });
+    expect(opened.settingsValid).toBe(false);
+    expect(opened.settingsText).toBe('{invalid');
+    expect(opened.document.styles).toEqual(defaults);
+    expect(opened.notices.join(' ')).toContain('设置文件无效');
+  });
+});

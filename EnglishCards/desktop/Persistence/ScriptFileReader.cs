@@ -7,7 +7,7 @@ namespace EnglishCards;
 internal static class ScriptFileReader
 {
     internal sealed record Companion(string Path, string Text);
-    internal sealed record Snapshot(string Path, string Text, Companion? Vocabulary, Companion? Translation, string[] Notices);
+    internal sealed record Snapshot(string Path, string Text, Companion? Vocabulary, Companion? Translation, string[] Notices, string? SettingsText);
 
     internal static async Task<Snapshot> OpenAsync(string requestedPath)
     {
@@ -50,7 +50,13 @@ internal static class ScriptFileReader
         }
         var selectedVocabulary = Select(vocabulary, "Vocabulary");
         var selectedTranslation = Select(translation, "Translation");
-        return new(path, text, selectedVocabulary, selectedTranslation, notices.ToArray());
+        string? settingsText = null;
+        try { settingsText = await ReaderFileWrites.LoadSettingsAsync(path); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
+        {
+            notices.Add($"读取 Script 设置失败：{error.Message}");
+        }
+        return new(path, text, selectedVocabulary, selectedTranslation, notices.ToArray(), settingsText);
     }
 
     private static string? FileType(JsonElement value) =>
