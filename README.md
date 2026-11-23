@@ -1,13 +1,14 @@
 # EnglishCards
 
-本开发分支为 Windows x64 **只读 Script 阅读器 A1 + A2**：WPF + .NET 10 + WebView2 + React/TypeScript。设计依据是 [PR #11](https://github.com/chenjing2000/englishcards/pull/11) 的最新实施文档；A1 已合并并通过所有者验收；本 PR 只落实 A2，不合并设计 PR，也不代表 A3/B/C 已实施。
+本开发分支为 Windows x64 **只读 Script 阅读器 A1 + A2 + A3**：WPF + .NET 10 + WebView2 + React/TypeScript。设计依据是 [PR #11](https://github.com/chenjing2000/englishcards/pull/11) 的实施文档；A1（PR #12）及 A2（PR #13）已合并，当前 [Draft PR #14](https://github.com/chenjing2000/englishcards/pull/14) 仅实现 A3，仍待所有者 Windows 实机验收，不代表 B/C 已完成。
 
 ## 当前范围
 
 - 从现有目录树明确选择 Script JSON，显示其句子 text；可选显示同目录的原生 Vocabulary 与 Translation。
 - 单页阅读，上一页/下一页与页码；标题可为空，时间戳不影响正文完整性。
 - 不再编辑、清空、自动保存原文或执行 JSON + ZIP 联合保存，不接受 Article v6 作为生产输入。
-- PNG、MP4、播放与停止在 A1/A2 不可用；新增生词、每 Script 设置属于 A3，不能用 A1 验收其写入功能。
+- A3 可在 Script 有效句中选词，点击蓝色加号填写词性和释义，将词条立即写入当前活动 Vocabulary；没有生词本时首次加词才创建文件。外部修改或重复词会拒绝覆盖。
+- A3 设置窗口按 Script 独立读取、编辑、显式保存基础页面样式；支持恢复默认、取消及校验，损坏设置不会被自动覆盖。媒体播放与 PNG/MP4 导出仍不可用，分别留到 B/C。
 - 目录按层加载，仅显示 Script JSON；无当前 Script 时，本层只有一个便自动打开，多个等待选择。折叠重开和同路径根刷新保持当前阅读；取消/失败保留旧会话，不同根成功选择才切换。媒体与导出分别留到 B/C。
 - [项目契约](docs/project-contract.md) 记录当前范围；[实施状态](docs/implementation-status.md) 分开记录自动化和实机证据。
 
@@ -33,7 +34,7 @@ npm.cmd ci
 npm.cmd test -- reader.test.ts
 npm.cmd run build
 npm.cmd run test:e2e
-dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Release -- --a2
+dotnet run --project EnglishCards.Tests\dotnet\EnglishCards.Tests.csproj -c Release -- --a3
 ```
 
 发布：
@@ -43,7 +44,7 @@ npm.cmd run build
 dotnet publish EnglishCards\desktop\EnglishCards.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist\EnglishCards
 ```
 
-Playwright/Chromium 只用于开发测试。自动化浏览器测试不能替代真实 Windows/WPF/WebView2 启动及单页阅读实机验收。
+Playwright/Chromium 只用于开发测试。自动化浏览器及原生文件测试不能替代真实 Windows/WPF/WebView2 的 A3 生词与设置写入实机验收。
 
 ## 仓库与文档
 
